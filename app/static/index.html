@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GAS Nhiên Liệu Xanh – LNG Monitoring</title>
+  <link rel="icon" href="logo-gx.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #e4e6eb;
+      --surface: #ffffff;
+      --line: #cfd3da;
+      --line-strong: #9aa1ad;
+      --fg: #10151c;
+      --muted: #3d4654;
+      --faint: #6b7380;
+      --brand: #0d4fb5;
+      --ok: #15732c;
+      --ok-bg: #def5e4;
+      --warn: #8a3f00;
+      --crit: #9f160e;
+      --crit-bg: #fde8e6;
+      --warn-bg: #fff1d6;
+      --sel: #dce9fb;
+      --ring: #0d4fb5;
+      --header-h: 56px;
+      --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --z-header: 40;
+      --z-login: 1000;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; color: var(--fg);
+      font: 15px/1.45 var(--font);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      touch-action: manipulation;
+    }
+    @media (min-width: 900px) {
+      html, body { overflow: hidden; }
+    }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+    .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 100; }
+    .skip:focus { left: 8px; top: 8px; }
+
+    header.topbar {
+      height: var(--header-h);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 0 16px; background: #f7f8fa; border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 0 auto; }
+    .brand img { width: 36px; height: 36px; object-fit: contain; }
+    .brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.02em; white-space: nowrap; line-height: 1.15; }
+    .brand-name .gas { color: #0d4fb5; }
+    .brand-name .nlx { color: #15732c; }
+    .brand-sub { display: block; color: var(--muted); font-size: 12px; font-weight: 500; margin-top: 1px; }
+    .statusline {
+      display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+      color: var(--muted); font-size: 13px; flex-wrap: wrap;
+    }
+    .statusline .stat {
+      display: inline-flex; align-items: baseline; gap: 5px;
+      padding: 3px 8px; background: #fff; border: 1px solid var(--line);
+    }
+    .statusline .stat b { color: var(--fg); font-weight: 700; font-size: 16px; line-height: 1; }
+    .statusline .stat.ok { background: var(--ok-bg); border-color: #b7e4c3; }
+    .statusline .stat.ok b { color: var(--ok); }
+    .statusline .stat.bad { background: var(--crit-bg); border-color: #f0c2bc; }
+    .statusline .stat.bad b { color: var(--crit); }
+    .statusline .stat.vol { background: transparent; border-color: transparent; padding-left: 4px; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .who { color: var(--muted); font-size: 12px; }
+    .who[hidden] { display: none; }
+
+    button, .btn {
+      appearance: none; font: inherit; cursor: pointer;
+      border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg);
+      min-height: 32px; padding: 0 12px; border-radius: 4px;
+    }
+    button:hover, .btn:hover { background: #f3f4f6; }
+    button:focus-visible, .btn:focus-visible, .field:focus-visible, tr.tank:focus-visible {
+      outline: 2px solid var(--ring); outline-offset: 1px;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn-primary:hover { background: #0f46a0; }
+    .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+    .btn-quiet:hover { background: #eceef1; color: var(--fg); }
+
+    main.app {
+      display: grid; gap: 0;
+      min-height: calc(100dvh - var(--header-h));
+    }
+    @media (min-width: 900px) {
+      main.app { grid-template-rows: auto 1fr; height: calc(100dvh - var(--header-h)); }
+    }
+
+    .action-strip {
+      display: none; background: var(--crit-bg); border-bottom: 1px solid #f0c2bc;
+      padding: 6px 16px;
+    }
+    .action-strip.show { display: block; }
+    .action-strip.warn { background: var(--warn-bg); border-bottom-color: #ead3a0; }
+    .action-strip h2 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--crit); }
+    .action-list { display: flex; flex-direction: column; gap: 2px; }
+    .action-list button {
+      display: flex; gap: 16px; align-items: baseline; justify-content: flex-start;
+      width: 100%; text-align: left; border: 0; background: transparent;
+      min-height: 30px; padding: 4px 0; border-radius: 0; color: inherit;
+    }
+    .action-list button:hover { background: rgba(255,255,255,0.45); }
+    .action-list .where { font-weight: 700; color: var(--fg); min-width: 14ch; }
+    .action-list .msg { color: var(--fg); font-weight: 500; }
+    .action-list .code { display: none; }
+
+    .banner {
+      display: none; margin: 8px 16px 0; padding: 8px 10px; font-size: 13px;
+      border: 1px solid var(--line); background: #fff;
+    }
+    .banner.show { display: block; }
+    .banner.err { background: var(--crit-bg); border-color: #f0c2bc; color: var(--crit); }
+    .banner.warn { background: var(--warn-bg); border-color: #ead3a0; color: var(--warn); }
+
+    .workspace {
+      display: grid; min-height: 0;
+    }
+    @media (min-width: 900px) {
+      .workspace { grid-template-columns: minmax(380px, 44%) 1fr; }
+    }
+
+    .fleet {
+      background: var(--surface); border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; min-width: 0;
+    }
+    .pane-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      padding: 10px 16px 8px; border-bottom: 1px solid var(--line);
+    }
+    .pane-head h1, .pane-head h2 {
+      margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--fg);
+    }
+    .pane-head .meta { color: var(--muted); font-size: 12px; }
+
+    table.tanks {
+      width: 100%; border-collapse: collapse; font-size: 14px;
+    }
+    table.tanks th {
+      text-align: left; font-weight: 600; color: var(--muted); font-size: 11px;
+      padding: 8px 12px; border-bottom: 1px solid var(--line); background: #f7f8fa;
+      position: sticky; top: 0; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    table.tanks th.r, table.tanks td.r { text-align: right; }
+    table.tanks td { padding: 10px 12px; border-bottom: 1px solid #e7eaee; vertical-align: middle; }
+    tr.tank { cursor: pointer; }
+    tr.tank:hover { background: #f4f6f8; }
+    tr.tank.is-selected { background: var(--sel); }
+    tr.tank.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+    .tname { font-weight: 700; font-size: 14px; color: var(--fg); }
+    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: 11px; font-weight: 400; }
+    td.r .num { font-weight: 700; font-size: 15px; color: var(--fg); }
+    .lvl {
+      display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+    }
+    .lvl-bar {
+      width: 52px; height: 6px; background: #e2e5ea; position: relative;
+    }
+    .lvl-bar > i {
+      position: absolute; left: 0; top: 0; bottom: 0; background: #8b93a0;
+    }
+    .lvl-bar.low > i { background: var(--warn); }
+    .lvl-bar.empty > i { background: var(--crit); }
+    .st {
+      display: inline-block; font-size: 12px; font-weight: 700;
+      padding: 2px 8px; line-height: 1.4; letter-spacing: 0.01em;
+    }
+    .st.on { color: var(--ok); background: var(--ok-bg); }
+    .st.off { color: var(--crit); background: var(--crit-bg); }
+    .fleet-scroll { overflow: auto; flex: 1; }
+    .empty { padding: 20px 16px; color: var(--muted); }
+
+    .inspect {
+      background: #f3f4f6; min-width: 0; overflow: auto; padding: 12px 16px 24px;
+      display: grid; gap: 12px; align-content: start;
+    }
+    .hero {
+      background: var(--surface); border: 1px solid var(--line); padding: 14px 16px;
+    }
+    .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .hero .ids { color: var(--muted); font-size: 13px; margin-top: 3px; font-weight: 500; }
+    .readouts {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 700px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+    .readout { padding: 8px 10px; background: #f4f6f8; }
+    .readout dt { color: var(--muted); font-size: 11px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .readout dd { margin: 4px 0 0; font-size: 28px; font-weight: 700; font-family: var(--mono); letter-spacing: -0.03em; color: var(--fg); }
+    .readout dd small { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+    .readout.bad { background: var(--crit-bg); }
+    .readout.bad dd { color: var(--crit); }
+
+    .chart-panel {
+      background: var(--surface); border: 1px solid var(--line); padding: 10px 12px 8px;
+    }
+    .chart-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .seg { display: inline-flex; border: 1px solid var(--line-strong); }
+    .seg button {
+      min-height: 28px; padding: 0 10px; border: 0; border-right: 1px solid var(--line);
+      background: #fff; color: var(--muted); border-radius: 0; font-size: 12px;
+    }
+    .seg button:last-child { border-right: 0; }
+    .seg button[aria-pressed="true"] { background: #1b2430; color: #fff; }
+    .chart-box { position: relative; height: 220px; }
+    .chart-empty, .chart-skel {
+      display: none; height: 220px; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 13px; text-align: center; padding: 16px;
+    }
+    .chart-empty.show, .chart-skel.show { display: flex; }
+    .chart-box.hidden { display: none; }
+    .skel { background: linear-gradient(90deg, #eee 25%, #e2e2e2 50%, #eee 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    .meta-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      background: var(--surface); border: 1px solid var(--line);
+    }
+    @media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
+    .meta-grid .row {
+      display: flex; justify-content: space-between; gap: 12px;
+      padding: 8px 12px; border-bottom: 1px solid #eef0f3; font-size: 14px;
+    }
+    .meta-grid .row:nth-child(odd) { background: #fafbfc; }
+    .meta-grid dt { color: var(--muted); font-weight: 500; }
+    .meta-grid dd { margin: 0; text-align: right; font-weight: 700; color: var(--fg); font-family: var(--mono); font-size: 13px; }
+    .meta-grid dd.ok { color: var(--ok); }
+    .meta-grid dd.off { color: var(--crit); }
+
+    .rename {
+      background: var(--surface); border: 1px solid var(--line); padding: 10px 12px;
+      display: grid; gap: 6px;
+    }
+    .rename label { font-size: 12px; color: var(--muted); }
+    .rename-row { display: flex; gap: 8px; }
+    .field {
+      flex: 1; min-height: 32px; border: 1px solid var(--line-strong);
+      background: #fff; color: var(--fg); padding: 0 10px; font: inherit; border-radius: 4px;
+    }
+    .hint { margin: 0; color: var(--faint); font-size: 12px; }
+    .local-alerts { display: grid; gap: 6px; margin-top: 12px; }
+    .local-alerts p {
+      margin: 0; font-size: 13px; font-weight: 600; padding: 6px 8px;
+    }
+    .local-alerts .crit { color: var(--crit); background: var(--crit-bg); }
+    .local-alerts .warn { color: var(--warn); background: var(--warn-bg); }
+
+    /* login — only decorative surface */
+    .login-gate {
+      position: fixed; inset: 0; z-index: var(--z-login);
+      display: grid; place-items: center; padding: 24px;
+      background-color: #0b1d36;
+      background-image:
+        linear-gradient(105deg, rgba(11, 29, 54, 0.62) 0%, rgba(11, 29, 54, 0.28) 46%, rgba(18, 48, 86, 0.55) 100%),
+        url("login-bg.jpg");
+      background-size: cover; background-position: center;
+    }
+    .login-gate[hidden] { display: none; }
+    body.is-locked .topbar,
+    body.is-locked main { display: none; }
+    .login-card {
+      width: min(400px, 100%);
+      background: #fff; border-radius: 8px; padding: 28px 24px 22px;
+      box-shadow: 0 16px 48px rgba(11, 29, 54, 0.28);
+    }
+    .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-bottom: 20px; }
+    .login-brand img { width: 64px; height: 64px; object-fit: contain; }
+    .login-brand h1 { font-size: 18px; margin: 0; }
+    .login-brand p { margin: 0; color: var(--muted); font-size: 13px; max-width: 34ch; }
+    .login-form { display: grid; gap: 12px; }
+    .login-form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .pass-wrap { position: relative; display: flex; align-items: center; }
+    .pass-wrap .field { width: 100%; padding-right: 52px; min-height: 40px; }
+    .login-form .field { min-height: 40px; }
+    .pass-toggle {
+      position: absolute; right: 2px; top: 2px; bottom: 2px; width: 44px;
+      border: 0; background: transparent; color: var(--muted); font-size: 12px;
+    }
+    .login-form .btn-primary { width: 100%; min-height: 40px; margin-top: 4px; }
+    .login-error { display: none; margin: 0; padding: 8px 10px; background: var(--crit-bg); color: var(--crit); font-size: 13px; }
+    .login-error.show { display: block; }
+
+    @media (max-width: 899px) {
+      header.topbar { height: auto; flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
+      .brand img { width: 32px; height: 32px; }
+      .brand-name { font-size: 16px; }
+      .statusline { display: none; }
+      .top-actions { margin-left: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body class="is-locked">
+  <a class="skip" href="#main">Bỏ qua tới nội dung</a>
+
+  <div id="login-gate" class="login-gate" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="logo-gx.png" width="64" height="64" alt="GAS Nhiên Liệu Xanh" />
+        <h1 id="login-title" class="brand-name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></h1>
+        <p>Giám sát bồn LNG nội bộ. Đăng nhập bằng tài khoản giám sát thiết bị của công ty.</p>
+      </div>
+      <form class="login-form" id="login-form" autocomplete="on">
+        <p id="login-error" class="login-error" role="alert"></p>
+        <label for="login-user">Tài khoản
+          <input id="login-user" class="field" name="username" type="text" autocomplete="username" required maxlength="128" />
+        </label>
+        <label for="login-pass">Mật khẩu
+          <div class="pass-wrap">
+            <input id="login-pass" class="field" name="password" type="password" autocomplete="current-password" required maxlength="256" />
+            <button type="button" class="pass-toggle" id="btn-pass" aria-controls="login-pass" aria-pressed="false">Hiện</button>
+          </div>
+        </label>
+        <button type="submit" class="btn btn-primary" id="btn-login">Đăng nhập</button>
+      </form>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="logo-gx.png" width="36" height="36" alt="" />
+      <div>
+        <div class="brand-name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></div>
+        <div class="brand-sub">Giám sát bồn LNG</div>
+      </div>
+    </div>
+    <div class="statusline" aria-label="Tóm tắt">
+      <span class="stat"><b class="num" id="stat-total">--</b> bồn</span>
+      <span class="stat ok"><b class="num" id="stat-online">--</b> online</span>
+      <span class="stat bad"><b class="num" id="stat-offline">--</b> offline</span>
+      <span class="stat bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
+      <span class="stat vol num" id="stat-volume">--</span>
+      <span id="stat-critical" hidden></span>
+    </div>
+    <div class="top-actions">
+      <span id="health-pill" class="who" role="status">máy: --</span>
+      <span id="ingest-label" class="who">—</span>
+      <span id="last-update" class="who">Cập nhật: --</span>
+      <span id="user-chip" class="who" hidden> <span id="user-name"></span></span>
+      <button type="button" id="btn-refresh" class="btn" onclick="refreshData()">Làm mới</button>
+      <button type="button" id="btn-logout" class="btn-quiet">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main id="main" class="app">
+    <div id="error-banner" class="banner err" role="alert"></div>
+    <div id="health-banner" class="banner warn" role="status"></div>
+
+    <section id="action-strip" class="action-strip" aria-label="Cần xử lý">
+      <h2>Cần xử lý</h2>
+      <div id="alert-list" class="action-list"></div>
+    </section>
+
+    <div class="workspace">
+      <aside class="fleet">
+        <div class="pane-head">
+          <h1>Bồn</h1>
+          <span class="meta">chọn một dòng để xem chi tiết</span>
+        </div>
+        <div class="fleet-scroll">
+          <table class="tanks">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th class="r">Mức</th>
+                <th class="r">Áp suất</th>
+                <th>Trạng thái</th>
+                <th>Cập nhật</th>
+              </tr>
+            </thead>
+            <tbody id="tank-list"></tbody>
+          </table>
+        </div>
+      </aside>
+
+      <section class="inspect" aria-label="Chi tiết">
+        <div id="tank-detail"><p class="empty">Chọn một bồn bên trái.</p></div>
+        <div class="chart-panel" id="chart-panel">
+          <div class="pane-head" style="border:0;padding:0 0 8px">
+            <h2>Xu hướng theo lần đo cuối</h2>
+            <div class="chart-tools">
+              <div class="seg" role="group" aria-label="Khoảng thời gian biểu đồ">
+                <button type="button" data-range="24" aria-pressed="true">24 giờ</button>
+                <button type="button" data-range="168" aria-pressed="false">7 ngày</button>
+                <button type="button" data-range="720" aria-pressed="false">30 ngày</button>
+              </div>
+              <select id="chart-psn" class="field" onchange="selectTank(this.value)" aria-label="Chọn bồn cho biểu đồ" hidden></select>
+            </div>
+          </div>
+          <div id="chart-empty" class="chart-empty">Không có điểm đo trong khoảng này. Thiết bị có thể đã offline lâu hơn cửa sổ đang chọn.</div>
+          <div id="chart-skel" class="chart-skel skel" aria-hidden="true"></div>
+          <div id="chart-wrap" class="chart-box">
+            <canvas id="historyChart" aria-label="Biểu đồ thể tích và áp suất"></canvas>
+          </div>
+        </div>
+        <div id="tank-specs"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const API = "";
+    let tanks = [], summary = null, alerts = [], health = null;
+    let chartInstance = null, selectedPsn = null, chartHours = 24, saving = false;
+    let currentUser = null, refreshTimer = null;
+
+    function esc(s) {
+      if (s === null || s === undefined) return "";
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    async function api(path, opts) {
+      const r = await fetch(API + path, {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", ...(opts && opts.headers) },
+        ...opts,
+      });
+      if (r.status === 401) {
+        let extra = "";
+        try { extra = (await r.json()).detail || ""; } catch (_) {}
+        const err = new Error(extra || "cần đăng nhập");
+        err.name = "AuthError";
+        if (!path.startsWith("/api/auth/")) showLogin();
+        throw err;
+      }
+      if (!r.ok) {
+        let extra = "";
+        try { extra = (await r.json()).detail || ""; } catch (_) {}
+        throw new Error(`${r.status} ${r.statusText} — ${path}${extra ? " — " + extra : ""}`);
+      }
+      if (r.status === 204) return null;
+      return r.json();
+    }
+
+    function showLogin() {
+      currentUser = null;
+      document.body.classList.add("is-locked");
+      document.getElementById("login-gate").hidden = false;
+      setUserChip(null);
+      const u = document.getElementById("login-user");
+      if (u) u.focus();
+    }
+    function hideLogin() {
+      document.body.classList.remove("is-locked");
+      document.getElementById("login-gate").hidden = true;
+    }
+    function setUserChip(name) {
+      const chip = document.getElementById("user-chip");
+      const label = document.getElementById("user-name");
+      if (!name) { chip.hidden = true; label.textContent = ""; return; }
+      label.textContent = name;
+      chip.hidden = false;
+    }
+    function startAutoRefresh() {
+      if (refreshTimer) return;
+      refreshTimer = setInterval(refreshData, 60000);
+    }
+    function stopAutoRefresh() {
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    }
+    function setLoginError(msg) {
+      const el = document.getElementById("login-error");
+      if (!msg) { el.textContent = ""; el.classList.remove("show"); return; }
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+    async function doLogin(ev) {
+      ev.preventDefault();
+      const user = document.getElementById("login-user").value.trim();
+      const pass = document.getElementById("login-pass").value;
+      const btn = document.getElementById("btn-login");
+      setLoginError("");
+      btn.disabled = true;
+      btn.textContent = "Đang đăng nhập…";
+      try {
+        const me = await api("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ username: user, password: pass }),
+        });
+        currentUser = me.username;
+        document.getElementById("login-pass").value = "";
+        setUserChip(currentUser);
+        hideLogin();
+        await refreshData();
+        startAutoRefresh();
+      } catch (e) {
+        setLoginError(e.message || "Không đăng nhập được.");
+        document.getElementById("login-pass").focus();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Đăng nhập";
+      }
+    }
+    async function doLogout() {
+      stopAutoRefresh();
+      try { await api("/api/auth/logout", { method: "POST" }); } catch (_) {}
+      showLogin();
+    }
+    function togglePass() {
+      const input = document.getElementById("login-pass");
+      const btn = document.getElementById("btn-pass");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.setAttribute("aria-pressed", String(show));
+      btn.textContent = show ? "Ẩn" : "Hiện";
+    }
+
+    function showError(msg) {
+      const b = document.getElementById("error-banner");
+      b.textContent = "Không tải được dữ liệu: " + msg;
+      b.classList.add("show");
+    }
+    function clearError() { document.getElementById("error-banner").classList.remove("show"); }
+
+    // volume_percent của vendor là thang 0-100: 0.59 nghĩa là 0.59% ĐẦY.
+    // fill_percent do server tự tính từ volume_l/capacity_l; ưu tiên nó.
+    function pctOf(tank) {
+      const v = tank.fill_percent ?? tank.volume_percent;
+      return (v === null || v === undefined) ? null : Number(v);
+    }
+    function fmtPct(p) { return p === null ? "--" : p.toFixed(2); }
+    function barHeight(p) { return p === null ? 0 : Math.min(100, Math.max(0, p)); }
+    function fmtNum(v, unit) {
+      return (v === null || v === undefined) ? "--" : `${Number(v)} ${unit}`;
+    }
+    function fmtTime(iso) {
+      return iso ? new Date(iso).toLocaleString("vi-VN") : "chưa bao giờ";
+    }
+    function fmtAgo(iso) {
+      if (!iso) return "chưa có";
+      const ms = Date.now() - new Date(iso).getTime();
+      if (ms < 0) return fmtTime(iso);
+      const m = Math.floor(ms / 60000);
+      if (m < 60) return m + " phút trước";
+      const h = Math.floor(m / 60);
+      if (h < 48) return h + " giờ trước";
+      return Math.floor(h / 24) + " ngày trước";
+    }
+    function alertsFor(psn) { return alerts.filter(a => a.psn === psn); }
+    function worstSeverity(list) {
+      if (list.some(a => a.severity === "critical")) return "critical";
+      if (list.some(a => a.severity === "warning")) return "warning";
+      if (list.length) return "info";
+      return null;
+    }
+    function tankName(t) { return t.name || t.psn; }
+
+    function renderHealth() {
+      const pill = document.getElementById("health-pill");
+      const banner = document.getElementById("health-banner");
+      if (!health) { pill.textContent = "máy: --"; banner.classList.remove("show"); return; }
+      const map = {
+        ok: "máy ổn",
+        degraded: "máy suy giảm",
+        error: "máy lỗi",
+      };
+      pill.textContent = map[health.status] || map.degraded;
+      pill.style.color = health.status === "ok" ? "var(--ok)" : "var(--crit)";
+      const ingest = health.ingest && health.ingest.detail
+        ? health.ingest.detail
+        : (health.last_ingest_at ? "lấy số liệu: " + fmtTime(health.last_ingest_at) : "chưa lấy số liệu");
+      document.getElementById("ingest-label").textContent = ingest;
+      if (health.status === "ok") { banner.classList.remove("show"); return; }
+      const parts = [];
+      if (health.database && !health.database.ok) parts.push("DB: " + (health.database.detail || "lỗi"));
+      if (health.migration && !health.migration.ok) parts.push("schema: " + (health.migration.detail || "lỗi"));
+      if (health.ingest && !health.ingest.ok) parts.push("ingest: " + (health.ingest.detail || "lỗi"));
+      if (health.ingest_paused_reason) parts.push("job tạm dừng: " + health.ingest_paused_reason);
+      banner.textContent = parts.join(" · ") || "Máy không ở trạng thái ổn.";
+      banner.className = "banner show " + (health.status === "error" ? "err" : "warn");
+    }
+
+    function renderStats() {
+      if (!summary) return;
+      document.getElementById("stat-total").textContent = summary.total;
+      document.getElementById("stat-online").textContent = summary.online;
+      document.getElementById("stat-offline").textContent = summary.offline;
+      document.getElementById("stat-alert").textContent = summary.alert;
+      document.getElementById("stat-critical").textContent = summary.critical ?? 0;
+      const vol = summary.total_volume_l;
+      document.getElementById("stat-volume").textContent =
+        (vol === null || vol === undefined) ? "" : `${Number(vol).toFixed(0)} L`;
+      const on = document.getElementById("stat-online").parentElement;
+      const off = document.getElementById("stat-offline").parentElement;
+      const al = document.getElementById("stat-alert").parentElement;
+      on.classList.toggle("ok", summary.online > 0);
+      off.classList.toggle("bad", summary.offline > 0);
+      al.classList.toggle("bad", summary.alert > 0);
+    }
+
+    function sortedTanks() {
+      const rank = (t) => {
+        const sev = worstSeverity(alertsFor(t.psn));
+        if (sev === "critical") return 0;
+        if (t.status !== "online") return 1;
+        if (sev === "warning") return 2;
+        return 3;
+      };
+      return tanks.slice().sort((a, b) => rank(a) - rank(b) || tankName(a).localeCompare(tankName(b), "vi"));
+    }
+
+    function renderTankList() {
+      const container = document.getElementById("tank-list");
+      if (!tanks.length) {
+        container.innerHTML = `<tr><td colspan="5" class="empty">Chưa có bồn nào trong hệ thống</td></tr>`;
+        return;
+      }
+      container.innerHTML = sortedTanks().map(tank => {
+        const p = pctOf(tank);
+        const barClass = p === null ? "" : (p < 5 ? " empty" : p < 15 ? " low" : "");
+        const selected = tank.psn === selectedPsn ? " is-selected" : "";
+        return `
+          <tr class="tank${selected}" tabindex="0" data-psn="${esc(tank.psn)}" onclick="selectTank('${esc(tank.psn)}')">
+            <td>
+              <span class="tname">${esc(tankName(tank))}</span>
+              <span class="tpsn">${esc(tank.psn)}</span>
+            </td>
+            <td class="r num">${esc(fmtPct(p))}%</td>
+            <td class="r num">${esc(tank.pressure_mpa == null ? "--" : Number(tank.pressure_mpa))}</td>
+            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "online" : "offline"}</span></td>
+            <td>${esc(fmtAgo(tank.last_seen_at))}</td>
+          </tr>`;
+      }).join("");
+    }
+
+    function row(label, val, extra) {
+      return `<div class="row"><dt>${esc(label)}</dt><dd class="${extra || ""}">${val}</dd></div>`;
+    }
+
+    async function selectTank(psn) {
+      if (!psn) return;
+      selectedPsn = psn;
+      const sel = document.getElementById("chart-psn");
+      if (sel.value !== psn) sel.value = psn;
+      renderTankList();
+
+      const tank = tanks.find(t => t.psn === psn);
+      if (!tank) return;
+      const p = pctOf(tank);
+      let detail = tank;
+      try { detail = await api("/api/terminals/" + encodeURIComponent(psn)); }
+      catch (_) {}
+
+      const mine = alertsFor(psn);
+      const alertBlock = mine.length
+        ? `<div class="local-alerts">${mine.map(a =>
+            `<p class="${a.severity === "critical" ? "crit" : "warn"}">${esc(a.message)}</p>`
+          ).join("")}</div>`
+        : "";
+      const pctClass = p !== null && p < 15 ? " bad" : "";
+
+      document.getElementById("tank-detail").innerHTML = `
+        <div class="hero">
+          <div class="hero-top">
+            <div>
+              <h2>${esc(tankName(detail))}</h2>
+              <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
+            </div>
+            <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "online" : "offline"}</span>
+          </div>
+          <dl class="readouts">
+            <div class="readout${pctClass}"><dt>Mức</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
+            <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : Number(detail.volume_l).toFixed(0))}<small>L / ${esc(detail.capacity_l == null ? "--" : Number(detail.capacity_l).toFixed(0))}</small></dd></div>
+            <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
+            <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
+          </dl>
+          ${alertBlock}
+        </div>`;
+      document.getElementById("tank-specs").innerHTML = `
+        <div class="meta-grid">
+          ${row("Mực lỏng", esc(fmtNum(detail.level_mmwc, "mmWC")))}
+          ${row("Áp suất vi sai", esc(fmtNum(detail.diff_pressure_kpa, "kPa")))}
+          ${row("Chân không", esc(fmtNum(detail.vacuum_pa, "Pa")))}
+          ${row("Pin", esc(fmtNum(detail.battery_v, "V")))}
+          ${row("Tín hiệu", esc(fmtNum(detail.signal_percent, "%")))}
+          ${row("Firmware", esc(detail.software_version ?? "--"))}
+          ${row("Phần cứng", esc(detail.hardware_version ?? "--"))}
+          ${row("Modem", esc(detail.modem_number ?? "--"))}
+          ${row("SIM", esc(detail.sim_iccid ?? "--"))}
+          ${row("Cập nhật cuối", esc(fmtTime(detail.last_seen_at)))}
+        </div>
+        <form class="rename" onsubmit="saveTerminal(event)">
+          <label for="name-edit">Tên do người vận hành đặt</label>
+          <div class="rename-row">
+            <input id="name-edit" class="field" name="name" maxlength="128" value="${esc(detail.name ?? "")}" />
+            <button type="submit" class="btn" id="btn-save">Lưu tên</button>
+          </div>
+          <p class="hint">Lần lấy số liệu sau không ghi đè tên này.</p>
+        </form>`;
+      await renderChart();
+    }
+
+    async function saveTerminal(ev) {
+      ev.preventDefault();
+      if (!selectedPsn || saving) return;
+      const name = document.getElementById("name-edit").value.trim();
+      if (!name) { showError("Tên không được để trống"); return; }
+      const btn = document.getElementById("btn-save");
+      saving = true;
+      if (btn) { btn.disabled = true; btn.textContent = "Đang lưu…"; }
+      try {
+        await api("/api/terminals/" + encodeURIComponent(selectedPsn), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        await refreshData();
+      } catch (e) {
+        if (e.name !== "AuthError") showError(e.message);
+      } finally {
+        saving = false;
+      }
+    }
+
+    async function renderChart() {
+      const psn = document.getElementById("chart-psn").value || selectedPsn;
+      if (!psn) return;
+      const tank = tanks.find(t => t.psn === psn);
+      const anchor = tank && tank.last_seen_at ? new Date(tank.last_seen_at) : new Date();
+      const from = new Date(anchor.getTime() - chartHours * 3600 * 1000);
+      const empty = document.getElementById("chart-empty");
+      const wrap = document.getElementById("chart-wrap");
+      const skel = document.getElementById("chart-skel");
+      empty.classList.remove("show");
+      wrap.classList.add("hidden");
+      skel.classList.add("show");
+      let items = [];
+      try {
+        const res = await api("/api/telemetry/" + encodeURIComponent(psn)
+          + `?from=${from.toISOString()}&to=${anchor.toISOString()}&limit=500&order=asc`);
+        items = res.items;
+      } catch (e) { skel.classList.remove("show"); if (e.name !== "AuthError") showError(e.message); return; }
+      skel.classList.remove("show");
+
+      if (!items.length) {
+        empty.classList.add("show");
+        wrap.classList.add("hidden");
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        return;
+      }
+      empty.classList.remove("show");
+      wrap.classList.remove("hidden");
+
+      const labels = items.map(r => new Date(r.sampled_at)
+        .toLocaleString("vi-VN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
+      const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l));
+      const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
+      const ctx = document.getElementById("historyChart").getContext("2d");
+      if (chartInstance) chartInstance.destroy();
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Thể tích (L)", data: volume, borderColor: "#1558c0",
+              backgroundColor: "transparent", tension: 0.15, yAxisID: "y",
+              spanGaps: true, borderWidth: 1.5, pointRadius: 0 },
+            { label: "Áp suất (MPa)", data: pressure, borderColor: "#5c6572",
+              backgroundColor: "transparent", tension: 0.15, yAxisID: "y1",
+              spanGaps: true, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: reduce ? false : { duration: 160 },
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { labels: { color: "#5c6572", usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y}` } },
+          },
+          scales: {
+            y:  { type: "linear", position: "left",
+                  title: { display: true, text: "L", color: "#8a93a0", font: { size: 11 } },
+                  grid: { color: "rgba(27,36,48,0.06)" }, ticks: { color: "#8a93a0", font: { family: "IBM Plex Mono", size: 10 } } },
+            y1: { type: "linear", position: "right",
+                  title: { display: true, text: "MPa", color: "#8a93a0", font: { size: 11 } },
+                  grid: { drawOnChartArea: false }, ticks: { color: "#8a93a0", font: { family: "IBM Plex Mono", size: 10 } } },
+            x:  { grid: { color: "rgba(27,36,48,0.04)" }, ticks: { color: "#8a93a0", maxRotation: 0, font: { size: 10 } } },
+          },
+        },
+      });
+    }
+
+    function renderAlerts() {
+      const strip = document.getElementById("action-strip");
+      const container = document.getElementById("alert-list");
+      if (!alerts.length) {
+        strip.classList.remove("show");
+        container.innerHTML = "";
+        return;
+      }
+      const hasCrit = alerts.some(a => a.severity === "critical");
+      strip.className = "action-strip show" + (hasCrit ? "" : " warn");
+      const byPsn = [];
+      for (const a of alerts) {
+        let g = byPsn.find(x => x.psn === a.psn);
+        if (!g) { g = { psn: a.psn, items: [] }; byPsn.push(g); }
+        g.items.push(a);
+      }
+      container.innerHTML = byPsn.map(g => {
+        const t = tanks.find(x => x.psn === g.psn);
+        const msg = g.items.map(a => a.message.replace(/\s+/g, " ")).join(" · ");
+        return `
+        <button type="button" onclick="selectTank('${esc(g.psn)}')">
+          <span class="where">${esc(t ? tankName(t) : g.psn)}</span>
+          <span class="msg">${esc(msg)}</span>
+        </button>`;
+      }).join("");
+    }
+
+    function renderPsnOptions() {
+      const sel = document.getElementById("chart-psn");
+      const keep = selectedPsn || sel.value;
+      sel.innerHTML = tanks.map(t =>
+        `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`
+      ).join("");
+      if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
+    }
+
+    function setRange(hours) {
+      chartHours = hours;
+      document.querySelectorAll(".seg button").forEach(btn => {
+        btn.setAttribute("aria-pressed", String(Number(btn.dataset.range) === hours));
+      });
+      renderChart();
+    }
+
+    async function refreshData() {
+      const btn = document.getElementById("btn-refresh");
+      if (btn) { btn.disabled = true; }
+      try {
+        const [s, t, a, h] = await Promise.all([
+          api("/api/stats/summary"),
+          api("/api/terminals?limit=500"),
+          api("/api/alerts"),
+          api("/api/health"),
+        ]);
+        summary = s; tanks = t.items; alerts = a; health = h;
+        clearError();
+        document.getElementById("last-update").textContent =
+          "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+        renderHealth(); renderStats(); renderAlerts(); renderPsnOptions();
+        renderTankList();
+        await selectTank(selectedPsn ?? (sortedTanks()[0] && sortedTanks()[0].psn));
+      } catch (e) {
+        if (e.name === "AuthError") return;
+        showError(e.message);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function boot() {
+      try {
+        const me = await api("/api/auth/me");
+        currentUser = me.username;
+        setUserChip(currentUser);
+        hideLogin();
+        await refreshData();
+        startAutoRefresh();
+      } catch (_) {
+        showLogin();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".seg button").forEach(btn => {
+        btn.addEventListener("click", () => setRange(Number(btn.dataset.range)));
+      });
+      document.getElementById("login-form").addEventListener("submit", doLogin);
+      document.getElementById("btn-pass").addEventListener("click", togglePass);
+      document.getElementById("btn-logout").addEventListener("click", doLogout);
+      document.getElementById("tank-list").addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && ev.target.dataset.psn) selectTank(ev.target.dataset.psn);
+      });
+      boot();
+    });
+  </script>
+</body>
+</html>

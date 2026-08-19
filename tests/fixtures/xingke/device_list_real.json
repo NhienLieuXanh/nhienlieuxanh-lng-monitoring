@@ -1,0 +1,36 @@
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "currentPage": 1,
+    "pageSize": 10,
+    "prevPage": 1,
+    "nextPage": 1,
+    "currentPageElements": 1,
+    "totalPage": 1,
+    "totalElements": 1,
+    "content": [
+      {
+        "id": 843743870273327100,
+        "createTime": "2026-05-11 17:49:30",
+        "createId": 0,
+        "createName": null,
+        "deviceType": "DEVICE_TYPE_TSS_IRTE",
+        "deviceTypeName": "智能液位仪",
+        "deviceMode": "X-DLG",
+        "psn": "2604200016",
+        "phone": "",
+        "hardwarVersion": "",
+        "softwareVersion": "",
+        "bindStatus": 1,
+        "bindStatusName": "已绑定",
+        "sensorStatus": 0,
+        "sensorStatusName": "未接入",
+        "isSupportFillingStatus": 0,
+        "isSupportFillingStatusName": "否"
+      }
+    ],
+    "firstPage": true,
+    "lastPage": true
+  }
+}

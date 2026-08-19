@@ -1,0 +1,26 @@
+# secrets
+.env
+*.token.json
+
+# probe output — may contain unredacted vendor data
+var/
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# logs
+logs/
+*.log
+
+# editor screenshots / scratch images
+*.png
+
+# local run helpers that may embed machine paths/secrets
+*.token.json

@@ -1,0 +1,261 @@
+"""Model SQLAlchemy 2.0.
+
+Ba sai lệch có chủ ý so với spec gốc, đều được giải thích tại chỗ:
+
+1. ``telemetry`` PK là ``(psn, sampled_at)``, không phải ``id bigserial``.
+2. FK từ ``telemetry`` sang ``terminals`` là **composite** ``(terminal_id, psn)``.
+3. Thêm ``terminals.capacity_l`` và bảng ``ingest_runs``.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Identity,
+    Index,
+    Integer,
+    Numeric,
+    PrimaryKeyConstraint,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
+# Numeric thay vì Float: giá trị vendor là số thập phân ngắn (0.071 MPa, 3.6 V) và
+# ta so sánh chúng với ngưỡng cảnh báo. Float làm 3.6 thành 3.5999999999999996 nên
+# một ngưỡng "battery_v < 3.6" hành xử khác nhau tuỳ hướng gió. Numeric giữ đúng
+# giá trị vendor gửi, và Decimal ở tầng Python khớp 1:1 với nó.
+_MEASURE = Numeric(18, 6)
+
+
+class Terminal(Base):
+    """Một thiết bị đo + bồn nó gắn vào.
+
+    Giai đoạn 1 gộp *thiết bị* (psn, modem, SIM, firmware) và *bồn* (capacity_l,
+    tên, site) vào một bảng vì chúng đang 1:1. Khi nào thay thiết bị trên một bồn
+    — việc bảo trì thường xuyên — thì cần tách bảng ``tanks`` với
+    ``terminals.tank_id``, nếu không lịch sử của bồn vỡ thành hai PSN. Ghi lại đây
+    để lúc đó không ai phải khảo cổ lý do.
+    """
+
+    __tablename__ = "terminals"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        # gen_random_uuid() là core từ Postgres 13 — KHÔNG cần CREATE EXTENSION
+        # pgcrypto. Sinh phía server nên INSERT thô bằng psql cũng có id.
+        server_default=text("gen_random_uuid()"),
+    )
+    psn: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+
+    # Tên do người vận hành đặt. sync_terminals() KHÔNG BAO GIỜ ghi đè field này
+    # bằng giá trị vendor — xem repositories/terminals.py.
+    name: Mapped[str | None] = mapped_column(String(128))
+
+    modem_number: Mapped[str | None] = mapped_column(String(64))
+    sim_iccid: Mapped[str | None] = mapped_column(String(32))
+    hardware_version: Mapped[str | None] = mapped_column(String(64))
+    software_version: Mapped[str | None] = mapped_column(String(64))
+    device_model: Mapped[str | None] = mapped_column(String(64))
+    device_type_name: Mapped[str | None] = mapped_column(String(64))
+
+    medium_name: Mapped[str | None] = mapped_column(String(64))
+    tank_type_name: Mapped[str | None] = mapped_column(String(64))
+
+    # THÊM so với spec. Vendor gửi cylinderVolume kèm MỌI lần đọc, nhưng đó là cấu
+    # hình tài sản vật lý, không phải telemetry — không có lý gì lưu lại 48 lần
+    # mỗi ngày. Ở đây nó cũng sửa tay được khi vendor sai.
+    capacity_l: Mapped[Decimal | None] = mapped_column(Numeric(18, 3))
+
+    # `status` là CACHE, không phải sự thật. API suy lại từ last_seen_at lúc đọc
+    # (xem domain/status.py) vì cột lưu có lỗi staleness không tránh được: thiết bị
+    # ngừng báo thì không ingest nào chạm row đó, nên nó đứng mãi ở giá trị cũ.
+    # Giữ cột để query SQL ad-hoc và alert phía DB vẫn dùng được.
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'offline'")
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        # varchar + CHECK thay vì PG ENUM: thêm giá trị vào enum bên trong một
+        # migration transactional là nỗi đau đã biết (ALTER TYPE ... ADD VALUE bị
+        # hạn chế), còn CHECK chỉ là một dòng drop + create.
+        CheckConstraint("status IN ('online','offline')", name="status_valid"),
+        CheckConstraint(
+            "capacity_l IS NULL OR capacity_l > 0", name="capacity_positive"
+        ),
+        # Target cho composite FK của telemetry. Redundant với PK về mặt logic
+        # nhưng Postgres đòi một UNIQUE khớp đúng cặp cột được tham chiếu.
+        UniqueConstraint("id", "psn"),
+    )
+
+
+class Telemetry(Base):
+    """Một lần đọc đã chuẩn hoá. Bất biến — không bao giờ UPDATE trong luồng thường."""
+
+    __tablename__ = "telemetry"
+
+    # `id` giữ lại làm tie-breaker đơn điệu cho keyset pagination sau này, nhưng
+    # KHÔNG unique và KHÔNG phải PK. Identity() là idiom hiện đại thay bigserial.
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), nullable=False)
+
+    terminal_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    psn: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    # LUÔN lưu UTC. Vendor gửi naive string render ở UTC+8; adapter gắn timezone
+    # rồi convert, và NormalizedTelemetry từ chối datetime naive để việc đó không
+    # thể bị bỏ sót.
+    sampled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    # String timestamp gốc của vendor, y nguyên. ~20 byte/dòng, và nó biến việc sửa
+    # timezone về sau thành một câu UPDATE re-derive thuần SQL thay vì phải fetch
+    # lại vendor — quan trọng vì retention lịch sử của vendor chưa rõ và thiết bị
+    # đã offline hàng tháng.
+    vendor_ts_raw: Mapped[str | None] = mapped_column(String(64))
+
+    level_mmwc: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    diff_pressure_kpa: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    pressure_mpa: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    volume_l: Mapped[Decimal | None] = mapped_column(_MEASURE)
+
+    # Thang 0-100. Xác minh trên dữ liệu thật: vendor gửi volumePercentage=0.59 với
+    # currentVolume=61 và cylinderVolume=10425, và 61/10425*100 = 0.5851. Nghĩa là
+    # 0.59% ĐẦY. Không CHECK constraint nào bắt được lỗi hiểu sai thang này vì 0.59
+    # hợp lệ ở cả hai — nên API phát kèm fill_percent tính độc lập làm đối chứng.
+    volume_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    volume_percent_source: Mapped[str | None] = mapped_column(String(16))
+
+    temperature_c: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    vacuum_pa: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    signal_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    battery_v: Mapped[Decimal | None] = mapped_column(_MEASURE)
+
+    medium_name: Mapped[str | None] = mapped_column(String(64))
+    tank_type_name: Mapped[str | None] = mapped_column(String(64))
+
+    # Payload vendor nguyên bản. Đây là thứ duy nhất cho phép sửa một field map sai
+    # mà không phải gọi lại vendor. CŨNG là vector rò tên vendor nguy hiểm nhất:
+    # loại khỏi mọi response model, enforce bằng tests/test_isolation.py.
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'xingke'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        # PK là (psn, sampled_at), không phải id. Thoả hợp đồng uniqueness của spec
+        # bằng MỘT index thay vì hai, và TimescaleDB-ready ngay: create_hypertable
+        # đòi cột phân vùng phải có trong PK và mọi unique index. Với PK theo spec
+        # (id) thì chuyển sang Timescale là DROP PK + rebuild bảng dưới lock.
+        PrimaryKeyConstraint("psn", "sampled_at", name="pk_telemetry"),
+        # FK COMPOSITE. Spec denormalize psn cạnh terminal_id, nên về nguyên tắc
+        # hai cột có thể lệch nhau. Thay vì trigger hay kỷ luật tầng app, để
+        # Postgres chứng minh: giờ không thể insert một dòng telemetry mà psn không
+        # thuộc terminal_id của nó. ON UPDATE CASCADE để sửa một PSN gõ sai ở bảng
+        # cha lan xuống. ON DELETE RESTRICT vì xoá terminal mà còn telemetry gần
+        # như luôn là nhầm.
+        ForeignKeyConstraint(
+            ["terminal_id", "psn"],
+            ["terminals.id", "terminals.psn"],
+            onupdate="CASCADE",
+            ondelete="RESTRICT",
+        ),
+        # Postgres KHÔNG tự index cột referencing của FK. Không có index này thì
+        # mỗi UPDATE/DELETE trên terminals phải seq scan cả telemetry.
+        Index("ix_telemetry_terminal_id_sampled_at", "terminal_id", "sampled_at"),
+        # Không thêm index (psn, sampled_at DESC): Postgres scan btree ngược gần
+        # như cùng chi phí, nên PK ASC đã phục vụ cả latest-per-psn lẫn range scan.
+        # Index DESC chỉ có ích khi trộn hướng sort trên nhiều cột trong cùng một
+        # ORDER BY, việc không endpoint nào làm — thêm nó chỉ tăng gấp đôi chi phí ghi.
+    )
+
+
+class IngestRun(Base):
+    """Audit log mỗi lần chạy ingest.
+
+    THÊM so với spec, và bắt buộc phải có: ``/api/health`` cần biết "lần ingest
+    thành công gần nhất cách đây bao lâu". Suy ra từ ``MAX(telemetry.created_at)``
+    là SAI — nó không phân biệt được "ingest chạy tốt, thiết bị chỉ đang offline"
+    với "ingest hỏng". Cả hai thiết bị thật hiện offline nhiều tháng, nên health
+    suy từ telemetry sẽ báo đỏ vĩnh viễn và không ai còn tin nó nữa.
+    """
+
+    __tablename__ = "ingest_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    fetched: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    inserted: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    duplicates: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    terminals_created: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    error_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    error_summary: Mapped[str | None] = mapped_column(Text)
+
+    params: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    # MappingReport được persist ở đây để khoảng trống mapping nổi lên qua endpoint
+    # admin, thay vì đòi ai đó đi đọc log file.
+    mapping_report: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('success','partial','failed')", name="status_valid"
+        ),
+        CheckConstraint("trigger IN ('scheduler','cli','api')", name="trigger_valid"),
+        # Truy vấn nóng duy nhất: "lần thành công gần nhất" cho health check.
+        Index("ix_ingest_runs_status_finished_at", "status", "finished_at"),
+    )
