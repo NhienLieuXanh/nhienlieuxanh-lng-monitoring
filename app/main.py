@@ -44,19 +44,27 @@ def _alembic_head() -> str | None:
         return None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+def _init_state(app: FastAPI) -> None:
+    """Khởi tạo state idempotent.
+
+    Gọi được từ CẢ create_app() (lúc import — để chạy trên môi trường serverless
+    như Vercel, nơi ``lifespan`` có thể KHÔNG được chạy) lẫn ``lifespan`` (server
+    thường). Lần gọi thứ hai là no-op. ``create_engine`` là lazy nên gọi lúc import
+    KHÔNG mở kết nối DB — an toàn.
+    """
+    if getattr(app.state, "_state_ready", False):
+        return
+
     settings = get_settings()
     setup_logging(settings.log_level)
 
-    # Cảnh báo này phải nằm SAU setup_logging: nếu để ở create_app() (chạy lúc
-    # import module) thì nó fire trước khi handler log được lắp, nên không bao giờ
-    # vào file log — lưới an toàn im lặng.
+    # Cảnh báo phải nằm SAU setup_logging, nếu không nó fire trước khi handler log
+    # được lắp và không bao giờ vào log — lưới an toàn im lặng.
     if settings.session_secret == "change-me-session-secret":
         log.warning(
             "SESSION_SECRET đang dùng giá trị mặc định công khai — ai biết default "
             "cũng forge được cookie nlx_session và bỏ qua đăng nhập. Đặt secret "
-            "riêng trong .env trước khi cho máy khác truy cập."
+            "riêng trước khi cho máy khác truy cập."
         )
 
     app.state.settings = settings
@@ -65,21 +73,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.alembic_head = _alembic_head()
     app.state.ingest_failures = 0
     app.state.ingest_paused_reason = None
-
-    adapter, fatal_types, psns = build_adapter(settings)
-    app.state.adapter = adapter
-    app.state.ingestion = IngestionService(
-        adapter,
-        app.state.session_factory,
-        settings,
-        fatal_exc_types=fatal_types,
-        psns=psns,
-    )
-
     app.state.scheduler = None
+
+    # Adapter có thể fail nếu thiếu credential vendor. KHÔNG để nó làm chết cả
+    # API/dashboard — chỉ ingestion không dùng được cho tới khi cấu hình xong.
+    try:
+        adapter, fatal_types, psns = build_adapter(settings)
+        app.state.adapter = adapter
+        app.state.ingestion = IngestionService(
+            adapter,
+            app.state.session_factory,
+            settings,
+            fatal_exc_types=fatal_types,
+            psns=psns,
+        )
+    except Exception as exc:
+        log.error("không khởi tạo được adapter/ingestion: %s", exc)
+        app.state.adapter = None
+        app.state.ingestion = None
+
+    app.state._state_ready = True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _init_state(app)
+    settings = app.state.settings
+
     if settings.scheduler_enabled:
-        # AsyncIOScheduler dùng chung event loop của uvicorn, nên lifetime của nó
-        # khớp đúng lifetime app và không cần marshalling cross-loop.
+        # AsyncIOScheduler dùng chung event loop của uvicorn. KHÔNG chạy trên
+        # serverless (Vercel): ở đó đặt SCHEDULER_ENABLED=false và để Vercel Cron
+        # gọi /api/cron/ingest thay thế.
         app.state.scheduler = build_scheduler(app)
         app.state.scheduler.start()
         log.info(
@@ -95,11 +119,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         if app.state.scheduler is not None:
-            # wait=False: trên Windows wait=True thường xuyên làm Ctrl+C treo trong
-            # khi scheduler đợi một job đang chạy, và người dùng thấy server đóng băng.
+            # wait=False: trên Windows wait=True thường xuyên làm Ctrl+C treo.
             app.state.scheduler.shutdown(wait=False)
-        adapter.close()
-        app.state.engine.dispose()
+        if getattr(app.state, "adapter", None) is not None:
+            app.state.adapter.close()
+        if getattr(app.state, "engine", None) is not None:
+            app.state.engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -147,6 +172,10 @@ def create_app() -> FastAPI:
         def _root() -> RedirectResponse:
             return RedirectResponse("/ui/")
 
+    # Khởi tạo state ngay lúc import: trên serverless (Vercel) lifespan có thể không
+    # chạy, nên endpoint phải có sẵn engine/session_factory/ingestion. Idempotent
+    # với lifespan (server thường), và create_engine lazy nên không mở kết nối DB.
+    _init_state(app)
     return app
 
 

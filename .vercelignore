@@ -1,0 +1,15 @@
+# Không upload lên Vercel (giảm bundle + tránh lộ). Env vars đặt trong dashboard.
+.env
+.venv/
+tests/
+scripts/
+var/
+logs/
+*.log
+*.png
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+DISCOVERY.md
+ONBOARDING.md
+start.cmd

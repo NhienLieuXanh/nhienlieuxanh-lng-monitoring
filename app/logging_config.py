@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import os
 import re
 from pathlib import Path
 
@@ -45,19 +46,25 @@ def setup_logging(level: str = "INFO", log_dir: str | None = "logs") -> None:
     console.addFilter(redact)
     root.addHandler(console)
 
-    if log_dir:
-        path = Path(log_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        fileh = logging.handlers.RotatingFileHandler(
-            path / "app.log",
-            maxBytes=5_000_000,
-            backupCount=5,
-            encoding="utf-8",
-            delay=True,
-        )
-        fileh.setFormatter(fmt)
-        fileh.addFilter(redact)
-        root.addHandler(fileh)
+    # Trên serverless (Vercel) filesystem là read-only trừ /tmp, và không có process
+    # sống lâu để giữ file log — ghi file sẽ raise OSError lúc khởi động. Chỉ log ra
+    # stdout; Vercel thu log stdout sẵn. try/except là lưới an toàn cho mọi FS read-only.
+    if log_dir and not os.environ.get("VERCEL"):
+        try:
+            path = Path(log_dir)
+            path.mkdir(parents=True, exist_ok=True)
+            fileh = logging.handlers.RotatingFileHandler(
+                path / "app.log",
+                maxBytes=5_000_000,
+                backupCount=5,
+                encoding="utf-8",
+                delay=True,
+            )
+            fileh.setFormatter(fmt)
+            fileh.addFilter(redact)
+            root.addHandler(fileh)
+        except OSError as exc:
+            root.warning("không tạo được file log (%s); chỉ log ra stdout", exc)
 
     # httpx log mọi request ở INFO, kèm URL đầy đủ -> rò path vendor vào log.
     logging.getLogger("httpx").setLevel(logging.WARNING)

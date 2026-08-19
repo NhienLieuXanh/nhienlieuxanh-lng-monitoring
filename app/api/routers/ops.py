@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from sqlalchemy import text
 
 from app.api.deps import AdminDep, SessionDep, SettingsDep, UserDep, to_terminal_out
@@ -227,3 +229,40 @@ def admin_runs(
         IngestRunDetailOut.model_validate(r)
         for r in runs_repo.recent(session, limit=limit)
     ]
+
+
+@router.get("/cron/ingest", response_model=ActionOut, include_in_schema=False)
+def cron_ingest(
+    request: Request,
+    authorization: Annotated[str | None, Header()] = None,
+) -> ActionOut:
+    """Kích hoạt một vòng ingest từ Vercel Cron.
+
+    Thay cho APScheduler trên serverless (Vercel không giữ process chạy nền). Vercel
+    Cron gọi GET kèm header ``Authorization: Bearer <CRON_SECRET>`` tự động khi biến
+    môi trường CRON_SECRET được set. Không có secret => từ chối, để endpoint này
+    không thành một nút bấm ingest công khai.
+    """
+    secret = os.environ.get("CRON_SECRET")
+    if not secret:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "CRON_SECRET chưa cấu hình; cron ingest bị tắt",
+        )
+    if authorization != f"Bearer {secret}":
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "unauthorized")
+
+    svc = getattr(request.app.state, "ingestion", None)
+    if svc is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "ingestion chưa sẵn sàng (thiếu cấu hình vendor)",
+        )
+    try:
+        # trigger='scheduler': đây là đường ingest định kỳ; CHECK của ingest_runs chỉ
+        # cho phép scheduler|cli|api nên dùng lại 'scheduler' cho đúng ngữ nghĩa.
+        stats = svc.run_cycle(trigger="scheduler")
+    except Exception as exc:  # gồm cả FatalIngestError (session hết hạn)
+        log.error("cron ingest thất bại: %s", exc)
+        return ActionOut(ok=False, message=f"ingest thất bại: {type(exc).__name__}")
+    return ActionOut(ok=not stats.errors, message=stats.summary())
