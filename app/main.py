@@ -146,7 +146,10 @@ def create_app() -> FastAPI:
         session_cookie="nlx_session",
         max_age=settings.session_hours * 3600,
         same_site="lax",
-        https_only=False,
+        # Secure cookie ngoài dev: production luôn chạy HTTPS (Vercel), nên gắn cờ
+        # Secure để cookie phiên không bao giờ đi qua HTTP. Dev (localhost http) để
+        # False cho tiện chạy thử.
+        https_only=not settings.is_dev,
     )
 
     if settings.cors_origin_list:
