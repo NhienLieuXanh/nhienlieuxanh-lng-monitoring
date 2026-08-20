@@ -2,6 +2,14 @@
 # `python -m app.cli` và `python -m uvicorn app.main:app` từ project root, không
 # `pip install -e .` — tránh ma sát build backend trên Windows khi không có uv.
 
+[project]
+name = "lng-tank-monitoring"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.uv]
+package = false
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
