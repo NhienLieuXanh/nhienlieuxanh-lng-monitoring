@@ -87,7 +87,15 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_url(self) -> str:
         if self.database_url:
-            return self.database_url
+            # Neon/Vercel/Heroku phát URL scheme `postgres://` hoặc `postgresql://`.
+            # SQLAlchemy mặc định map cả hai sang driver psycopg2 (KHÔNG cài trên
+            # dự án này — ta dùng psycopg3). Ép về `postgresql+psycopg://` để URL từ
+            # nhà cung cấp DÙNG ĐƯỢC NGAY mà không phải sửa tay từng nơi.
+            u = self.database_url
+            for prefix in ("postgres://", "postgresql://"):
+                if u.startswith(prefix) and not u.startswith("postgresql+"):
+                    return "postgresql+psycopg://" + u[len(prefix):]
+            return u
         return URL.create(
             "postgresql+psycopg",
             username=self.db_user,
