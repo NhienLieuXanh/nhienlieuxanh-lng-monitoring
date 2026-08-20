@@ -29,3 +29,6 @@ logs/
 
 # local run helpers that may embed machine paths/secrets
 *.token.json
+
+# local MCP config (không thuộc sản phẩm)
+.mcp.json
