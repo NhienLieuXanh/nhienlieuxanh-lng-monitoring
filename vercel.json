@@ -1,15 +1,11 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.py": {
-      "includeFiles": "app/static/**"
-    }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
-  ],
-  "crons": [
-    { "path": "/api/cron/ingest", "schedule": "0 0 * * *" }
-  ]
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "functions": {
+          "app/main.py": {
+                  "includeFiles": "app/static/**"
+          }
+    },
+    "crons": [
+          { "path": "/api/cron/ingest", "schedule": "0 0 * * *" }
+    ]
 }
-
