@@ -6,7 +6,7 @@ scripts/
 var/
 logs/
 *.log
-*.png
+/*.png
 .pytest_cache/
 .ruff_cache/
 __pycache__/

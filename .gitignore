@@ -20,7 +20,8 @@ logs/
 *.log
 
 # editor screenshots / scratch images
-*.png
+# chỉ ignore ảnh screenshot ở thư mục gốc, KHÔNG đụng asset trong app/static/
+/*.png
 
 # local run helpers that may embed machine paths/secrets
 *.token.json
