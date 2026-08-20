@@ -95,6 +95,9 @@ def health(
                 mig = CheckOut(ok=False, detail=f"schema ở {current}, code cần {head}")
                 overall = "degraded" if overall == "ok" else overall
         except Exception:
+            # Query lỗi làm abort transaction của Postgres; rollback để các check
+            # sau (counts_by_status) không dính InFailedSqlTransaction rồi 500.
+            session.rollback()
             mig = CheckOut(ok=False, detail="chưa có bảng alembic_version")
             overall = "degraded" if overall == "ok" else overall
 
@@ -132,7 +135,13 @@ def health(
         ing = CheckOut(ok=False, detail=f"job ingest đang bị tạm dừng: {paused}")
         overall = "degraded" if overall == "ok" else overall
 
-    counts = term_repo.counts_by_status(session) if db.ok else {}
+    counts: dict[str, int] = {}
+    if db.ok:
+        try:
+            counts = term_repo.counts_by_status(session)
+        except Exception:
+            # Bảng terminals chưa có (chưa migrate) hoặc lỗi khác — không để health 500.
+            session.rollback()
 
     # 503 CHỈ khi error. degraded vẫn 200 để monitor phân biệt được "API sống nhưng
     # ingestion tắc" với "database mất" — gộp cả hai thành 503 là phá tín hiệu đó.
