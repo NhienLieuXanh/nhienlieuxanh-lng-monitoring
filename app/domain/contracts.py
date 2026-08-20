@@ -7,7 +7,7 @@
     app/domain  ──KHÔNG BAO GIỜ imports──>  app/adapters/**
 
 Adapter cụ thể được khởi tạo đúng một lần (``app/main.py`` hoặc ``app/cli.py``)
-rồi inject. Nhờ đó FakeAdapter là drop-in, và từ vựng vendor không rò lên trên.
+rồi inject. Nhờ đó adapter có thể hoán đổi, và từ vựng vendor không rò lên trên.
 """
 
 from __future__ import annotations

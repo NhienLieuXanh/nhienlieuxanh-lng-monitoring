@@ -1,7 +1,7 @@
 """Lắp ráp adapter. Đây là NƠI DUY NHẤT phần còn lại của app biết vendor tồn tại.
 
 Mọi module khác (services, api, repositories, domain) chỉ thấy TelemetryPort. Nhờ
-vậy FakeAdapter là drop-in thật, và ``tests/test_isolation.py`` kiểm được luật đó
+vậy adapter có thể hoán đổi, và ``tests/test_isolation.py`` kiểm được luật đó
 bằng máy chứ không bằng kỷ luật.
 """
 

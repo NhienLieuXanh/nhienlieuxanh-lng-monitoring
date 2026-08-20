@@ -1,6 +1,6 @@
 """IngestionService — đường ghi DUY NHẤT vào telemetry.
 
-Scheduler, CLI backfill, seed-demo và endpoint admin đều đi qua đây. Không nhân bản
+Scheduler, CLI backfill và endpoint admin đều đi qua đây. Không nhân bản
 logic ghi: nhờ vậy semantics của --repair, dedupe và thống kê giống nhau theo cấu
 trúc, không phải theo kỷ luật.
 """
