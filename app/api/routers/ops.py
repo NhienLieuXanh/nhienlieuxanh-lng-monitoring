@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import text
 
 from app.api.deps import AdminDep, SessionDep, SettingsDep, UserDep, to_terminal_out
@@ -274,4 +274,53 @@ def cron_ingest(
     except Exception as exc:  # gồm cả FatalIngestError (session hết hạn)
         log.error("cron ingest thất bại: %s", exc)
         return ActionOut(ok=False, message=f"ingest thất bại: {type(exc).__name__}")
+    return ActionOut(ok=not stats.errors, message=stats.summary())
+
+
+# Trần số ngày mỗi lần backfill: mỗi ngày là 1 HTTP call/PSN có throttle ~1s, mà
+# function serverless có trần thời gian (maxDuration). Chia nhỏ để không timeout.
+_BACKFILL_MAX_DAYS = 20
+
+
+@router.post("/admin/backfill", response_model=ActionOut)
+def admin_backfill(
+    request: Request,
+    _: AdminDep,
+    from_: Annotated[str, Query(alias="from")],
+    to: Annotated[str, Query()],
+    psn: Annotated[str | None, Query()] = None,
+) -> ActionOut:
+    """Kéo lịch sử THẬT từ vendor về DB cho khoảng ngày [from, to] (giờ vendor).
+
+    Chạy từ server (Vercel) vì máy local bị firewall chặn Postgres tới Neon. Endpoint
+    vận hành chính thức: dùng lại IngestionService.backfill (idempotent, ON CONFLICT
+    DO NOTHING) nên gọi lại an toàn. Mỗi lần tối đa 20 ngày để không timeout serverless.
+    """
+    svc = getattr(request.app.state, "ingestion", None)
+    if svc is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "ingestion chưa sẵn sàng (thiếu cấu hình vendor)",
+        )
+    try:
+        start = date.fromisoformat(from_)
+        end = date.fromisoformat(to)
+    except ValueError as exc:
+        raise HTTPException(422, "from/to phải dạng YYYY-MM-DD") from exc
+    if end < start:
+        raise HTTPException(422, "from phải <= to")
+    if (end - start).days + 1 > _BACKFILL_MAX_DAYS:
+        raise HTTPException(
+            422,
+            f"khoảng > {_BACKFILL_MAX_DAYS} ngày; chia nhỏ để tránh timeout serverless",
+        )
+
+    psns = [psn] if psn else list(getattr(svc, "_configured_psns", None) or [])
+    if not psns:
+        raise HTTPException(422, "không có PSN nào để backfill (thiếu XINGKE_ALLOWED_PSNS)")
+    try:
+        stats = svc.backfill(psns, start, end, trigger="api")
+    except Exception as exc:  # gồm cả FatalIngestError
+        log.error("backfill thất bại: %s", exc)
+        return ActionOut(ok=False, message=f"backfill thất bại: {type(exc).__name__}")
     return ActionOut(ok=not stats.errors, message=stats.summary())
