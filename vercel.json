@@ -12,3 +12,4 @@
     { "path": "/api/cron/ingest", "schedule": "0 0 * * * }
   ]
 }
+
