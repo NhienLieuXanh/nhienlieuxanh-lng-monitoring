@@ -1,5 +1,9 @@
 # secrets
 .env
+.env.local
+.env.*.local
+# Vercel CLI: chứa prod.env (DATABASE_URL, secret) + OIDC token
+.vercel
 *.token.json
 
 # probe output — may contain unredacted vendor data
