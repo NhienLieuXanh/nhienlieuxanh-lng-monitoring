@@ -418,6 +418,9 @@
     const API = "";
     let tanks = [], summary = null, alerts = [], health = null;
     let chartInstance = null, selectedPsn = null, chartHours = 24, saving = false;
+    // Cache theo PSN: chi tiết bồn + chuỗi 90 ngày. Đổi khoảng 24h/7d/30d chỉ lọc
+    // trong bộ nhớ (tức thì, không round-trip); refreshData xoá cache khi có số mới.
+    let chartCache = {}, detailCache = {};
     let currentUser = null, refreshTimer = null;
 
     function esc(s) {
@@ -649,21 +652,9 @@
       return `<div class="row"><dt>${esc(label)}</dt><dd class="${extra || ""}">${val}</dd></div>`;
     }
 
-    async function selectTank(psn) {
-      if (!psn) return;
-      selectedPsn = psn;
-      const sel = document.getElementById("chart-psn");
-      if (sel.value !== psn) sel.value = psn;
-      renderTankList();
-
-      const tank = tanks.find(t => t.psn === psn);
-      if (!tank) return;
-      const p = pctOf(tank);
-      let detail = tank;
-      try { detail = await api("/api/terminals/" + encodeURIComponent(psn)); }
-      catch (_) {}
-
-      const mine = alertsFor(psn);
+    function renderTankDetail(detail) {
+      const p = pctOf(detail);
+      const mine = alertsFor(detail.psn);
       const alertBlock = mine.length
         ? `<div class="local-alerts">${mine.map(a =>
             `<p class="${a.severity === "critical" ? "crit" : "warn"}">${esc(a.message)}</p>`
@@ -709,7 +700,32 @@
           </div>
           <p class="hint">Lần lấy số liệu sau không ghi đè tên này.</p>
         </form>`;
-      await renderChart();
+    }
+
+    async function selectTank(psn) {
+      if (!psn) return;
+      selectedPsn = psn;
+      const sel = document.getElementById("chart-psn");
+      if (sel.value !== psn) sel.value = psn;
+      renderTankList();
+
+      const tank = tanks.find(t => t.psn === psn);
+      if (!tank) return;
+      // Vẽ NGAY từ dữ liệu list (đã có sẵn) hoặc bản chi tiết đã cache — không chờ
+      // round-trip nào. Đây là điểm mấu chốt để bấm thấy phản hồi tức thì.
+      renderTankDetail(detailCache[psn] || tank);
+      renderChart();  // dùng cache, không block
+
+      // Bổ sung các field chỉ có ở /{psn} (firmware/modem/SIM) ở NỀN, không chặn UI.
+      // Không ghi đè nếu người dùng đang gõ tên.
+      api("/api/terminals/" + encodeURIComponent(psn))
+        .then(d => {
+          detailCache[psn] = d;
+          if (selectedPsn === psn && document.activeElement?.id !== "name-edit") {
+            renderTankDetail(d);
+          }
+        })
+        .catch(() => {});
     }
 
     async function saveTerminal(ev) {
@@ -739,29 +755,34 @@
       if (!psn) return;
       const tank = tanks.find(t => t.psn === psn);
       const anchor = tank && tank.last_seen_at ? new Date(tank.last_seen_at) : new Date();
-      const from = new Date(anchor.getTime() - chartHours * 3600 * 1000);
       const empty = document.getElementById("chart-empty");
       const wrap = document.getElementById("chart-wrap");
       const skel = document.getElementById("chart-skel");
-      empty.classList.remove("show");
-      wrap.classList.add("hidden");
-      skel.classList.add("show");
-      let items = [];
-      const q = (f, t) => "/api/telemetry/" + encodeURIComponent(psn)
-        + `?from=${f.toISOString()}&to=${t.toISOString()}&limit=500&order=asc`;
+
+      // Lấy chuỗi 90 ngày MỘT LẦN cho mỗi PSN rồi cache. Skeleton chỉ hiện ở lần
+      // fetch đầu; đổi khoảng 24h/7d/30d sau đó chỉ lọc trong bộ nhớ -> tức thì,
+      // không round-trip, không waterfall.
+      let all = chartCache[psn];
+      if (all === undefined) {
+        empty.classList.remove("show");
+        wrap.classList.add("hidden");
+        skel.classList.add("show");
+        const wideFrom = new Date(anchor.getTime() - 89 * 86400 * 1000);
+        const q = "/api/telemetry/" + encodeURIComponent(psn)
+          + `?from=${wideFrom.toISOString()}&to=${anchor.toISOString()}&limit=500&order=asc`;
+        try {
+          all = (await api(q)).items;
+          chartCache[psn] = all;
+        } catch (e) { skel.classList.remove("show"); if (e.name !== "AuthError") showError(e.message); return; }
+        skel.classList.remove("show");
+      }
+
+      // Lọc theo khoảng đang chọn; nếu rỗng nhưng PSN có dữ liệu cũ hơn -> hiện tất
+      // cả (auto-widen lấy TỪ CACHE nên không round-trip).
+      const fromMs = anchor.getTime() - chartHours * 3600 * 1000;
+      let items = all.filter(r => new Date(r.sampled_at).getTime() >= fromMs);
       let widened = false;
-      try {
-        items = (await api(q(from, anchor))).items;
-        if (!items.length) {
-          // Cửa sổ chọn rỗng nhưng thiết bị có thể có cụm dữ liệu cũ hơn (offline
-          // lâu). Mở rộng tới trần cho phép (90 ngày) để hiện lịch sử thật gần nhất
-          // thay vì để trống dù DB có số.
-          const wide = new Date(anchor.getTime() - 89 * 86400 * 1000);
-          items = (await api(q(wide, anchor))).items;
-          widened = items.length > 0;
-        }
-      } catch (e) { skel.classList.remove("show"); if (e.name !== "AuthError") showError(e.message); return; }
-      skel.classList.remove("show");
+      if (!items.length && all.length) { items = all; widened = true; }
 
       if (!items.length) {
         empty.classList.add("show");
@@ -863,6 +884,8 @@
     async function refreshData() {
       const btn = document.getElementById("btn-refresh");
       if (btn) { btn.disabled = true; }
+      // Refresh = có thể có số mới -> bỏ cache để lần chọn/vẽ kế tiếp lấy tươi.
+      chartCache = {}; detailCache = {};
       try {
         const [s, t, a, h] = await Promise.all([
           api("/api/stats/summary"),
