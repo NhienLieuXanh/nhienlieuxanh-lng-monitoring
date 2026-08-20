@@ -1,7 +1,6 @@
 """CLI vận hành. Dùng CHUNG IngestionService với scheduler — không nhân bản write path.
 
     .venv\\Scripts\\python.exe -m app.cli check-db
-    .venv\\Scripts\\python.exe -m app.cli seed-demo --days 3
     .venv\\Scripts\\python.exe -m app.cli run-once
     .venv\\Scripts\\python.exe -m app.cli probe
     .venv\\Scripts\\python.exe -m app.cli backfill --psn 2604200016 --from 2026-07-01 --to 2026-07-31
@@ -202,43 +201,6 @@ def backfill(
             raise typer.Exit(1)
     finally:
         adapter.close()
-        engine.dispose()
-
-
-@app.command("seed-demo")
-def seed_demo(
-    days: Annotated[int, typer.Option(help="số ngày dữ liệu tổng hợp")] = 3,
-    fresh: Annotated[
-        bool, typer.Option(help="neo timestamp vào hiện tại để có terminal ONLINE")
-    ] = False,
-) -> None:
-    """Nạp dữ liệu tổng hợp QUA ĐÚNG đường ingestion thật.
-
-    Vì vậy nó vừa seed dữ liệu vừa smoke-test upsert. Chạy hai lần: lần hai phải
-    báo inserted=0 và duplicates=<số dòng> — đó là bằng chứng idempotency bằng một
-    câu lệnh.
-
-    Không --fresh thì timestamp kết thúc ở ngày stale THẬT (2026-07-23, 2026-06-02),
-    tái hiện production. Có --fresh thì ít nhất một terminal tính ra ONLINE — nếu
-    không thì nhánh online không bao giờ được chạy.
-    """
-    from app.adapters.fake import FakeAdapter
-
-    fake = FakeAdapter(days=days, fresh=fresh)
-    _, engine, sf, _adapter, svc = _wire(adapter_override=fake)
-    try:
-        stats = IngestStats()
-        pairs = fake.demo_days()
-        svc.sync_terminals(stats, list(dict.fromkeys(p for p, _ in pairs)))
-        for p, d in pairs:
-            svc.ingest_psn_day(p, d, stats)
-        svc.refresh_statuses(sorted({p for p, _ in pairs}))
-        _print_stats(stats)
-        with sf() as session:
-            typer.echo(
-                f"  tổng dòng telemetry trong DB: {tel_repo.count_all(session)}"
-            )
-    finally:
         engine.dispose()
 
 

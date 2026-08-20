@@ -80,8 +80,9 @@ class Settings(BaseSettings):
     max_history_span_days: int = Field(90, ge=1)
 
     # ---- adapter selection ----
-    # Chỉ TÊN adapter nằm ở core; không setting nào của vendor lọt vào đây.
-    xingke_adapter: str = "fake"  # "fake" | "live"
+    # Chỉ có adapter THẬT (live). Không còn adapter giả trong sản phẩm — mọi dữ liệu
+    # đều từ vendor. Giữ field để override/tương thích, mặc định live.
+    xingke_adapter: str = "live"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

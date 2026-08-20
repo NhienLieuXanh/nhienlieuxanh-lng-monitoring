@@ -6,8 +6,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from stub_adapter import DEMO_PSNS, FakeAdapter
 
-from app.adapters.fake import DEMO_PSNS, FakeAdapter
 from app.domain.alerts import fill_percent
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo

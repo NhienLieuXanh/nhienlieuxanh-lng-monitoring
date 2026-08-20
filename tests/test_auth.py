@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.deps import UserDep, get_settings
-from app.api.routers.auth import router as auth_router
 from app.api.routers import auth as auth_mod
+from app.api.routers.auth import router as auth_router
 from app.config import Settings
 from app.factory import VendorLoginError, verify_vendor_credentials
 
@@ -24,14 +24,27 @@ def fake_settings() -> Settings:
     return Settings(
         app_env="test",
         db_password="x",
-        xingke_adapter="fake",
+        xingke_adapter="live",
         scheduler_enabled=False,
         session_secret="test-session-secret",
     )
 
 
 @pytest.fixture
-def client(fake_settings: Settings) -> TestClient:
+def client(fake_settings: Settings, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    # Đăng nhập giờ LUÔN xác thực với vendor thật (không còn đường demo trong sản
+    # phẩm). Trong test, thay bằng stub để kiểm cookie phiên + rate limit mà không
+    # gọi mạng: mật khẩu "demo" là đúng, còn lại sai.
+    def _verify(username: str, password: str, settings: Settings) -> str:
+        u = username.strip()
+        if not u or not password:
+            raise VendorLoginError("nhập tài khoản và mật khẩu")
+        if password != "demo":
+            raise VendorLoginError("sai tài khoản hoặc mật khẩu")
+        return u
+
+    monkeypatch.setattr(auth_mod, "verify_vendor_credentials", _verify)
+
     app = FastAPI()
     app.add_middleware(SessionMiddleware, secret_key="test-session-secret")
     app.include_router(auth_router, prefix="/api")
@@ -42,21 +55,6 @@ def client(fake_settings: Settings) -> TestClient:
 
     app.dependency_overrides[get_settings] = lambda: fake_settings
     return TestClient(app)
-
-
-def test_fake_demo_password(fake_settings: Settings) -> None:
-    assert verify_vendor_credentials("son", "demo", fake_settings) == "son"
-    assert verify_vendor_credentials("  lan  ", "demo", fake_settings) == "lan"
-
-
-def test_fake_wrong_password(fake_settings: Settings) -> None:
-    with pytest.raises(VendorLoginError):
-        verify_vendor_credentials("son", "sai", fake_settings)
-
-
-def test_fake_empty_rejected(fake_settings: Settings) -> None:
-    with pytest.raises(VendorLoginError):
-        verify_vendor_credentials("   ", "demo", fake_settings)
 
 
 def test_me_requires_session(client: TestClient) -> None:

@@ -34,12 +34,6 @@ def verify_vendor_credentials(username: str, password: str, settings: Settings) 
     if not user or not password:
         raise VendorLoginError("nhập tài khoản và mật khẩu")
 
-    if settings.xingke_adapter != "live":
-        if password == "demo":
-            log.info("login demo (adapter fake): user=%s", user)
-            return user
-        raise VendorLoginError("sai tài khoản hoặc mật khẩu")
-
     import httpx
 
     from app.adapters.xingke.auth import VENDOR_XHR_HEADER, _find_token, post_vendor_login
@@ -83,20 +77,14 @@ def build_adapter(settings: Settings) -> tuple[TelemetryPort, tuple[type[BaseExc
     ``fatal_exc_types`` được TRẢ RA thay vì để IngestionService import: service
     không được biết tên module vendor. Scheduler chỉ cần biết "cái này fatal".
     """
-    if settings.xingke_adapter == "live":
-        from app.adapters.xingke.adapter import XingkeAdapter
-        from app.adapters.xingke.config import get_xingke_settings
-        from app.adapters.xingke.errors import XingkeSessionExpired
+    from app.adapters.xingke.adapter import XingkeAdapter
+    from app.adapters.xingke.config import get_xingke_settings
+    from app.adapters.xingke.errors import XingkeSessionExpired
 
-        xs = get_xingke_settings()
-        adapter = XingkeAdapter(xs, store_raw=settings.store_raw_payload)
-        psns = sorted(xs.allowed_psn_set)
-        log.info("adapter: live, %s PSN trong allowlist", len(psns))
-        # CHỈ SessionExpired là fatal. XingkeAuthError thường vẫn cứu được bằng
-        # re-login (client tự làm), nên nó không được làm dừng job.
-        return adapter, (XingkeSessionExpired,), psns
-
-    from app.adapters.fake import DEMO_PSNS, FakeAdapter, FakeAuthError
-
-    log.info("adapter: fake (XINGKE_ADAPTER=fake) — không gọi mạng")
-    return FakeAdapter(), (FakeAuthError,), list(DEMO_PSNS)
+    xs = get_xingke_settings()
+    adapter = XingkeAdapter(xs, store_raw=settings.store_raw_payload)
+    psns = sorted(xs.allowed_psn_set)
+    log.info("adapter: live, %s PSN trong allowlist", len(psns))
+    # CHỈ SessionExpired là fatal. XingkeAuthError thường vẫn cứu được bằng re-login
+    # (client tự làm), nên nó không được làm dừng job.
+    return adapter, (XingkeSessionExpired,), psns

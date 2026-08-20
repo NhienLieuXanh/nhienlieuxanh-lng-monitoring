@@ -747,10 +747,19 @@
       wrap.classList.add("hidden");
       skel.classList.add("show");
       let items = [];
+      const q = (f, t) => "/api/telemetry/" + encodeURIComponent(psn)
+        + `?from=${f.toISOString()}&to=${t.toISOString()}&limit=500&order=asc`;
+      let widened = false;
       try {
-        const res = await api("/api/telemetry/" + encodeURIComponent(psn)
-          + `?from=${from.toISOString()}&to=${anchor.toISOString()}&limit=500&order=asc`);
-        items = res.items;
+        items = (await api(q(from, anchor))).items;
+        if (!items.length) {
+          // Cửa sổ chọn rỗng nhưng thiết bị có thể có cụm dữ liệu cũ hơn (offline
+          // lâu). Mở rộng tới trần cho phép (90 ngày) để hiện lịch sử thật gần nhất
+          // thay vì để trống dù DB có số.
+          const wide = new Date(anchor.getTime() - 89 * 86400 * 1000);
+          items = (await api(q(wide, anchor))).items;
+          widened = items.length > 0;
+        }
       } catch (e) { skel.classList.remove("show"); if (e.name !== "AuthError") showError(e.message); return; }
       skel.classList.remove("show");
 
@@ -762,6 +771,9 @@
       }
       empty.classList.remove("show");
       wrap.classList.remove("hidden");
+      wrap.title = widened
+        ? "Cửa sổ chọn không có điểm đo — đang hiển thị lịch sử thật 90 ngày gần nhất"
+        : "";
 
       const labels = items.map(r => new Date(r.sampled_at)
         .toLocaleString("vi-VN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
