@@ -528,8 +528,10 @@
 
     /* Pill "còn lại" trong danh sách bồn — thay cột áp suất, vì áp suất đã có ở
        readout chi tiết còn "còn bao nhiêu ngày" thì không có ở đâu khác. */
-    table.tanks td:nth-child(3), table.tanks td:nth-child(4),
-    table.tanks td:nth-child(5) { white-space: nowrap; }
+    table.tanks td:nth-child(3), table.tanks td:nth-child(4) { white-space: nowrap; }
+    /* Tuổi lần đo nằm ngay dưới badge trạng thái: hai thứ này trả lời cùng một câu
+       hỏi ("thiết bị còn báo không, lần cuối là khi nào") nên đứng cùng một ô. */
+    .tago { display: block; margin-top: 3px; font-size: var(--fs-tiny); color: var(--faint); }
     .runpill { display: inline-block; font-family: var(--mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
                padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
     .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
@@ -733,13 +735,12 @@
                 <tr>
                   <th>Bồn</th>
                   <th class="r">Mức chứa</th>
-                  <!-- "Còn lại" thay chỗ của "Áp suất": áp suất đã hiện ở readout
-                       chi tiết và ở thẻ hold time, còn "còn bao nhiêu ngày tới
-                       cạn" thì không có ở đâu khác — và đó mới là con số khiến
-                       người vận hành phải làm gì đó. -->
+                  <!-- "Tới dự trữ" thay chỗ của "Áp suất": áp suất đã hiện ở readout
+                       chi tiết và ở ô thời gian giữ áp, còn "còn bao nhiêu ngày tới
+                       mức dự trữ" thì không có ở đâu khác — và đó mới là con số
+                       khiến người vận hành phải làm gì đó. -->
                   <th class="r">Tới dự trữ</th>
                   <th>Trạng thái</th>
-                  <th>Lần đo cuối</th>
                 </tr>
               </thead>
               <tbody id="tank-list"></tbody>
@@ -1402,7 +1403,7 @@
     function renderTankList() {
       const container = document.getElementById("tank-list");
       if (!tanks.length) {
-        container.innerHTML = `<tr><td colspan="5" class="empty">Chưa có bồn nào trong hệ thống.</td></tr>`;
+        container.innerHTML = `<tr><td colspan="4" class="empty">Chưa có bồn nào trong hệ thống.</td></tr>`;
         return;
       }
       container.innerHTML = sortedTanks().map(tank => {
@@ -1422,8 +1423,10 @@
               </div>
             </td>
             <td class="r">${runPill(tank.psn)}</td>
-            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span></td>
-            <td>${esc(fmtAgo(tank.last_seen_at))}</td>
+            <td>
+              <span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
+              <span class="tago">${esc(fmtAgo(tank.last_seen_at))}</span>
+            </td>
           </tr>`;
       }).join("");
     }
