@@ -1024,11 +1024,14 @@
       const chip = document.getElementById("btn-alerts");
       const chipBadge = document.getElementById("alert-badge");
       const navBadge = document.getElementById("nav-alert-badge");
-      const n = alerts.length;
-      chip.classList.toggle("has", n > 0);
-      chipBadge.textContent = n;
-      if (navBadge) { navBadge.textContent = n; navBadge.hidden = n === 0; }
-      if (!n) {
+      // Đếm theo SỐ BỒN có cảnh báo (không phải số dòng cảnh báo) để khớp với KPI
+      // header (server: len distinct psn) và với số dòng popover (gom theo bồn).
+      const total = alerts.length;
+      const count = new Set(alerts.map(a => a.psn)).size;
+      chip.classList.toggle("has", total > 0);
+      chipBadge.textContent = count;
+      if (navBadge) { navBadge.textContent = count; navBadge.hidden = total === 0; }
+      if (!total) {
         container.innerHTML = `<p class="empty-al">Không có cảnh báo nào. Mọi bồn đang bình thường.</p>`;
         return;
       }
