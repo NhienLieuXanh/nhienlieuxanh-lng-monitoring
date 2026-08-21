@@ -1041,6 +1041,24 @@
     }
     function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
+    // FastAPI trả `detail` là CHUỖI cho HTTPException nhưng là MẢNG OBJECT
+    // ({loc, msg, type}) cho lỗi validate 422. Nối chuỗi thẳng vào sẽ ra
+    // "[object Object]" — đúng cái người dùng thấy khi nhập email sai, tức là
+    // kênh phản hồi của mọi form trong app bị vô hiệu. Hàm này xử lý cả hai dạng.
+    function apiErrText(body) {
+      const d = body && body.detail;
+      if (!d) return "";
+      if (typeof d === "string") return d;
+      if (!Array.isArray(d)) return JSON.stringify(d);
+      return d.map(e => {
+        // loc = ["body", "alert_email_to"] -> bỏ "body", giữ tên field.
+        const field = Array.isArray(e.loc) ? e.loc.filter(x => x !== "body").join(".") : "";
+        // Pydantic tiền tố "Value error, " vào message của validator — bỏ cho gọn.
+        const msg = String(e.msg || "").replace(/^Value error,\s*/, "");
+        return (field ? field + ": " : "") + msg;
+      }).filter(Boolean).join(" · ");
+    }
+
     async function api(path, opts) {
       const r = await fetch(API + path, {
         credentials: "same-origin",
@@ -1049,7 +1067,7 @@
       });
       if (r.status === 401) {
         let extra = "";
-        try { extra = (await r.json()).detail || ""; } catch (_) {}
+        try { extra = apiErrText(await r.json()); } catch (_) {}
         const err = new Error(extra || "cần đăng nhập");
         err.name = "AuthError";
         if (!path.startsWith("/api/auth/")) showLogin();
@@ -1057,8 +1075,14 @@
       }
       if (!r.ok) {
         let extra = "";
-        try { extra = (await r.json()).detail || ""; } catch (_) {}
-        throw new Error(`${r.status} ${r.statusText} — ${path}${extra ? " — " + extra : ""}`);
+        try { extra = apiErrText(await r.json()); } catch (_) {}
+        // Lỗi validate (422) thì THÔNG ĐIỆP là thứ người dùng cần, không phải mã
+        // trạng thái và đường dẫn — đưa nó lên trước.
+        throw new Error(
+          r.status === 422 && extra
+            ? extra
+            : `${r.status} ${r.statusText} — ${path}${extra ? " — " + extra : ""}`
+        );
       }
       if (r.status === 204) return null;
       return r.json();
@@ -1955,7 +1979,7 @@
         if (r.status === 401) { showLogin(); return; }
         if (!r.ok) {
           let d = "";
-          try { d = (await r.json()).detail || ""; } catch (_) {}
+          try { d = apiErrText(await r.json()); } catch (_) {}
           showError(`Không tải được báo cáo (${r.status})${d ? " — " + d : ""}`);
           return;
         }
@@ -2134,7 +2158,7 @@
       "online_stale_minutes", "alert_low_volume_percent", "alert_low_battery_v",
       "alert_low_signal_percent"];
 
-    async function saveSettings(keys, msgId) {
+    async function saveSettings(keys, msgId, doneMsg) {
       const patch = collectSettings(keys);
       // Mật khẩu: ô trống nghĩa là GIỮ NGUYÊN, không phải xoá. Nếu gửi null khi
       // trống thì mỗi lần lưu một thay đổi nhỏ sẽ xoá mất mật khẩu đã lưu.
@@ -2149,6 +2173,9 @@
         body: JSON.stringify(patch),
       });
       document.getElementById("s-pass").value = "";
+      // Báo xong NGAY sau khi PATCH trả về, trước loadSettings(): nếu để sau thì
+      // người dùng còn thấy "Đang lưu…" thêm vài giây trong khi việc đã xong.
+      if (doneMsg) setMsg(msgId, doneMsg, "ok");
       await loadSettings();
       return d;
     }
@@ -2173,8 +2200,7 @@
       const btn = document.getElementById("s-save2");
       btn.disabled = true;
       try {
-        await saveSettings(PARAM_KEYS, "s-msg2");
-        document.getElementById("s-msg2").textContent = "Đã lưu — dự báo sẽ tính lại theo số mới.";
+        await saveSettings(PARAM_KEYS, "s-msg2", "Đã lưu — dự báo sẽ tính lại theo số mới.");
         // Ngưỡng vừa đổi ảnh hưởng trực tiếp dự báo -> lấy lại ngay để số trên
         // dashboard không còn theo cấu hình cũ.
         refreshForecast();
