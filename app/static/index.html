@@ -93,11 +93,16 @@
 
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
-    body {
+    body { font-size: var(--fs-body);
       color: var(--fg); font: 14.5px/1.5 var(--font); background: var(--bg);
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
       touch-action: manipulation; overflow: hidden;
     }
+    /* Ô nhập, select và nút KHÔNG khai báo cỡ chữ thì rơi về mặc định của trình
+       duyệt (đo được 14.5px) — lệch thang, và chữ trong ô nhập khác cỡ với nhãn
+       ngay trên nó. Kéo cả nhóm form vào thang; các selector theo class
+       (.nav-item, .page-title, .btn-dl…) vẫn thắng nhờ độ đặc hiệu cao hơn. */
+    input, select, textarea, button { font-family: inherit; font-size: var(--fs-body); }
     .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
     .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
     .skip:focus { left: 0; top: 0; }
