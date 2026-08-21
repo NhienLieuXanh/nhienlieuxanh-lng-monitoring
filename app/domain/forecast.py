@@ -597,19 +597,53 @@ def suggest_order(
             reasons=["Chưa biết dung tích bồn nên không tính được lượng đặt."],
         )
     if daily_use is None or daily_use <= 0 or volume_l is None:
+        # Không đo được mức dùng thì KHÔNG biết "khi nào" — nhưng nếu mức đã dưới
+        # dự trữ thì vẫn biết chắc "cần đặt ngay" và biết "bao nhiêu" (mức đích trừ
+        # mức hiện tại). Trả None cho cả hai câu là bỏ mất một kết luận chắc chắn:
+        # phát hiện khi test e2e, bồn còn 0.06/10.43 m³ mà lịch giao báo "không cần
+        # chuyến nào".
+        target = capacity_l * max_fill_percent / 100.0
+        floor = reserve_l if reserve_l is not None else 0.0
+        no_use = (
+            "Chưa đo được mức dùng/ngày từ lịch sử (thiết bị offline hoặc chưa có "
+            "đủ dữ liệu sụt giảm) nên KHÔNG dự báo được thời điểm cần đặt."
+        )
+        if volume_l is not None and volume_l < floor:
+            return OrderSuggestion(
+                order_l=max(0.0, target - volume_l),
+                # Không có mức dùng thì không suy được thời điểm; "ngay" là kết luận
+                # từ MỨC HIỆN TẠI, nên order_at = now chứ không phải một mốc dự báo.
+                order_at=now,
+                deliver_at=now + timedelta(days=lead_time_days),
+                target_l=target,
+                reorder_point_l=floor,
+                safety_stock_l=0.0,
+                lead_time_days=lead_time_days,
+                service_level=service_level,
+                urgency="now",
+                reasons=[
+                    no_use,
+                    f"Nhưng mức hiện tại {volume_l / 1000:.2f} m³ ĐÃ dưới mức dự trữ "
+                    f"{floor / 1000:.2f} m³ — cần đặt ngay, không cần dự báo.",
+                    f"Lượng đặt = mức đích {target / 1000:.2f} m³ "
+                    f"({max_fill_percent:g}% dung tích, chừa ullage) − mức hiện tại.",
+                    "⚠ Chưa có dự trữ an toàn thống kê (cần đo được biến động tiêu thụ).",
+                ],
+            )
         return OrderSuggestion(
             order_l=None,
             order_at=None,
             deliver_at=None,
-            target_l=capacity_l * max_fill_percent / 100.0,
-            reorder_point_l=0.0,
+            target_l=target,
+            reorder_point_l=floor,
             safety_stock_l=0.0,
             lead_time_days=lead_time_days,
             service_level=service_level,
             urgency="unknown",
             reasons=[
-                "Chưa đo được mức dùng/ngày từ lịch sử (thiết bị offline hoặc chưa "
-                "có đủ dữ liệu sụt giảm), nên chưa đề xuất được lượng đặt.",
+                no_use,
+                f"Mức hiện tại còn trên mức dự trữ {floor / 1000:.2f} m³ nên chưa "
+                "cần đặt; theo dõi tiếp khi thiết bị có dữ liệu.",
             ],
         )
 

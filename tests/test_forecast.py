@@ -433,8 +433,13 @@ def test_build_forecast_survives_dead_device() -> None:
     assert f.consumption.confidence == "none"
     # Vẫn cạn dần vì bay hơi tham chiếu, dù không đo được lượng rút.
     assert f.runout.days_to_empty is not None
-    assert f.suggestion.order_l is None
-    assert f.suggestion.urgency == "unknown"
+    # Lần đọc cách đây 30 ngày -> stale -> KHÔNG phát cảnh báo hướng tới tương lai.
+    assert f.stale is True
+    assert f.alerts == []
+    # Nhưng vẫn nói được BAO NHIÊU (mức đã dưới dự trữ), chỉ không nói được KHI NÀO.
+    assert f.suggestion.urgency == "now"
+    assert f.suggestion.order_l is not None
+    assert any("KHÔNG dự báo được thời điểm" in r for r in f.suggestion.reasons)
 
 
 def test_stale_reading_suppresses_forward_alerts() -> None:
@@ -540,3 +545,55 @@ def test_plan_trips_empty_inputs() -> None:
     )
     assert plan_trips([f], truck_capacity_l=10_000.0) == []
     assert plan_trips([f], truck_capacity_l=0.0) == []
+
+
+def test_suggestion_still_gives_quantity_when_below_reserve_without_usage() -> None:
+    """Không đo được mức dùng nhưng mức ĐÃ dưới dự trữ -> vẫn phải nói BAO NHIÊU.
+
+    Ca thật phát hiện khi test e2e: bồn còn 0.061 / 10.425 m³, mức dùng chưa đo
+    được (thiết bị chết), và lịch giao báo "không cần chuyến nào". Không biết
+    KHI NÀO là đúng; nhưng "bao nhiêu" thì biết chắc — mức đích trừ mức hiện tại.
+    """
+    cons = estimate_consumption([], capacity_l=CAP)
+    idle = estimate_idle_trend([], capacity_l=CAP)
+    reserve = CAP * 0.15
+
+    sug = suggest_order(
+        volume_l=61.0, capacity_l=CAP, consumption=cons, idle=idle, now=T0,
+        lead_time_days=1.0, reserve_l=reserve,
+    )
+    assert sug.urgency == "now"
+    assert sug.order_l is not None
+    assert abs(sug.order_l - (CAP * 0.9 - 61.0)) < 1e-9
+    assert sug.order_at == T0  # kết luận từ MỨC, không phải mốc dự báo
+    assert sug.safety_stock_l == 0.0  # chưa đo được biến động thì không bịa đệm
+    assert any("KHÔNG dự báo được thời điểm" in r for r in sug.reasons)
+    assert any("ĐÃ dưới mức dự trữ" in r for r in sug.reasons)
+
+
+def test_suggestion_stays_silent_when_level_is_fine_without_usage() -> None:
+    """Mức còn trên dự trữ và chưa đo được mức dùng -> KHÔNG bịa lượng đặt."""
+    cons = estimate_consumption([], capacity_l=CAP)
+    idle = estimate_idle_trend([], capacity_l=CAP)
+    sug = suggest_order(
+        volume_l=CAP * 0.6, capacity_l=CAP, consumption=cons, idle=idle, now=T0,
+        reserve_l=CAP * 0.15,
+    )
+    assert sug.order_l is None
+    assert sug.urgency == "unknown"
+    assert any("chưa cần đặt" in r for r in sug.reasons)
+
+
+def test_plan_trips_includes_below_reserve_tank_without_usage_data() -> None:
+    """Bồn gần cạn phải xuất hiện trong lịch giao dù chưa đo được mức dùng."""
+    f = build_forecast(
+        [Sample(at=T0, volume_l=61.0, pressure_mpa=0.071)],
+        psn="2604200016", volume_l=61.0, capacity_l=CAP, pressure_mpa=0.071,
+        now=T0, tz=VN, reading_at=T0,  # dữ liệu tươi
+    )
+    assert f.stale is False
+    assert f.suggestion.urgency == "now"
+    trips = plan_trips([f], truck_capacity_l=20_000.0, horizon_days=30.0)
+    assert len(trips) == 1
+    assert trips[0].stops[0].psn == "2604200016"
+    assert trips[0].total_l > 9_000  # gần một xe đầy
