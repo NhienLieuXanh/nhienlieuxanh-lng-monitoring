@@ -1267,8 +1267,14 @@
         const cap = t.capacity_l != null ? round2(Number(t.capacity_l) / 1000) : null;
         if (cap != null) document.getElementById("p-cap").value = cap;
         if (t.volume_l != null) document.getElementById("p-start").value = round2(Number(t.volume_l) / 1000);
-        const resEl = document.getElementById("p-res");
-        if (cap && parseFloat(resEl.value) >= cap) resEl.value = round2(cap * 0.15);
+        if (cap) {
+          // Đặt chính sách vận hành mặc định theo dung tích bồn để có kế hoạch hợp lý
+          // ngay; người dùng chỉnh lại theo thực tế. Chỉ đổi khi giá trị hiện tại quá
+          // lớn so với bồn (vd default 60 m³ áp lên bồn 10 m³).
+          const resEl = document.getElementById("p-res"), useEl = document.getElementById("p-use");
+          if (parseFloat(resEl.value) >= cap * 0.5) resEl.value = round2(cap * 0.15);
+          if (parseFloat(useEl.value) >= cap * 0.5) useEl.value = round2(cap * 0.1);
+        }
       }
       computePlan();
     }
