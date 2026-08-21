@@ -428,6 +428,18 @@
       /* Bảng rộng thì cuộn TRONG panel của nó, không đẩy cả trang cuộn ngang. */
       .fleet-scroll { max-height: 42vh; overflow-x: auto; }
       .kpis { display: none; }
+      /* .head-right là `flex: 0 0 auto` nên nó KHÔNG co, và chuỗi chip chữ (lấy số
+         liệu / cập nhật / tên user) giữ nó ở 603px -> đẩy cả trang cuộn ngang
+         296px. Đo được ở bề rộng 487px.
+         Giữ lại thứ BẤM ĐƯỢC (chuông, theme, làm mới, đăng xuất) + đèn tình trạng;
+         bỏ các chip chỉ để đọc — chúng đã có ở chỗ khác (tình trạng máy trong
+         banner khi có sự cố, thời điểm cập nhật trong cột "Cập nhật"). */
+      header.topbar { min-width: 0; overflow: hidden; }
+      .head-right { flex: 1 1 auto; min-width: 0; justify-content: flex-end; gap: 6px; }
+      #ingest-label, #last-update, #user-chip { display: none !important; }
+      #health-pill #health-text { display: none; }
+      #health-pill { flex: 0 0 auto; }
+      .page-title { overflow: hidden; text-overflow: ellipsis; }
     }
     @media (min-width: 981px) { .drawer-scrim { display: none; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
