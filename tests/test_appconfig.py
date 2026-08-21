@@ -182,3 +182,64 @@ def test_ranges_are_enforced() -> None:
         SettingsIn(lng_max_fill_percent=101)
     with pytest.raises(ValidationError):
         SettingsIn(truck_capacity_l=0)
+
+
+# --------------------------------------------------------------------------- #
+# Router Cài đặt: bắt lỗi "hàm đã đổi tên nhưng chỗ gọi thì chưa"
+# --------------------------------------------------------------------------- #
+#
+# Bug thật đã xảy ra: đổi `appconfig.load` -> `load_config` mà router Cài đặt vẫn
+# gọi tên cũ. ruff không bắt được (nó là truy cập attribute trên module), và test
+# API thì bị skip khi không có Postgres — nên endpoint 500 và chỉ lộ ra lúc bấm
+# trên production. Session giả dưới đây cho phép chạy đúng đường code đó mà không
+# cần DB, nên lớp lỗi này không lặp lại.
+
+
+class _StubResult:
+    def scalar_one_or_none(self) -> None:
+        return None
+
+    def one_or_none(self) -> None:
+        return None
+
+
+class _StubSession:
+    """Chỉ đủ để app_settings.load()/meta() chạy: bảng rỗng."""
+
+    def execute(self, *a: object, **k: object) -> _StubResult:
+        return _StubResult()
+
+    def rollback(self) -> None:
+        pass
+
+
+def test_settings_router_builds_response_without_db_rows() -> None:
+    from app.api.routers.settings import _out, _why_blocked
+
+    out = _out(_StubSession(), _env())  # type: ignore[arg-type]
+    assert set(out.sources) == set(OVERRIDABLE)
+    assert "smtp_password" not in out.values
+    # Chưa ai vào Cài đặt -> mọi field lấy từ .env.
+    assert all(v == "env" for v in out.sources.values())
+    assert out.updated_at is None and out.updated_by is None
+    # .env mẫu thiếu địa chỉ gửi -> phải nói CHÍNH XÁC thiếu gì.
+    assert out.smtp_ready is False
+    assert out.smtp_blocked_reason
+
+    ready = EffectiveConfig(
+        _env(),
+        {"smtp_host": "s.example.com", "smtp_from": "bot@x.com",
+         "alert_email_to": "a@x.com", "notify_enabled": True,
+         "smtp_password": "pw"},
+    )
+    assert _why_blocked(ready) is None
+
+
+def test_why_blocked_names_the_missing_piece() -> None:
+    from app.api.routers.settings import _why_blocked
+
+    full = {"smtp_host": "s.example.com", "smtp_from": "bot@x.com",
+            "alert_email_to": "a@x.com", "notify_enabled": True, "smtp_password": "pw"}
+    assert "tắt" in _why_blocked(EffectiveConfig(_env(), {**full, "notify_enabled": False})).lower()
+    assert "SMTP" in _why_blocked(EffectiveConfig(_env(), {**full, "smtp_host": ""}))
+    assert "nhận" in _why_blocked(EffectiveConfig(_env(), {**full, "alert_email_to": ""}))

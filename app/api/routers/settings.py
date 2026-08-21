@@ -27,7 +27,8 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import SessionDep, SettingsDep, UserDep
 from app.api.schemas import ActionOut, SettingsIn, SettingsOut
 from app.repositories import app_settings as store
-from app.services import appconfig, notifier
+from app.services import notifier
+from app.services.appconfig import EffectiveConfig, load_config
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -35,7 +36,7 @@ UTC = ZoneInfo("UTC")
 
 
 def _out(session: SessionDep, settings: SettingsDep) -> SettingsOut:
-    cfg = appconfig.load(session, settings)
+    cfg = load_config(session, settings)
     updated_at, updated_by = store.meta(session)
     return SettingsOut(
         values=cfg.public_values(),
@@ -48,7 +49,7 @@ def _out(session: SessionDep, settings: SettingsDep) -> SettingsOut:
     )
 
 
-def _why_blocked(cfg: appconfig.EffectiveConfig) -> str | None:
+def _why_blocked(cfg: EffectiveConfig) -> str | None:
     """Nói CHÍNH XÁC thiếu gì, thay vì một cờ false không giải thích.
 
     Đây là màn hình mà người dùng đến khi "email không chạy"; trả về đúng mảnh
@@ -109,7 +110,7 @@ def test_email(session: SessionDep, settings: SettingsDep, user: UserDep) -> Act
     bản ghi kiểm toán lẫn thư rác thử nghiệm, và nếu tính vào cửa chặn thì một lần
     bấm thử sẽ làm cảnh báo thật im lặng suốt 12 giờ sau đó.
     """
-    cfg = appconfig.load(session, settings)
+    cfg = load_config(session, settings)
     reason = _why_blocked(cfg)
     if not cfg.smtp_ready:
         return ActionOut(ok=False, message=reason or "Cấu hình SMTP chưa đủ")
