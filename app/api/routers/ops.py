@@ -96,7 +96,7 @@ def health(
             ).scalar_one_or_none()
             head = getattr(request.app.state, "alembic_head", None)
             if head and current != head:
-                mig = CheckOut(ok=False, detail=f"schema ở {current}, code cần {head}")
+                mig = CheckOut(ok=False, detail=f"DB ở {current}, code cần {head}")
                 overall = "degraded" if overall == "ok" else overall
         except Exception:
             # Query lỗi làm abort transaction của Postgres; rollback để các check

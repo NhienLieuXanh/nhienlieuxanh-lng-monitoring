@@ -468,6 +468,7 @@
 
     /* Pill "còn lại" trong danh sách bồn — thay cột áp suất, vì áp suất đã có ở
        readout chi tiết còn "còn bao nhiêu ngày" thì không có ở đâu khác. */
+    table.tanks td:nth-child(5), table.tanks td:nth-child(3) { white-space: nowrap; }
     .runpill { display: inline-block; font-family: var(--mono); font-size: .72rem; font-variant-numeric: tabular-nums;
                padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
     .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
@@ -992,15 +993,18 @@
     function fmtPct(p) { return p === null ? "--" : p.toFixed(2); }
     function fmtNum(v, unit) { return (v === null || v === undefined) ? "--" : `${Number(v)} ${unit}`; }
     function fmtTime(iso) { return iso ? new Date(iso).toLocaleString("vi-VN") : "chưa bao giờ"; }
+    // Bỏ chữ "trước": tiêu đề cột là "Cập nhật" nên đã hàm ý khoảng đã trôi, và
+    // "79 ngày trước" trong cột hẹp (sau khi thêm cột "Còn lại") gãy thành 3 dòng
+    // làm mọi hàng cao lên — mất chỗ hiển thị bồn trên một màn hình.
     function fmtAgo(iso) {
       if (!iso) return "chưa có";
       const ms = Date.now() - new Date(iso).getTime();
       if (ms < 0) return fmtTime(iso);
       const m = Math.floor(ms / 60000);
-      if (m < 60) return m + " phút trước";
+      if (m < 60) return m + " phút";
       const h = Math.floor(m / 60);
-      if (h < 48) return h + " giờ trước";
-      return Math.floor(h / 24) + " ngày trước";
+      if (h < 48) return h + " giờ";
+      return Math.floor(h / 24) + " ngày";
     }
     /* ---------- DỰ BÁO: định dạng & nhãn ---------- */
     // Server trả mọi thể tích bằng LÍT (đơn vị canonical của DB); UI luôn hiện m³.
