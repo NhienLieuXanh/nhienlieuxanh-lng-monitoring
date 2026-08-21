@@ -899,7 +899,6 @@
               Hệ thống gửi cảnh báo tới các địa chỉ này khi bồn sắp cạn, thời gian giữ áp
               còn ngắn, mức chứa xuống thấp, hoặc thiết bị mất kết nối.
             </p>
-            <p class="set-note" id="set-smtp-state"></p>
             <div class="set-grid">
               <label class="wide">
                 <span class="set-lbl">Địa chỉ nhận · phân tách bằng dấu phẩy
@@ -915,13 +914,24 @@
                 <input type="number" id="s-resend" class="field num" min="1" max="168" step="1" />
               </label>
             </div>
+            <div class="set-actions">
+              <button type="button" class="btn-primary-sm" id="s-save-recipients">Lưu</button>
+              <span class="set-note" id="s-msg0"></span>
+            </div>
+          </div>
 
-            <p class="set-note" style="margin-top:12px">
-              <b>Máy chủ thư điện tử.</b> Hệ thống dùng máy chủ này để phát cảnh báo. Nhà cung
-              cấp thư điện tử yêu cầu một mật khẩu ứng dụng riêng, cần được tạo từ tài khoản
-              của bạn. Với Gmail: bật xác thực hai bước, tạo mật khẩu ứng dụng 16 ký tự, sau
-              đó nhập vào ô bên dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
+          <!-- Máy chủ gửi thư là một nhóm RIÊNG: "ai nhận" và "máy nào gửi" là hai
+               việc khác nhau, gộp một thẻ làm người đọc không biết nút Lưu đang lưu
+               phần nào. -->
+          <div class="rep-card">
+            <h3>Máy chủ thư điện tử</h3>
+            <p class="hint">
+              Hệ thống dùng máy chủ này để phát cảnh báo. Nhà cung cấp thư điện tử yêu cầu
+              một mật khẩu ứng dụng riêng, cần được tạo từ tài khoản của bạn. Với Gmail:
+              bật xác thực hai bước, tạo mật khẩu ứng dụng 16 ký tự, sau đó nhập vào ô bên
+              dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
             </p>
+            <p class="set-note" id="set-smtp-state"></p>
             <div class="set-grid">
               <label>
                 <span class="set-lbl">Địa chỉ máy chủ <span class="src" data-src="smtp_host">Mặc định</span></span>
@@ -2176,8 +2186,10 @@
       return patch;
     }
 
-    const EMAIL_KEYS = ["alert_email_to", "notify_enabled", "alert_resend_hours",
-      "smtp_host", "smtp_port", "smtp_user", "smtp_from", "smtp_starttls"];
+    // Hai nhóm khoá RIÊNG, khớp đúng hai thẻ trên giao diện: mỗi nút Lưu chỉ ghi
+    // phần nó phụ trách, nên người dùng luôn biết mình vừa lưu cái gì.
+    const RECIPIENT_KEYS = ["alert_email_to", "notify_enabled", "alert_resend_hours"];
+    const SMTP_KEYS = ["smtp_host", "smtp_port", "smtp_user", "smtp_from", "smtp_starttls"];
     const PARAM_KEYS = ["lng_relief_pressure_mpa", "lng_max_fill_percent",
       "forecast_reserve_percent", "forecast_lead_time_days", "forecast_service_level",
       "forecast_window_days", "truck_capacity_l", "forecast_max_reading_age_hours",
@@ -2188,7 +2200,7 @@
       const patch = collectSettings(keys);
       // Mật khẩu: ô trống nghĩa là GIỮ NGUYÊN, không phải xoá. Nếu gửi null khi
       // trống thì mỗi lần lưu một thay đổi nhỏ sẽ xoá mất mật khẩu đã lưu.
-      if (keys === EMAIL_KEYS) {
+      if (keys === SMTP_KEYS) {
         const pass = document.getElementById("s-pass").value;
         if (pass) patch.smtp_password = pass;
       }
@@ -2206,12 +2218,24 @@
       return d;
     }
 
+    async function onSaveRecipients() {
+      const btn = document.getElementById("s-save-recipients");
+      btn.disabled = true;
+      try {
+        await saveSettings(RECIPIENT_KEYS, "s-msg0", "Đã lưu danh sách người nhận.");
+      } catch (e) {
+        if (e.name !== "AuthError") document.getElementById("s-msg0").textContent = e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     async function onSaveEmail(alsoTest) {
       const btns = ["s-save", "s-save-test"].map(i => document.getElementById(i));
       btns.forEach(b => b.disabled = true);
       try {
-        await saveSettings(EMAIL_KEYS, "s-msg");
-        if (!alsoTest) { setMsg("s-msg", "Đã lưu cấu hình.", "ok"); return; }
+        await saveSettings(SMTP_KEYS, "s-msg");
+        if (!alsoTest) { setMsg("s-msg", "Đã lưu cấu hình máy chủ.", "ok"); return; }
         setMsg("s-msg", "Đã lưu. Đang gửi thư kiểm tra…", "");
         const r = await api("/api/settings/test-email", { method: "POST" });
         setMsg("s-msg", r.message, r.ok ? "ok" : "bad");
@@ -2305,6 +2329,7 @@
       document.getElementById("nav-settings").addEventListener("click", () => showView("settings"));
 
       // Cài đặt
+      document.getElementById("s-save-recipients").addEventListener("click", onSaveRecipients);
       document.getElementById("s-save").addEventListener("click", () => onSaveEmail(false));
       document.getElementById("s-save-test").addEventListener("click", () => onSaveEmail(true));
       document.getElementById("s-save2").addEventListener("click", onSaveParams);
