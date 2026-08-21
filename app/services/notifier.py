@@ -31,13 +31,13 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.config import Settings
 from app.domain import forecast as fc
 from app.domain.alerts import AlertThresholds, TerminalSnapshot, evaluate
 from app.domain.alerts import fill_percent as _fill_percent
 from app.repositories import notifications as notif_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.services.appconfig import ConfigLike, load_config
 
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
@@ -83,7 +83,7 @@ class NotifyStats:
 
 
 def collect_notices(
-    session: Session, settings: Settings, now: datetime
+    session: Session, settings: ConfigLike, now: datetime
 ) -> list[Notice]:
     """Gom cảnh báo thiết bị + cảnh báo dự báo cho mọi bồn.
 
@@ -152,11 +152,17 @@ def collect_notices(
     return picked
 
 
-def notify(session: Session, settings: Settings, now: datetime) -> NotifyStats:
-    """Điểm vào duy nhất: gom cảnh báo, lọc theo cửa chặn, gửi một email, ghi log."""
+def notify(session: Session, settings: ConfigLike, now: datetime) -> NotifyStats:
+    """Điểm vào duy nhất: gom cảnh báo, lọc theo cửa chặn, gửi một email, ghi log.
+
+    Cấu hình lấy qua ``appconfig.load``, KHÔNG đọc thẳng ``settings``: người vận
+    hành đổi địa chỉ nhận trong trang Cài đặt thì vòng cảnh báo kế tiếp phải dùng
+    ngay địa chỉ đó, không cần redeploy.
+    """
     stats = NotifyStats()
+    cfg = load_config(session, settings)
     try:
-        notices = collect_notices(session, settings, now)
+        notices = collect_notices(session, cfg, now)
     except Exception as exc:
         # Không để lỗi ở tầng cảnh báo làm hỏng vòng ingest.
         log.error("notify: không gom được cảnh báo: %s", exc)
@@ -167,7 +173,7 @@ def notify(session: Session, settings: Settings, now: datetime) -> NotifyStats:
     if not notices:
         return stats
 
-    if not settings.smtp_ready:
+    if not cfg.smtp_ready:
         # Ghi log rồi bỏ qua, KHÔNG raise: hộp thư chưa khai báo là chuyện cấu
         # hình, không phải sự cố dữ liệu.
         stats.reason = "SMTP/người nhận chưa cấu hình"
@@ -178,17 +184,17 @@ def notify(session: Session, settings: Settings, now: datetime) -> NotifyStats:
         )
         return stats
 
-    window = timedelta(hours=settings.alert_resend_hours)
+    window = timedelta(hours=cfg.alert_resend_hours)
     last = notif_repo.last_sent_map(session)
     due = [n for n in notices if _is_due(last.get((n.psn, n.code)), now, window)]
     stats.suppressed = len(notices) - len(due)
     if not due:
         return stats
 
-    subject, body = render_email(due, settings, now)
+    subject, body = render_email(due, cfg, now)
     error: str | None = None
     try:
-        send_email(settings, subject, body)
+        send_email(cfg, subject, body)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         log.error("notify: gửi email thất bại: %s", error)
@@ -210,7 +216,7 @@ def notify(session: Session, settings: Settings, now: datetime) -> NotifyStats:
     else:
         stats.sent = len(due)
         log.info(
-            "notify: đã gửi %d cảnh báo tới %s", len(due), settings.alert_email_list
+            "notify: đã gửi %d cảnh báo tới %s", len(due), cfg.alert_email_list
         )
     return stats
 
@@ -226,7 +232,7 @@ def _is_due(last: datetime | None, now: datetime, window: timedelta) -> bool:
 
 
 def render_email(
-    notices: list[Notice], settings: Settings, now: datetime
+    notices: list[Notice], settings: ConfigLike, now: datetime
 ) -> tuple[str, str]:
     """Soạn tiêu đề + nội dung text thuần.
 
@@ -259,7 +265,7 @@ def render_email(
     return subject, "\n".join(lines)
 
 
-def send_email(settings: Settings, subject: str, body: str) -> None:
+def send_email(settings: ConfigLike, subject: str, body: str) -> None:
     """Gửi qua SMTP. Raise nếu thất bại — người gọi quyết định xử lý thế nào.
 
     ``timeout`` là bắt buộc, không phải tuỳ chọn: hàm này chạy trong một function
@@ -285,7 +291,7 @@ def send_email(settings: Settings, subject: str, body: str) -> None:
             _login_send(s, settings, msg)
 
 
-def _login_send(s: smtplib.SMTP, settings: Settings, msg: EmailMessage) -> None:
+def _login_send(s: smtplib.SMTP, settings: ConfigLike, msg: EmailMessage) -> None:
     if settings.smtp_user and settings.smtp_password:
         s.login(settings.smtp_user, settings.smtp_password)
     s.send_message(msg)

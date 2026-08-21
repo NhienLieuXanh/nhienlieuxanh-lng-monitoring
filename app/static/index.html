@@ -512,6 +512,32 @@
     .trip .stop { display: flex; justify-content: space-between; gap: 8px; font-size: .74rem; padding: 3px 0; border-top: 1px dashed var(--line-soft); }
     .trip .stop .q { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     .trip .stop.now .q { color: var(--crit); }
+    /* ===== CÀI ĐẶT ===== */
+    #view-settings[hidden] { display: none !important; }
+    #view-settings { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .set-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 16px;
+                  display: flex; flex-direction: column; gap: 12px; }
+    .set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .set-grid label { display: flex; flex-direction: column; gap: 3px; font-size: .7rem; color: var(--muted); min-width: 0; }
+    .set-grid label.wide { grid-column: 1 / -1; }
+    .set-grid .field { width: 100%; }
+    /* Nhãn cho biết giá trị đang lấy từ đâu — câu hỏi đầu tiên của bất kỳ ai mở
+       một trang cấu hình có hai nguồn (app và biến môi trường). */
+    .src { font-size: .58rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase;
+           padding: 0 4px; border-radius: 999px; border: 1px solid var(--line); color: var(--faint); }
+    .src.app { color: var(--brand); border-color: var(--brand); }
+    .set-lbl { display: flex; align-items: center; gap: 5px; justify-content: space-between; }
+    .set-note { font-size: .66rem; color: var(--faint); line-height: 1.55; }
+    .set-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    .set-msg { font-size: .74rem; padding: 7px 10px; border-radius: var(--r-sm); border: 1px solid var(--line);
+               background: var(--surface-2); overflow-wrap: anywhere; }
+    .set-msg.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+    .set-msg.bad { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
+    .set-msg.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+    .btn-primary-sm { font-size: .74rem; padding: 6px 13px; border-radius: var(--r-sm); border: 1px solid var(--brand);
+                      background: var(--brand); color: #fff; cursor: pointer; font-weight: 600; }
+    .btn-primary-sm:hover { background: var(--brand-strong); }
+    .btn-primary-sm[disabled] { opacity: .5; cursor: not-allowed; }
   </style>
 </head>
 <body class="is-locked">
@@ -571,14 +597,14 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>
           <span class="lbl">Báo cáo</span>
         </button>
+        <button type="button" class="nav-item" id="nav-settings" data-view="settings" title="Cài đặt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="lbl">Cài đặt</span>
+        </button>
         <div class="nav-group">Sắp có</div>
         <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           <span class="lbl">Lịch sử</span><span class="tag">SOON</span>
-        </button>
-        <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="lbl">Cài đặt</span><span class="tag">SOON</span>
         </button>
       </nav>
       <div class="side-foot">
@@ -827,6 +853,166 @@
             </div>
             <div id="trip-list"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- CÀI ĐẶT: cấu hình vận hành bấm được trong app, không phải sửa biến môi
+           trường rồi redeploy. Mỗi ô có nhãn nguồn (APP / ENV) để trả lời được
+           "vì sao giá trị này lại thế". -->
+      <section id="view-settings" class="settings" hidden aria-label="Cài đặt">
+        <div class="pane-head">
+          <h1>Cài đặt</h1>
+          <span class="meta" id="set-meta">lưu là có hiệu lực ngay, không cần deploy lại</span>
+        </div>
+        <div class="set-scroll">
+
+          <div class="rep-card">
+            <h3>Gửi cảnh báo qua email</h3>
+            <p class="hint">
+              Nhập địa chỉ nhận rồi bấm <b>Lưu &amp; gửi thử</b> — thư thử đi ngay để bạn
+              biết cấu hình đúng hay chưa. Cảnh báo thật gửi khi bồn sắp cạn, hold time
+              ngắn, mức thấp, hoặc thiết bị mất liên lạc.
+            </p>
+            <p class="set-note" id="set-smtp-state"></p>
+            <div class="set-grid">
+              <label class="wide">
+                <span class="set-lbl">Địa chỉ nhận (nhiều địa chỉ cách nhau bằng dấu phẩy)
+                  <span class="src" data-src="alert_email_to">env</span></span>
+                <input type="text" id="s-emails" class="field" placeholder="ten@congty.com, ten2@congty.com" maxlength="1000" />
+              </label>
+              <label>
+                <span class="set-lbl">Bật gửi thông báo <span class="src" data-src="notify_enabled">env</span></span>
+                <select id="s-notify" class="field"><option value="true">Bật</option><option value="false">Tắt</option></select>
+              </label>
+              <label>
+                <span class="set-lbl">Không gửi lại trong (giờ) <span class="src" data-src="alert_resend_hours">env</span></span>
+                <input type="number" id="s-resend" class="field num" min="1" max="168" step="1" />
+              </label>
+            </div>
+
+            <p class="set-note" style="margin-top:10px">
+              <b>Máy chủ gửi thư.</b> Đây là phần duy nhất cần bạn tự tạo: mọi nhà cung cấp
+              mail đều đòi một mật khẩu ứng dụng / API key, không hệ thống nào tạo hộ được.
+              Với Gmail: bật xác thực 2 bước, tạo <i>App password</i> 16 ký tự, rồi dán vào ô
+              mật khẩu bên dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
+            </p>
+            <div class="set-grid">
+              <label>
+                <span class="set-lbl">Máy chủ SMTP <span class="src" data-src="smtp_host">env</span></span>
+                <input type="text" id="s-host" class="field" placeholder="smtp.gmail.com" maxlength="255" />
+              </label>
+              <label>
+                <span class="set-lbl">Cổng <span class="src" data-src="smtp_port">env</span></span>
+                <input type="number" id="s-port" class="field num" min="1" max="65535" step="1" />
+              </label>
+              <label>
+                <span class="set-lbl">Tài khoản <span class="src" data-src="smtp_user">env</span></span>
+                <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" />
+              </label>
+              <label>
+                <span class="set-lbl">Mật khẩu ứng dụng <span class="src" id="s-pass-state">chưa lưu</span></span>
+                <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="để trống = giữ nguyên" />
+              </label>
+              <label>
+                <span class="set-lbl">Địa chỉ gửi (From) <span class="src" data-src="smtp_from">env</span></span>
+                <input type="text" id="s-from" class="field" maxlength="255" />
+              </label>
+              <label>
+                <span class="set-lbl">STARTTLS <span class="src" data-src="smtp_starttls">env</span></span>
+                <select id="s-tls" class="field"><option value="true">Bật (cổng 587)</option><option value="false">Tắt (cổng 465 dùng SSL)</option></select>
+              </label>
+            </div>
+            <div class="set-actions">
+              <button type="button" class="btn-primary-sm" id="s-save-test">Lưu &amp; gửi thử</button>
+              <button type="button" class="btn-dl" id="s-save">Chỉ lưu</button>
+            </div>
+            <p class="set-msg" id="s-msg" hidden></p>
+          </div>
+
+          <div class="rep-card">
+            <h3>Thông số bồn &amp; an toàn LNG</h3>
+            <p class="hint">
+              <b>Áp van an toàn</b> quyết định con số Hold time — phải khớp thông số bồn thật,
+              nếu không cột đó đúng công thức nhưng sai ngưỡng.
+            </p>
+            <div class="set-grid">
+              <label>
+                <span class="set-lbl">Áp van an toàn (MPa) <span class="src" data-src="lng_relief_pressure_mpa">env</span></span>
+                <input type="number" id="s-relief" class="field num" min="0.01" max="10" step="0.01" />
+              </label>
+              <label>
+                <span class="set-lbl">Nạp tối đa (% dung tích) <span class="src" data-src="lng_max_fill_percent">env</span></span>
+                <input type="number" id="s-maxfill" class="field num" min="1" max="100" step="1" />
+              </label>
+              <label>
+                <span class="set-lbl">Mức dự trữ (% dung tích) <span class="src" data-src="forecast_reserve_percent">env</span></span>
+                <input type="number" id="s-reserve" class="field num" min="0" max="100" step="1" />
+              </label>
+            </div>
+          </div>
+
+          <div class="rep-card">
+            <h3>Đặt hàng &amp; dự báo</h3>
+            <p class="hint">
+              Các số này là đầu vào của trợ lý đề xuất: điểm đặt hàng lại = thất thoát trong
+              lead time + dự trữ an toàn (z × σ × √lead time).
+            </p>
+            <div class="set-grid">
+              <label>
+                <span class="set-lbl">Lead time giao hàng (ngày) <span class="src" data-src="forecast_lead_time_days">env</span></span>
+                <input type="number" id="s-lead" class="field num" min="0" max="30" step="0.5" />
+              </label>
+              <label>
+                <span class="set-lbl">Mức phục vụ (%) <span class="src" data-src="forecast_service_level">env</span></span>
+                <select id="s-service" class="field">
+                  <option value="50">50 — không đệm</option>
+                  <option value="80">80</option>
+                  <option value="90">90</option>
+                  <option value="95">95 — chuẩn ngành</option>
+                  <option value="99">99 — rất an toàn</option>
+                </select>
+              </label>
+              <label>
+                <span class="set-lbl">Cửa sổ lịch sử (ngày) <span class="src" data-src="forecast_window_days">env</span></span>
+                <input type="number" id="s-window" class="field num" min="1" max="365" step="1" />
+              </label>
+              <label>
+                <span class="set-lbl">Tải xe (m³) <span class="src" data-src="truck_capacity_l">env</span></span>
+                <input type="number" id="s-truck" class="field num" min="0.5" step="0.5" />
+              </label>
+              <label>
+                <span class="set-lbl">Số liệu cũ quá (giờ) thì ngừng dự báo <span class="src" data-src="forecast_max_reading_age_hours">env</span></span>
+                <input type="number" id="s-age" class="field num" min="1" max="8760" step="1" />
+              </label>
+            </div>
+          </div>
+
+          <div class="rep-card">
+            <h3>Ngưỡng cảnh báo thiết bị</h3>
+            <div class="set-grid">
+              <label>
+                <span class="set-lbl">Coi là offline sau (phút) <span class="src" data-src="online_stale_minutes">env</span></span>
+                <input type="number" id="s-stale" class="field num" min="1" step="1" />
+              </label>
+              <label>
+                <span class="set-lbl">Mức thấp dưới (%) <span class="src" data-src="alert_low_volume_percent">env</span></span>
+                <input type="number" id="s-lowvol" class="field num" min="0" max="100" step="0.5" />
+              </label>
+              <label>
+                <span class="set-lbl">Pin yếu dưới (V) <span class="src" data-src="alert_low_battery_v">env</span></span>
+                <input type="number" id="s-lowbat" class="field num" min="0" step="0.01" />
+              </label>
+              <label>
+                <span class="set-lbl">Tín hiệu yếu dưới (%) <span class="src" data-src="alert_low_signal_percent">env</span></span>
+                <input type="number" id="s-lowsig" class="field num" min="0" max="100" step="1" />
+              </label>
+            </div>
+            <div class="set-actions">
+              <button type="button" class="btn-primary-sm" id="s-save2">Lưu thông số</button>
+              <span class="set-note" id="s-msg2"></span>
+            </div>
+          </div>
+
         </div>
       </section>
     </main>
@@ -1842,10 +2028,168 @@
 
     /* ---------- ĐIỀU HƯỚNG VIEW ---------- */
 
+    /* ---------- CÀI ĐẶT ---------- */
+
+    // Ánh xạ id ô nhập <-> tên field API. Một bảng duy nhất cho cả đọc và ghi, nên
+    // không thể có chuyện một ô hiện đúng nhưng lưu sai tên field.
+    const SET_FIELDS = [
+      ["s-emails", "alert_email_to", "str"],
+      ["s-notify", "notify_enabled", "bool"],
+      ["s-resend", "alert_resend_hours", "int"],
+      ["s-host", "smtp_host", "str"],
+      ["s-port", "smtp_port", "int"],
+      ["s-user", "smtp_user", "str"],
+      ["s-from", "smtp_from", "str"],
+      ["s-tls", "smtp_starttls", "bool"],
+      ["s-relief", "lng_relief_pressure_mpa", "num"],
+      ["s-maxfill", "lng_max_fill_percent", "num"],
+      ["s-reserve", "forecast_reserve_percent", "num"],
+      ["s-lead", "forecast_lead_time_days", "num"],
+      ["s-service", "forecast_service_level", "int"],
+      ["s-window", "forecast_window_days", "int"],
+      ["s-truck", "truck_capacity_l", "num"],
+      ["s-age", "forecast_max_reading_age_hours", "num"],
+      ["s-stale", "online_stale_minutes", "int"],
+      ["s-lowvol", "alert_low_volume_percent", "num"],
+      ["s-lowbat", "alert_low_battery_v", "num"],
+      ["s-lowsig", "alert_low_signal_percent", "num"],
+    ];
+    // Tải xe nhập bằng m³ nhưng API dùng lít — quy đổi ở đúng một chỗ.
+    const SET_M3 = new Set(["truck_capacity_l"]);
+
+    let settingsLoaded = false;
+
+    function setMsg(id, text, kind) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text || "";
+      el.className = "set-msg" + (kind ? " " + kind : "");
+      if ("hidden" in el) el.hidden = !text;
+    }
+
+    async function loadSettings() {
+      try {
+        const d = await api("/api/settings");
+        for (const [id, key, kind] of SET_FIELDS) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          let v = d.values[key];
+          if (v === null || v === undefined) { el.value = ""; continue; }
+          if (SET_M3.has(key)) v = Number(v) / 1000;
+          el.value = kind === "bool" ? String(!!v) : String(v);
+        }
+        // Nhãn nguồn: người dùng thấy ngay ô nào do mình đặt, ô nào còn theo .env.
+        document.querySelectorAll(".src[data-src]").forEach(tag => {
+          const src = d.sources[tag.dataset.src] || "env";
+          tag.textContent = src === "app" ? "app" : "env";
+          tag.classList.toggle("app", src === "app");
+        });
+        const ps = document.getElementById("s-pass-state");
+        ps.textContent = d.smtp_password_set ? "đã lưu" : "chưa lưu";
+        ps.classList.toggle("app", !!d.smtp_password_set);
+
+        const state = document.getElementById("set-smtp-state");
+        state.textContent = d.smtp_ready
+          ? "Cấu hình đủ để gửi. Bấm Lưu & gửi thử để kiểm tra thật."
+          : "Chưa gửi được: " + (d.smtp_blocked_reason || "thiếu cấu hình");
+        state.style.color = d.smtp_ready ? "var(--ok)" : "var(--warn)";
+
+        const meta = document.getElementById("set-meta");
+        meta.textContent = d.updated_at
+          ? `sửa lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " bởi " + d.updated_by : ""}`
+          : "lưu là có hiệu lực ngay, không cần deploy lại";
+        settingsLoaded = true;
+      } catch (e) {
+        if (e.name === "AuthError") return;
+        setMsg("s-msg", "Không tải được cài đặt: " + e.message, "bad");
+      }
+    }
+
+    // Chỉ gửi ô THỰC SỰ có giá trị hoặc bị bôi trống, và chỉ những field thuộc
+    // nhóm đang lưu. Gửi cả bảng mỗi lần sẽ ghi đè phần người khác vừa sửa.
+    function collectSettings(keys) {
+      const patch = {};
+      for (const [id, key, kind] of SET_FIELDS) {
+        if (keys && !keys.includes(key)) continue;
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const raw = el.value.trim();
+        if (raw === "") { patch[key] = null; continue; }  // null = trả về giá trị .env
+        if (kind === "bool") patch[key] = raw === "true";
+        else if (kind === "int") patch[key] = parseInt(raw, 10);
+        else if (kind === "num") patch[key] = parseFloat(raw);
+        else patch[key] = raw;
+        if (SET_M3.has(key) && typeof patch[key] === "number") patch[key] *= 1000;
+      }
+      return patch;
+    }
+
+    const EMAIL_KEYS = ["alert_email_to", "notify_enabled", "alert_resend_hours",
+      "smtp_host", "smtp_port", "smtp_user", "smtp_from", "smtp_starttls"];
+    const PARAM_KEYS = ["lng_relief_pressure_mpa", "lng_max_fill_percent",
+      "forecast_reserve_percent", "forecast_lead_time_days", "forecast_service_level",
+      "forecast_window_days", "truck_capacity_l", "forecast_max_reading_age_hours",
+      "online_stale_minutes", "alert_low_volume_percent", "alert_low_battery_v",
+      "alert_low_signal_percent"];
+
+    async function saveSettings(keys, msgId) {
+      const patch = collectSettings(keys);
+      // Mật khẩu: ô trống nghĩa là GIỮ NGUYÊN, không phải xoá. Nếu gửi null khi
+      // trống thì mỗi lần lưu một thay đổi nhỏ sẽ xoá mất mật khẩu đã lưu.
+      if (keys === EMAIL_KEYS) {
+        const pass = document.getElementById("s-pass").value;
+        if (pass) patch.smtp_password = pass;
+      }
+      setMsg(msgId, "Đang lưu…", "");
+      const d = await api("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      document.getElementById("s-pass").value = "";
+      await loadSettings();
+      return d;
+    }
+
+    async function onSaveEmail(alsoTest) {
+      const btns = ["s-save", "s-save-test"].map(i => document.getElementById(i));
+      btns.forEach(b => b.disabled = true);
+      try {
+        await saveSettings(EMAIL_KEYS, "s-msg");
+        if (!alsoTest) { setMsg("s-msg", "Đã lưu.", "ok"); return; }
+        setMsg("s-msg", "Đã lưu. Đang gửi thư thử…", "");
+        const r = await api("/api/settings/test-email", { method: "POST" });
+        setMsg("s-msg", r.message, r.ok ? "ok" : "bad");
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg("s-msg", e.message, "bad");
+      } finally {
+        btns.forEach(b => b.disabled = false);
+      }
+    }
+
+    async function onSaveParams() {
+      const btn = document.getElementById("s-save2");
+      btn.disabled = true;
+      try {
+        await saveSettings(PARAM_KEYS, "s-msg2");
+        document.getElementById("s-msg2").textContent = "Đã lưu — dự báo sẽ tính lại theo số mới.";
+        // Ngưỡng vừa đổi ảnh hưởng trực tiếp dự báo -> lấy lại ngay để số trên
+        // dashboard không còn theo cấu hình cũ.
+        refreshForecast();
+      } catch (e) {
+        if (e.name !== "AuthError") document.getElementById("s-msg2").textContent = e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ---------- ĐIỀU HƯỚNG VIEW ---------- */
+
     const VIEWS = {
       dashboard: { el: "view-dashboard", nav: "nav-dashboard", title: "Giám sát bồn LNG" },
       planner: { el: "view-planner", nav: "nav-planner", title: "Kế hoạch nạp LNG" },
       reports: { el: "view-reports", nav: "nav-reports", title: "Báo cáo & nhật ký" },
+      settings: { el: "view-settings", nav: "nav-settings", title: "Cài đặt" },
     };
 
     function showView(name) {
@@ -1859,6 +2203,9 @@
       document.querySelector(".page-title").textContent = VIEWS[name].title;
       if (name === "planner") { renderPlanTankOptions(); updateMeasuredBtn(); renderPlanAssist(); computePlan(); }
       if (name === "reports") { renderRepTankOptions(); loadRefills(); }
+      // Tải cài đặt lần đầu mở trang. Không tải lại mỗi lần vào: người dùng có thể
+      // đang gõ nửa dở rồi bấm sang tab khác và quay lại — nạp lại sẽ xoá mất.
+      if (name === "settings" && !settingsLoaded) loadSettings();
       closeDrawer();
     }
 
@@ -1902,6 +2249,12 @@
       document.getElementById("nav-dashboard").addEventListener("click", () => showView("dashboard"));
       document.getElementById("nav-planner").addEventListener("click", () => showView("planner"));
       document.getElementById("nav-reports").addEventListener("click", () => showView("reports"));
+      document.getElementById("nav-settings").addEventListener("click", () => showView("settings"));
+
+      // Cài đặt
+      document.getElementById("s-save").addEventListener("click", () => onSaveEmail(false));
+      document.getElementById("s-save-test").addEventListener("click", () => onSaveEmail(true));
+      document.getElementById("s-save2").addEventListener("click", onSaveParams);
       document.getElementById("plan-form").addEventListener("input", computePlan);
       document.getElementById("p-tank").addEventListener("change", applyTankToPlan);
       document.getElementById("p-use-measured").addEventListener("click", useMeasuredDaily);

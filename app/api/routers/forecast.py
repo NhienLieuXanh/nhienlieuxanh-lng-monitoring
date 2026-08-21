@@ -35,12 +35,12 @@ from app.api.schemas import (
     RunoutOut,
     SuggestionOut,
 )
-from app.config import Settings
 from app.db.models import Telemetry, Terminal
 from app.domain import forecast as fc
 from app.domain.status import derive_status
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.services.appconfig import ConfigLike, load_config
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["forecast"])
@@ -64,6 +64,7 @@ class ForecastParams:
 
 
 def forecast_params(
+    session: SessionDep,
     settings: SettingsDep,
     window_days: Annotated[int | None, Query(ge=1, le=365)] = None,
     reserve_l: Annotated[float | None, Query(ge=0)] = None,
@@ -72,7 +73,11 @@ def forecast_params(
     relief_mpa: Annotated[float | None, Query(gt=0, le=10)] = None,
     max_fill_percent: Annotated[float | None, Query(gt=0, le=100)] = None,
 ) -> ForecastParams:
-    sl = service_level if service_level is not None else settings.forecast_service_level
+    # Ngưỡng mặc định lấy từ cấu hình HIỆU LỰC (trang Cài đặt ghi đè .env), không
+    # phải từ .env trực tiếp — nếu không thì đổi lead time trong app sẽ không có
+    # tác dụng và người dùng không hiểu tại sao.
+    cfg = load_config(session, settings)
+    sl = service_level if service_level is not None else cfg.forecast_service_level
     if sl not in fc.Z_BY_SERVICE_LEVEL:
         # 422 chứ không im lặng lấy giá trị gần nhất: z-score sai làm dự trữ an
         # toàn sai, và đó là loại lỗi không ai phát hiện được từ con số đầu ra.
@@ -81,17 +86,17 @@ def forecast_params(
             f"service_level phải thuộc {sorted(fc.Z_BY_SERVICE_LEVEL)}",
         )
     return ForecastParams(
-        window_days=window_days or settings.forecast_window_days,
+        window_days=window_days or cfg.forecast_window_days,
         reserve_l=reserve_l,
         lead_time_days=(
             lead_time_days
             if lead_time_days is not None
-            else settings.forecast_lead_time_days
+            else cfg.forecast_lead_time_days
         ),
         service_level=sl,
-        relief_mpa=relief_mpa or settings.lng_relief_pressure_mpa,
-        max_fill_percent=max_fill_percent or settings.lng_max_fill_percent,
-        reserve_percent=settings.forecast_reserve_percent,
+        relief_mpa=relief_mpa or cfg.lng_relief_pressure_mpa,
+        max_fill_percent=max_fill_percent or cfg.lng_max_fill_percent,
+        reserve_percent=cfg.forecast_reserve_percent,
     )
 
 
@@ -112,7 +117,7 @@ def _samples(
 
 def _build(
     session: SessionDep,
-    settings: Settings,
+    settings: ConfigLike,
     term: Terminal,
     latest: Telemetry | None,
     p: ForecastParams,
@@ -206,12 +211,13 @@ def forecast_all(
 ) -> list[ForecastOut]:
     """Dự báo cho mọi bồn. Dashboard gọi endpoint này để hiện "còn N ngày"."""
     now = datetime.now(tz=UTC)
-    stale = timedelta(minutes=settings.online_stale_minutes)
+    cfg = load_config(session, settings)
+    stale = timedelta(minutes=cfg.online_stale_minutes)
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
     out: list[ForecastOut] = []
     for t in terms:
-        f = _build(session, settings, t, latest.get(t.psn), p, now)
+        f = _build(session, cfg, t, latest.get(t.psn), p, now)
         out.append(_to_out(f, t, latest.get(t.psn), now=now, stale_after=stale))
     return out
 
@@ -221,15 +227,13 @@ def forecast_one(
     psn: str, session: SessionDep, settings: SettingsDep, p: ParamsDep, _: UserDep
 ) -> ForecastOut:
     now = datetime.now(tz=UTC)
+    cfg = load_config(session, settings)
     term = _get_term(session, psn)
     latest = tel_repo.latest_for(session, psn)
-    f = _build(session, settings, term, latest, p, now)
+    f = _build(session, cfg, term, latest, p, now)
     return _to_out(
-        f,
-        term,
-        latest,
-        now=now,
-        stale_after=timedelta(minutes=settings.online_stale_minutes),
+        f, term, latest, now=now,
+        stale_after=timedelta(minutes=cfg.online_stale_minutes),
     )
 
 
@@ -265,10 +269,11 @@ def delivery_plan(
 ) -> DeliveryPlanOut:
     """Gom các bồn cần nạp trong ``horizon_days`` thành chuyến theo tải xe."""
     now = datetime.now(tz=UTC)
-    truck = truck_capacity_l or settings.truck_capacity_l
+    cfg = load_config(session, settings)
+    truck = truck_capacity_l or cfg.truck_capacity_l
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
-    forecasts = [_build(session, settings, t, latest.get(t.psn), p, now) for t in terms]
+    forecasts = [_build(session, cfg, t, latest.get(t.psn), p, now) for t in terms]
     names = {t.psn: t.name for t in terms}
     trips = fc.plan_trips(
         forecasts, truck_capacity_l=truck, horizon_days=horizon_days, names=names

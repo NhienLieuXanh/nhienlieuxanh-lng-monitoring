@@ -32,12 +32,12 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import HistoryQueryDep, SessionDep, SettingsDep, UserDep
-from app.config import Settings
 from app.domain import forecast as fc
 from app.domain.alerts import fill_percent
 from app.domain.status import derive_status
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.services.appconfig import ConfigLike, load_config
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/export", tags=["export"])
@@ -65,7 +65,7 @@ def _csv(
     )
 
 
-def _ts(dt: datetime | None, settings: Settings) -> str:
+def _ts(dt: datetime | None, settings: ConfigLike) -> str:
     if dt is None:
         return ""
     return dt.astimezone(settings.tzinfo).strftime(TS_FMT)
@@ -110,11 +110,12 @@ def export_telemetry(
     ``page``/``limit`` của dependency đó bị bỏ qua ở đây một cách có ý thức —
     báo cáo phải trọn khoảng, phân trang một file CSV là vô nghĩa.
     """
+    cfg = load_config(session, settings)
     if term_repo.get_by_psn(session, psn) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "PSN không tồn tại")
     assert q.from_ is not None and q.to is not None
     rows = tel_repo.export_rows(session, psn, q.from_, q.to)
-    out = [[_ts(r[0], settings), *[_num(v) for v in r[1:]]] for r in rows]
+    out = [[_ts(r[0], cfg), *[_num(v) for v in r[1:]]] for r in rows]
     header = ["thoi_diem", *tel_repo.EXPORT_COLUMNS[1:]]
     fname = f"telemetry_{psn}_{q.from_:%Y%m%d}_{q.to:%Y%m%d}.csv"
     return _csv(out, header, filename=fname, delimiter=_DELIMS[delimiter])
@@ -130,6 +131,7 @@ def export_refills(
     delimiter: DelimiterQ = "comma",
 ) -> Response:
     """Nhật ký nạp. Không có ``psn`` thì xuất mọi bồn trong một file."""
+    cfg = load_config(session, settings)
     now = datetime.now(tz=UTC)
     start = now - timedelta(days=window_days)
     if psn:
@@ -148,7 +150,7 @@ def export_refills(
         for e in fc.detect_refills(samples, capacity_l=cap):
             out.append(
                 [
-                    _ts(e.at, settings),
+                    _ts(e.at, cfg),
                     t.psn,
                     t.name or "",
                     f"{e.before_l / 1000:.3f}",
@@ -177,9 +179,10 @@ def export_tanks(
     đề xuất đặt. Cột ``do_tin_cay`` đi liền cột ``muc_dung_ngay_m3`` là cố ý —
     một con số dự báo không có độ tin cậy bên cạnh sẽ bị đọc như số đo.
     """
+    cfg = load_config(session, settings)
     now = datetime.now(tz=UTC)
-    win = window_days or settings.forecast_window_days
-    stale = timedelta(minutes=settings.online_stale_minutes)
+    win = window_days or cfg.forecast_window_days
+    stale = timedelta(minutes=cfg.online_stale_minutes)
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
 
@@ -200,14 +203,14 @@ def export_tanks(
             capacity_l=cap,
             pressure_mpa=pres,
             now=now,
-            tz=settings.tzinfo,
-            reserve_percent=settings.forecast_reserve_percent,
-            lead_time_days=settings.forecast_lead_time_days,
-            service_level=settings.forecast_service_level,
-            relief_mpa=settings.lng_relief_pressure_mpa,
-            max_fill_percent=settings.lng_max_fill_percent,
+            tz=cfg.tzinfo,
+            reserve_percent=cfg.forecast_reserve_percent,
+            lead_time_days=cfg.forecast_lead_time_days,
+            service_level=cfg.forecast_service_level,
+            relief_mpa=cfg.lng_relief_pressure_mpa,
+            max_fill_percent=cfg.lng_max_fill_percent,
             reading_at=lt.sampled_at if lt else None,
-            max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
+            max_reading_age_days=cfg.forecast_max_reading_age_hours / 24.0,
         )
         fp = fill_percent(lt.volume_l if lt else None, t.capacity_l)
         out.append(
@@ -215,7 +218,7 @@ def export_tanks(
                 t.psn,
                 t.name or "",
                 derive_status(t.last_seen_at, now, stale).value,
-                _ts(t.last_seen_at, settings),
+                _ts(t.last_seen_at, cfg),
                 _m3(cap),
                 _m3(vol),
                 "" if fp is None else f"{fp:.2f}",
@@ -231,10 +234,10 @@ def export_tanks(
                 "co" if f.stale else "khong",
                 _num2(f.runout.days_to_reserve, 1),
                 _num2(f.runout.days_to_empty, 1),
-                _ts(f.runout.empty_at, settings),
+                _ts(f.runout.empty_at, cfg),
                 _num2(f.hold.days, 1),
                 _m3(f.suggestion.order_l),
-                _ts(f.suggestion.order_at, settings),
+                _ts(f.suggestion.order_at, cfg),
                 f.suggestion.urgency,
             ]
         )
@@ -262,5 +265,5 @@ def export_tanks(
         "de_xuat_dat_luc",
         "muc_do_gap",
     ]
-    fname = f"tong_hop_bon_{now.astimezone(settings.tzinfo):%Y%m%d_%H%M}.csv"
+    fname = f"tong_hop_bon_{now.astimezone(cfg.tzinfo):%Y%m%d_%H%M}.csv"
     return _csv(out, header, filename=fname, delimiter=_DELIMS[delimiter])

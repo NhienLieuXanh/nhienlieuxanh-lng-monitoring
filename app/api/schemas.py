@@ -377,6 +377,103 @@ class NotificationOut(BaseModel):
     sent_at: datetime
 
 
+# --------------------------------------------------------------------------- #
+# Cài đặt do người vận hành đặt trong app
+# --------------------------------------------------------------------------- #
+
+
+class SettingsIn(BaseModel):
+    """Body của PATCH /api/settings. Mọi field optional — chỉ gửi ô vừa sửa.
+
+    Hai quy ước phải phân biệt được, và đó là lý do dùng ``exclude_unset``:
+
+    * **không gửi field**  -> giữ nguyên giá trị đang có;
+    * **gửi field = null** -> XOÁ override, trả field về giá trị .env.
+
+    ``extra="forbid"``: gõ sai tên field bị 422 chứ không im lặng bỏ qua. Một
+    trang cấu hình mà nhận rồi bỏ qua là cách tệ nhất — người dùng tưởng đã lưu.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # --- thông báo ---
+    notify_enabled: bool | None = None
+    alert_email_to: str | None = Field(None, max_length=1000)
+    alert_resend_hours: int | None = Field(None, ge=1, le=168)
+    smtp_host: str | None = Field(None, max_length=255)
+    smtp_port: int | None = Field(None, ge=1, le=65535)
+    smtp_user: str | None = Field(None, max_length=255)
+    #: Ghi được, KHÔNG BAO GIỜ đọc ra. SettingsOut chỉ phát `smtp_password_set`.
+    smtp_password: str | None = Field(None, max_length=255)
+    smtp_from: str | None = Field(None, max_length=255)
+    smtp_starttls: bool | None = None
+
+    # --- dự báo / kế hoạch ---
+    forecast_window_days: int | None = Field(None, ge=1, le=365)
+    forecast_reserve_percent: float | None = Field(None, ge=0, le=100)
+    forecast_lead_time_days: float | None = Field(None, ge=0, le=30)
+    forecast_service_level: int | None = None
+    forecast_max_reading_age_hours: float | None = Field(None, gt=0, le=8760)
+    lng_relief_pressure_mpa: float | None = Field(None, gt=0, le=10)
+    lng_max_fill_percent: float | None = Field(None, gt=0, le=100)
+    truck_capacity_l: float | None = Field(None, gt=0)
+
+    # --- ngưỡng cảnh báo thiết bị ---
+    online_stale_minutes: int | None = Field(None, ge=1, le=100_000)
+    alert_low_volume_percent: float | None = Field(None, ge=0, le=100)
+    alert_low_battery_v: float | None = Field(None, ge=0, le=100)
+    alert_low_signal_percent: float | None = Field(None, ge=0, le=100)
+
+    @field_validator("alert_email_to")
+    @classmethod
+    def _emails(cls, v: str | None) -> str | None:
+        """Chặn địa chỉ rác NGAY LÚC LƯU.
+
+        Không validate ở đây thì phản hồi duy nhất người dùng nhận được là một lỗi
+        SMTP khó hiểu lúc bấm Gửi thử — hoặc tệ hơn, cảnh báo im lặng không đến ai
+        suốt nhiều tuần.
+        """
+        if v is None:
+            return None
+        parts = [a.strip() for a in v.split(",") if a.strip()]
+        for a in parts:
+            if a.count("@") != 1 or " " in a or a.startswith("@") or a.endswith("@"):
+                raise ValueError(f"địa chỉ email không hợp lệ: {a}")
+            if "." not in a.split("@", 1)[1]:
+                raise ValueError(f"tên miền email không hợp lệ: {a}")
+        return ", ".join(parts)
+
+    @field_validator("forecast_service_level")
+    @classmethod
+    def _service_level(cls, v: int | None) -> int | None:
+        # Bảng z-score chỉ có 5 mức. Nhận một mức lạ rồi âm thầm dùng z=1.645 sẽ
+        # làm dự trữ an toàn sai mà không con số nào trên giao diện tố giác được.
+        allowed = (50, 80, 90, 95, 99)
+        if v is not None and v not in allowed:
+            raise ValueError(f"mức phục vụ phải thuộc {allowed}")
+        return v
+
+
+class SettingsOut(BaseModel):
+    """Giá trị ĐANG CÓ HIỆU LỰC + mỗi field đến từ đâu.
+
+    ``sources`` (app | env) trả lời câu hỏi đầu tiên của bất kỳ ai mở một trang
+    cấu hình có hai nguồn: "vì sao giá trị này lại thế". Không có nó, người dùng
+    sửa .env rồi không hiểu vì sao app vẫn giữ số cũ.
+
+    ``smtp_password`` KHÔNG có ở đây, kể cả dạng che dấu — chỉ có cờ đã-lưu-chưa.
+    """
+
+    values: dict[str, object]
+    sources: dict[str, str]
+    smtp_password_set: bool
+    smtp_ready: bool
+    #: Vì sao chưa gửi được, viết cho người đọc chứ không phải mã lỗi.
+    smtp_blocked_reason: str | None = None
+    updated_at: datetime | None = None
+    updated_by: str | None = None
+
+
 class ActionOut(BaseModel):
     ok: bool
     message: str

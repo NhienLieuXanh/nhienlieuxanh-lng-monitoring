@@ -24,6 +24,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     PrimaryKeyConstraint,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -114,6 +115,45 @@ class Terminal(Base):
         # nhưng Postgres đòi một UNIQUE khớp đúng cặp cột được tham chiếu.
         UniqueConstraint("id", "psn"),
     )
+
+
+class AppSetting(Base):
+    """Cấu hình do NGƯỜI VẬN HÀNH đặt trong app, ghi đè giá trị mặc định từ .env.
+
+    Vì sao cần bảng này: trước đó danh sách email nhận cảnh báo, ngưỡng gửi lại,
+    áp van an toàn... đều là biến môi trường. Đổi một địa chỉ email phải sửa env
+    trên Vercel rồi redeploy — với thứ thay đổi thường xuyên đó là thiết kế sai.
+    Cấu hình vận hành phải bấm được trong app; chỉ những thứ KHÔNG bao giờ đổi
+    mới thuộc về env.
+
+    **Một dòng duy nhất** (``id`` CHECK = 1). Không phải bảng nhiều dòng theo user
+    hay theo site: giai đoạn này chỉ có một cấu hình cho cả hệ thống, và một CHECK
+    một dòng thì không bao giờ có chuyện "hai bản cấu hình, không biết cái nào
+    đang có hiệu lực".
+
+    ``data`` là JSONB thay vì cột rời từng setting: tập setting sẽ còn mọc thêm, và
+    mỗi lần thêm một ô trong trang Cài đặt mà phải viết một migration là ma sát vô
+    ích. Đánh đổi: không có constraint ở tầng DB — bù lại bằng validate Pydantic ở
+    tầng API, và API là ĐƯỜNG GHI DUY NHẤT vào bảng này.
+    """
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=1)
+    data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    #: Ai sửa lần cuối. Cấu hình này quyết định cảnh báo đi đâu, nên phải truy
+    #: được người đổi — cùng lý do như bảng notifications.
+    updated_by: Mapped[str | None] = mapped_column(String(128))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
 
 class Notification(Base):
