@@ -604,7 +604,7 @@
       document.getElementById("stat-critical").textContent = summary.critical ?? 0;
       const vol = summary.total_volume_l;
       document.getElementById("stat-volume").textContent =
-        (vol === null || vol === undefined) ? "" : `${Number(vol).toFixed(0)} L`;
+        (vol === null || vol === undefined) ? "" : `${(Number(vol) / 1000).toFixed(3)} m³`;
       const on = document.getElementById("stat-online").parentElement;
       const off = document.getElementById("stat-offline").parentElement;
       const al = document.getElementById("stat-alert").parentElement;
@@ -673,7 +673,7 @@
           </div>
           <dl class="readouts">
             <div class="readout${pctClass}"><dt>Mức</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
-            <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : Number(detail.volume_l).toFixed(0))}<small>L / ${esc(detail.capacity_l == null ? "--" : Number(detail.capacity_l).toFixed(0))}</small></dd></div>
+            <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3))}<small>m³ / ${esc(detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3))}</small></dd></div>
             <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
             <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
           </dl>
@@ -798,7 +798,7 @@
 
       const labels = items.map(r => new Date(r.sampled_at)
         .toLocaleString("vi-VN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
-      const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l));
+      const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l) / 1000);
       const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
       const ctx = document.getElementById("historyChart").getContext("2d");
       if (chartInstance) chartInstance.destroy();
@@ -808,7 +808,7 @@
         data: {
           labels,
           datasets: [
-            { label: "Thể tích (L)", data: volume, borderColor: "#1558c0",
+            { label: "Thể tích (m³)", data: volume, borderColor: "#1558c0",
               backgroundColor: "transparent", tension: 0.15, yAxisID: "y",
               spanGaps: true, borderWidth: 1.5, pointRadius: 0 },
             { label: "Áp suất (MPa)", data: pressure, borderColor: "#5c6572",
@@ -826,7 +826,7 @@
           },
           scales: {
             y:  { type: "linear", position: "left",
-                  title: { display: true, text: "L", color: "#8a93a0", font: { size: 11 } },
+                  title: { display: true, text: "m³", color: "#8a93a0", font: { size: 11 } },
                   grid: { color: "rgba(27,36,48,0.06)" }, ticks: { color: "#8a93a0", font: { family: "IBM Plex Mono", size: 10 } } },
             y1: { type: "linear", position: "right",
                   title: { display: true, text: "MPa", color: "#8a93a0", font: { size: 11 } },
