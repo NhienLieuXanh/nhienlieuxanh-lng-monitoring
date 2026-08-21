@@ -369,6 +369,11 @@
     .plan-table td.low { color: var(--crit); font-weight: 700; }
     .plan-table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--brand); }
     .tag-fill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; color: var(--brand); background: var(--sel); padding: 2px 9px; border-radius: 999px; }
+    .plan-table td.trigger { color: var(--warn); font-weight: 700; background: var(--warn-bg); }
+    .plan-params .p-wide { grid-column: 1 / -1; }
+    .lg { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .lg-trig { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
+    .lg-low { color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); }
 
     /* ============ LOGIN ============ */
     .login-gate {
@@ -601,23 +606,32 @@
         </div>
         <div class="plan-scroll">
           <form class="plan-params" id="plan-form">
-            <label>Dung tích bồn (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.1" min="0" /></label>
+            <label class="p-wide">Bồn cần lập kế hoạch<select id="p-tank" class="field"><option value="">— Nhập tay —</option></select></label>
+            <label>Dung tích bồn (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.01" min="0" /></label>
             <label>Nạp tới (%)<input type="number" id="p-pct" class="field num" value="90" step="1" min="0" max="100" /></label>
             <label>Dùng trung bình/ngày (m³)<input type="number" id="p-use" class="field num" value="7.4" step="0.1" min="0" /></label>
             <label>Dự trữ tối thiểu (m³)<input type="number" id="p-res" class="field num" value="10" step="0.1" min="0" /></label>
-            <label>Mức bắt đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.1" min="0" /></label>
+            <label>Mức bắt đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" /></label>
             <label>Ngày bắt đầu<input type="date" id="p-date" class="field" /></label>
+            <label>Giờ nạp trong ngày<input type="time" id="p-time" class="field" step="1" value="08:00:00" /></label>
             <label>Số ngày<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="62" /></label>
             <label>Mức sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
           </form>
           <div class="plan-summary" id="plan-summary"></div>
-          <p class="plan-help">Quy tắc: nạp khi mức trong khoảng <b>dự trữ → dự trữ + mức dùng/ngày</b> (trừ Chủ Nhật); riêng <b>Thứ 7</b> nạp sớm một nhịp để không tụt dưới mức dự trữ vào Chủ Nhật (ngày không giao). Tick <b>Nghỉ</b> = ngày không dùng LNG; tick <b>Ép nạp</b> = buộc nạp ngày đó.</p>
+          <p class="plan-help">
+            <b>Cách hoạt động:</b> nạp khi mức chạm <b>ngưỡng kích hoạt</b> — trong khoảng
+            <b>dự trữ tối thiểu → dự trữ + mức dùng/ngày</b> (trừ Chủ Nhật không giao); riêng
+            <b>Thứ 7</b> nạp sớm một nhịp để không tụt dưới mức dự trữ vào Chủ Nhật.
+            Ô mức <span class="lg lg-trig">vàng</span> = đang ở ngưỡng kích hoạt nạp;
+            <span class="lg lg-low">đỏ</span> = dưới mức dự trữ.
+            Cột <b>Nghỉ</b>: ngày không tiêu thụ LNG. Cột <b>Chủ động nạp</b>: chỉ định nạp ngày đó bất kể mức.
+          </p>
           <div class="plan-table-wrap">
             <table class="plan-table">
               <thead>
                 <tr>
                   <th>Ngày</th><th>Thứ</th><th class="r">Mức đầu ngày (m³)</th>
-                  <th class="c">Nghỉ</th><th class="c">Ép nạp</th><th>Kết quả</th><th class="r">Cần đặt (m³)</th>
+                  <th class="c">Nghỉ</th><th class="c">Chủ động nạp</th><th>Kết quả</th><th>Thời điểm nạp</th><th class="r">Cần đặt (m³)</th>
                 </tr>
               </thead>
               <tbody id="plan-body"></tbody>
@@ -1151,7 +1165,7 @@
         const lu = document.getElementById("last-update");
         lu.textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
         lu.hidden = false;
-        renderHealth(); renderStats(); renderAlerts(); renderPsnOptions();
+        renderHealth(); renderStats(); renderAlerts(); renderPsnOptions(); renderPlanTankOptions();
         renderTankList();
         await selectTank(selectedPsn ?? (sortedTanks()[0] && sortedTanks()[0].psn));
       } catch (e) {
@@ -1168,6 +1182,8 @@
     const planRest = new Set(), planForce = new Set();
     const WD_VI = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
     const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const fmtDT = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 
     function planParams() {
       const num = (id, d) => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : d; };
@@ -1175,12 +1191,13 @@
         cap: num("p-cap", 60), pct: num("p-pct", 90), use: num("p-use", 7.4),
         res: num("p-res", 10), start: num("p-start", 0),
         date: document.getElementById("p-date").value,
+        time: document.getElementById("p-time").value || "08:00:00",
         days: Math.max(1, Math.min(62, parseInt(document.getElementById("p-days").value, 10) || 30)),
       };
     }
-    // Đúng công thức row 14: ép nạp | Thứ 7 & [res+use, res+2*use) | [res, res+use) & không phải CN.
-    function planShouldFill(level, dateObj, forced, p) {
-      if (forced) return true;
+    // Ngưỡng kích hoạt tự nhiên theo công thức row 14 (KHÔNG tính "chủ động nạp"):
+    // Thứ 7 & [res+use, res+2*use) | [res, res+use) & không phải Chủ Nhật.
+    function planShouldFill(level, dateObj, p) {
       const iso = ((dateObj.getDay() + 6) % 7) + 1;
       const R = p.res, U = p.use;
       if (iso === 6 && level >= R + U && level < R + 2 * U) return true;
@@ -1191,40 +1208,69 @@
       const p = planParams();
       const postFill = round2((p.pct / 100) * p.cap);           // = B4
       document.getElementById("p-postfill").textContent = postFill + " m³";
-      const start = p.date ? new Date(p.date + "T00:00:00") : new Date();
+      const tp = p.time.split(":").map(Number);
+      const base = p.date ? new Date(p.date + "T00:00:00") : new Date();
+      base.setHours(tp[0] || 0, tp[1] || 0, tp[2] || 0, 0);      // giờ:phút:giây nạp
       let level = p.start, total = 0, fills = 0;
       const rows = [];
       for (let i = 0; i < p.days; i++) {
-        const d = new Date(start.getTime() + i * 86400000);
+        const d = new Date(base.getTime() + i * 86400000);
         const forced = planForce.has(i), rest = planRest.has(i);
-        const fill = planShouldFill(level, d, forced, p);
-        const order = fill ? round2(postFill - level) : null;   // = row 15
+        const trig = planShouldFill(level, d, p);                // ngưỡng tự nhiên
+        const fill = forced || trig;
+        const order = fill ? round2(postFill - level) : null;    // = row 15
         if (fill) { total += order; fills++; }
-        rows.push({ i, d, level, fill, order, rest, forced });
+        rows.push({ i, d, level, fill, order, rest, forced, trig });
         // mức đầu ngày kế: vừa nạp -> về mức sau nạp; ngày nghỉ -> giữ; còn lại -> trừ mức dùng
         level = fill ? postFill : (rest ? level : level - p.use);
       }
-      renderPlan(rows, round2(total), fills, postFill);
+      renderPlan(rows, round2(total), fills, postFill, p);
     }
-    function renderPlan(rows, total, fills, postFill) {
+    function renderPlan(rows, total, fills, postFill, p) {
+      const U = p.use, R = p.res;
+      const band = `${round2(R)}–${round2(R + U)} m³` + (U > 0 ? ` · T7: đến ${round2(R + 2 * U)}` : "");
       document.getElementById("plan-summary").innerHTML =
         `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
-        `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>`;
+        `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
+        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num" style="font-size:17px">${band}</b></div>`;
       document.getElementById("plan-body").innerHTML = rows.map(r => {
-        const dd = String(r.d.getDate()).padStart(2, "0") + "/" + String(r.d.getMonth() + 1).padStart(2, "0");
         const lvl = round2(r.level);
-        const lowCls = r.level < planParams().res ? ' class="r num low"' : ' class="r num"';
+        let cls = "r num";
+        if (r.level < R) cls += " low";
+        else if (r.trig) cls += " trigger";
         const res = r.fill ? `<span class="tag-fill">Nạp LNG</span>` : "";
+        const when = r.fill ? fmtDT(r.d) : "";
         const order = r.order === null ? "" : `<b>${r.order}</b>`;
         return `<tr${r.fill ? ' class="is-fill"' : ""}>
-          <td class="num">${dd}</td><td>${WD_VI[r.d.getDay()]}</td>
-          <td${lowCls}>${lvl}</td>
-          <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ ${dd}"></td>
-          <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Ép nạp ${dd}"></td>
-          <td>${res}</td><td class="r num">${order}</td>
+          <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
+          <td class="${cls}">${lvl}</td>
+          <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
+          <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Chủ động nạp"></td>
+          <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
       }).join("");
+    }
+    function renderPlanTankOptions() {
+      const sel = document.getElementById("p-tank");
+      if (!sel) return;
+      const keep = sel.value;
+      sel.innerHTML = `<option value="">— Nhập tay —</option>` + tanks.map(t =>
+        `<option value="${esc(t.psn)}">${esc(t.name || t.psn)}</option>`).join("");
+      if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
+    }
+    // Chọn bồn -> lấy dung tích + mức hiện tại THẬT của bồn (lít -> m³). Chính sách vận
+    // hành (mức dùng/ngày, dự trữ, % nạp) do người dùng đặt cho phù hợp từng bồn.
+    function applyTankToPlan() {
+      const t = tanks.find(x => x.psn === document.getElementById("p-tank").value);
+      if (t) {
+        const cap = t.capacity_l != null ? round2(Number(t.capacity_l) / 1000) : null;
+        if (cap != null) document.getElementById("p-cap").value = cap;
+        if (t.volume_l != null) document.getElementById("p-start").value = round2(Number(t.volume_l) / 1000);
+        const resEl = document.getElementById("p-res");
+        if (cap && parseFloat(resEl.value) >= cap) resEl.value = round2(cap * 0.15);
+      }
+      computePlan();
     }
     function showView(name) {
       const dash = name !== "planner";
@@ -1233,7 +1279,7 @@
       document.getElementById("nav-dashboard").classList.toggle("active", dash);
       document.getElementById("nav-planner").classList.toggle("active", !dash);
       document.querySelector(".page-title").textContent = dash ? "Giám sát bồn LNG" : "Kế hoạch nạp LNG";
-      if (!dash) computePlan();
+      if (!dash) { renderPlanTankOptions(); computePlan(); }
       closeDrawer();
     }
 
@@ -1277,6 +1323,7 @@
       document.getElementById("nav-dashboard").addEventListener("click", () => showView("dashboard"));
       document.getElementById("nav-planner").addEventListener("click", () => showView("planner"));
       document.getElementById("plan-form").addEventListener("input", computePlan);
+      document.getElementById("p-tank").addEventListener("change", applyTankToPlan);
       document.getElementById("plan-body").addEventListener("change", (e) => {
         const t = e.target;
         if (!t.dataset || t.dataset.kind === undefined) return;
