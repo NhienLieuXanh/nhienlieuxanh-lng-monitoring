@@ -439,7 +439,7 @@ def test_build_forecast_survives_dead_device() -> None:
     # Nhưng vẫn nói được BAO NHIÊU (mức đã dưới dự trữ), chỉ không nói được KHI NÀO.
     assert f.suggestion.urgency == "now"
     assert f.suggestion.order_l is not None
-    assert any("KHÔNG dự báo được thời điểm" in r for r in f.suggestion.reasons)
+    assert any("không dự báo được thời điểm" in r for r in f.suggestion.reasons)
 
 
 def test_stale_reading_suppresses_forward_alerts() -> None:
@@ -567,8 +567,8 @@ def test_suggestion_still_gives_quantity_when_below_reserve_without_usage() -> N
     assert abs(sug.order_l - (CAP * 0.9 - 61.0)) < 1e-9
     assert sug.order_at == T0  # kết luận từ MỨC, không phải mốc dự báo
     assert sug.safety_stock_l == 0.0  # chưa đo được biến động thì không bịa đệm
-    assert any("KHÔNG dự báo được thời điểm" in r for r in sug.reasons)
-    assert any("ĐÃ dưới mức dự trữ" in r for r in sug.reasons)
+    assert any("không dự báo được thời điểm" in r for r in sug.reasons)
+    assert any("đã dưới mức dự trữ" in r for r in sug.reasons)
 
 
 def test_suggestion_stays_silent_when_level_is_fine_without_usage() -> None:

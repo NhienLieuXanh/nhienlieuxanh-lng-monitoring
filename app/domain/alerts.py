@@ -74,12 +74,12 @@ def evaluate(
 
     if derive_status(snap.last_seen_at, now, th.stale_after) is TerminalStatus.OFFLINE:
         if snap.last_seen_at is None:
-            detail = "chưa từng nhận dữ liệu"
+            detail = "chưa từng nhận được dữ liệu"
         else:
             hours = (now - snap.last_seen_at).total_seconds() / 3600.0
-            detail = f"không có dữ liệu {hours:.1f} giờ"
+            detail = f"không có dữ liệu trong {hours:.0f} giờ"
         out.append(Alert(snap.psn, AlertCode.OFFLINE, Severity.WARNING,
-                         f"Thiết bị offline — {detail}"))
+                         f"Mất kết nối thiết bị — {detail}"))
 
     # Ưu tiên fill_percent (server tự tính từ volume_l/capacity_l) hơn số vendor
     # gửi: nó là con số ta kiểm chứng được, và chính nó phát hiện lỗi thang 0-1
@@ -87,16 +87,16 @@ def evaluate(
     pct = snap.fill_percent if snap.fill_percent is not None else snap.volume_percent
     if pct is not None and pct < th.low_volume_percent:
         out.append(Alert(snap.psn, AlertCode.LOW_VOLUME, Severity.CRITICAL,
-                         f"Mức LNG thấp: {pct:.2f}%", pct, th.low_volume_percent))
+                         f"Mức chứa thấp: {pct:.2f}%", pct, th.low_volume_percent))
 
     if snap.battery_v is not None and snap.battery_v < th.low_battery_v:
         out.append(Alert(snap.psn, AlertCode.LOW_BATTERY, Severity.WARNING,
-                         f"Pin yếu: {snap.battery_v} V",
+                         f"Điện áp pin thấp: {snap.battery_v} V",
                          snap.battery_v, th.low_battery_v))
 
     if snap.signal_percent is not None and snap.signal_percent < th.low_signal_percent:
         out.append(Alert(snap.psn, AlertCode.WEAK_SIGNAL, Severity.INFO,
-                         f"Tín hiệu yếu: {snap.signal_percent}%",
+                         f"Cường độ tín hiệu thấp: {snap.signal_percent}%",
                          snap.signal_percent, th.low_signal_percent))
 
     # Đối chứng hai nguồn. Không CHECK constraint nào bắt được lỗi thang vì 0.59

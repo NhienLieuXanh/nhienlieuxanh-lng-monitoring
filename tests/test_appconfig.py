@@ -241,5 +241,5 @@ def test_why_blocked_names_the_missing_piece() -> None:
     full = {"smtp_host": "s.example.com", "smtp_from": "bot@x.com",
             "alert_email_to": "a@x.com", "notify_enabled": True, "smtp_password": "pw"}
     assert "tắt" in _why_blocked(EffectiveConfig(_env(), {**full, "notify_enabled": False})).lower()
-    assert "SMTP" in _why_blocked(EffectiveConfig(_env(), {**full, "smtp_host": ""}))
+    assert "máy chủ thư" in _why_blocked(EffectiveConfig(_env(), {**full, "smtp_host": ""}))
     assert "nhận" in _why_blocked(EffectiveConfig(_env(), {**full, "alert_email_to": ""}))

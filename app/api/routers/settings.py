@@ -56,16 +56,16 @@ def _why_blocked(cfg: EffectiveConfig) -> str | None:
     còn thiếu tiết kiệm cho họ một vòng thử-và-đoán.
     """
     if not cfg.notify_enabled:
-        return "Đang tắt gửi thông báo"
+        return "Trạng thái gửi cảnh báo đang tắt"
     if not cfg.smtp_host:
-        return "Chưa có máy chủ SMTP"
+        return "Chưa khai báo địa chỉ máy chủ thư"
     if not (cfg.smtp_from or cfg.smtp_user):
-        return "Chưa có địa chỉ gửi (From hoặc User)"
+        return "Chưa khai báo địa chỉ gửi hoặc tài khoản đăng nhập"
     if not cfg.alert_email_list:
-        return "Chưa có địa chỉ nhận"
+        return "Chưa khai báo địa chỉ nhận"
     if not cfg.has_secret("smtp_password"):
         # KHÔNG chặn: một số máy chủ SMTP nội bộ không cần xác thực. Chỉ nhắc.
-        return "Chưa có mật khẩu ứng dụng — chỉ đúng nếu máy chủ SMTP không cần xác thực"
+        return "Chưa có mật khẩu ứng dụng — chỉ phù hợp nếu máy chủ thư không yêu cầu xác thực"
     return None
 
 
@@ -88,7 +88,7 @@ def patch_settings(
     patch = body.model_dump(exclude_unset=True)
     if not patch:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "không có field nào để lưu"
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Không có thông số nào để lưu"
         )
     # Chuỗi rỗng = xoá override (người dùng bôi trống một ô rồi lưu). Không quy đổi
     # thì "" sẽ được lưu như một giá trị thật và ghi đè .env bằng chuỗi trắng.
@@ -113,21 +113,21 @@ def test_email(session: SessionDep, settings: SettingsDep, user: UserDep) -> Act
     cfg = load_config(session, settings)
     reason = _why_blocked(cfg)
     if not cfg.smtp_ready:
-        return ActionOut(ok=False, message=reason or "Cấu hình SMTP chưa đủ")
+        return ActionOut(ok=False, message=reason or "Cấu hình máy chủ thư chưa đầy đủ")
 
     now = datetime.now(tz=UTC)
     local = now.astimezone(cfg.tzinfo)
-    subject = "[THỬ] Hệ thống theo dõi bồn LNG — cấu hình email hoạt động"
+    subject = "[KIỂM TRA] Hệ thống giám sát bồn LNG — cấu hình thư điện tử hoạt động"
     body = "\n".join([
-        f"Email thử do {user} gửi lúc {local:%d/%m/%Y %H:%M:%S} ({cfg.app_tz}).",
+        f"Thư kiểm tra do {user} gửi lúc {local:%d/%m/%Y %H:%M:%S} (giờ {cfg.app_tz}).",
         "",
-        "Nếu bạn đọc được thư này thì cảnh báo thật sẽ tới đúng địa chỉ:",
+        "Nhận được thư này nghĩa là cảnh báo của hệ thống sẽ tới đúng các địa chỉ sau:",
         *[f"  - {a}" for a in cfg.alert_email_list],
         "",
-        f"Máy chủ gửi: {cfg.smtp_host}:{cfg.smtp_port}",
-        f"Không gửi lại cùng một cảnh báo trong {cfg.alert_resend_hours} giờ.",
+        f"Máy chủ thư: {cfg.smtp_host}, cổng {cfg.smtp_port}",
+        f"Chu kỳ nhắc lại cùng một cảnh báo: {cfg.alert_resend_hours} giờ.",
         "",
-        "Đây là thư thử, không phải cảnh báo.",
+        "Đây là thư kiểm tra cấu hình, không phải cảnh báo.",
     ])
     try:
         notifier.send_email(cfg, subject, body)
@@ -139,5 +139,5 @@ def test_email(session: SessionDep, settings: SettingsDep, user: UserDep) -> Act
         return ActionOut(ok=False, message=f"{type(exc).__name__}: {exc}")
     return ActionOut(
         ok=True,
-        message=f"Đã gửi thư thử tới {', '.join(cfg.alert_email_list)}",
+        message=f"Đã gửi thư kiểm tra tới {', '.join(cfg.alert_email_list)}",
     )

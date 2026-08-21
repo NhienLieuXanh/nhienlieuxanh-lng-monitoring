@@ -119,16 +119,16 @@ def test_subject_leads_with_critical_and_counts_the_rest() -> None:
     subject, body = render_email(notices, _settings(), NOW)
 
     # Tên bồn và nội dung nằm ngay trên dòng preview, không cần mở email.
-    assert subject.startswith("[NGUY CẤP] Bồn A - Long An:")
+    assert subject.startswith("[NGHIÊM TRỌNG] Bồn A - Long An:")
     assert "Còn 0.8 ngày" in subject
-    assert "+1 cảnh báo khác" in subject
+    assert "(và 1 cảnh báo khác)" in subject
 
     # Giờ hiển thị là giờ Việt Nam (08:00 UTC -> 15:00 ICT), không phải UTC.
     assert "21/08/2026 15:00:00" in body
     assert "Asia/Ho_Chi_Minh" in body
     # Bồn chưa đặt tên thì rơi về PSN, không để trống.
     assert "2605090007 (2605090007)" in body
-    assert "Số cảnh báo: 2" in body
+    assert "Tổng số cảnh báo: 2" in body
     assert "12 giờ" in body  # nói rõ cửa chặn gửi lại
 
 

@@ -610,11 +610,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
           <span class="lbl">Bảng điều khiển</span>
         </button>
-        <button type="button" class="nav-item" id="nav-alerts" title="Cảnh báo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9a2 2 0 0 1 3.4 0l7.4 12.8a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-          <span class="lbl">Cảnh báo</span>
-          <span class="badge" id="nav-alert-badge" hidden>0</span>
-        </button>
         <button type="button" class="nav-item" id="nav-planner" data-view="planner" title="Kế hoạch nạp LNG">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7S5 10 5 14.5a7 7 0 0 0 14 0C19 10 12 2.7 12 2.7z"/></svg>
           <span class="lbl">Kế hoạch nạp</span>
@@ -630,7 +625,7 @@
         <div class="nav-group">Sắp có</div>
         <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
-          <span class="lbl">Lịch sử</span><span class="tag">SOON</span>
+          <span class="lbl">Lịch sử</span>
         </button>
       </nav>
       <div class="side-foot">
@@ -649,8 +644,8 @@
       <div class="page-title">Giám sát bồn LNG</div>
       <div class="kpis" aria-label="Tóm tắt">
         <span class="kpi"><b class="num" id="stat-total">--</b> bồn</span>
-        <span class="kpi ok"><b class="num" id="stat-online">--</b> online</span>
-        <span class="kpi bad"><b class="num" id="stat-offline">--</b> offline</span>
+        <span class="kpi ok"><b class="num" id="stat-online">--</b> trực tuyến</span>
+        <span class="kpi bad"><b class="num" id="stat-offline">--</b> mất kết nối</span>
         <span class="kpi bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
         <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
         <span id="stat-critical" hidden></span>
@@ -688,22 +683,22 @@
       <div class="workspace" id="view-dashboard">
         <section class="fleet" aria-label="Danh sách bồn">
           <div class="pane-head">
-            <h1>Bồn</h1>
-            <span class="meta">chọn một dòng để xem chi tiết</span>
+            <h1>Danh sách bồn</h1>
+            <span class="meta">Chọn một bồn để xem chi tiết</span>
           </div>
           <div class="fleet-scroll">
             <table class="tanks">
               <thead>
                 <tr>
-                  <th>Tên</th>
-                  <th class="r">Mức</th>
+                  <th>Bồn</th>
+                  <th class="r">Mức chứa</th>
                   <!-- "Còn lại" thay chỗ của "Áp suất": áp suất đã hiện ở readout
                        chi tiết và ở thẻ hold time, còn "còn bao nhiêu ngày tới
                        cạn" thì không có ở đâu khác — và đó mới là con số khiến
                        người vận hành phải làm gì đó. -->
-                  <th class="r">Còn lại</th>
+                  <th class="r">Tới dự trữ</th>
                   <th>Trạng thái</th>
-                  <th>Cập nhật</th>
+                  <th>Lần đo cuối</th>
                 </tr>
               </thead>
               <tbody id="tank-list"></tbody>
@@ -712,16 +707,16 @@
         </section>
 
         <section class="inspect" aria-label="Chi tiết">
-          <div id="tank-detail" class="card hero"><p class="empty">Chọn một bồn bên trái.</p></div>
+          <div id="tank-detail" class="card hero"><p class="empty">Chọn một bồn trong danh sách.</p></div>
           <!-- Thẻ dự báo nằm NGAY DƯỚI readout hiện tại và TRÊN biểu đồ: thứ tự đọc
                là "đang thế nào -> sắp thế nào -> lịch sử thế nào". Đặt nó dưới biểu
                đồ thì phải cuộn mới thấy, mà đây lại là phần cần hành động. -->
           <div class="card" id="fc-card">
             <div class="fc-head">
-              <h3>Dự báo &amp; an toàn LNG</h3>
+              <h3>Dự báo tiêu thụ &amp; an toàn</h3>
               <span class="fc-badge n" id="fc-window">—</span>
             </div>
-            <div id="fc-body"><p class="empty">Đang tính từ lịch sử…</p></div>
+            <div id="fc-body"><p class="empty">Đang tính từ dữ liệu lịch sử…</p></div>
           </div>
           <div class="card chart-panel" id="chart-panel">
             <div class="chart-head">
@@ -734,7 +729,7 @@
               <select id="chart-psn" class="field" onchange="selectTank(this.value)" aria-label="Chọn bồn cho biểu đồ" hidden></select>
             </div>
             <div id="chart-note" class="chart-note" hidden></div>
-            <div id="chart-empty" class="chart-empty">Không có điểm đo trong khoảng này. Thiết bị có thể đã offline lâu hơn cửa sổ đang chọn.</div>
+            <div id="chart-empty" class="chart-empty">Không có dữ liệu đo trong khoảng đã chọn.</div>
             <div id="chart-skel" class="chart-skel skel" aria-hidden="true"></div>
             <div id="chart-wrap" class="chart-box">
               <canvas id="historyChart" aria-label="Biểu đồ thể tích và áp suất"></canvas>
@@ -754,29 +749,29 @@
       <!-- VIEW: KẾ HOẠCH NẠP LNG (tính theo công thức bảng tính Book1.xlsx) -->
       <section id="view-planner" class="planner" hidden aria-label="Kế hoạch nạp LNG">
         <div class="pane-head">
-          <h1>Kế hoạch nạp LNG hàng tháng</h1>
-          <span class="meta">tính theo công thức bảng tính — mọi số đều chỉnh được</span>
+          <h1>Kế hoạch nạp LNG</h1>
+          <span class="meta">Lập kế hoạch theo tháng · mọi thông số đều điều chỉnh được</span>
         </div>
         <div class="plan-scroll">
           <form class="plan-params" id="plan-form">
-            <label class="p-wide">Bồn cần lập kế hoạch<select id="p-tank" class="field"><option value="">— Nhập tay —</option></select></label>
-            <label>Dung tích bồn (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.01" min="0" /></label>
-            <label>Nạp tới (%)<input type="number" id="p-pct" class="field num" value="90" step="1" min="0" max="100" /></label>
+            <label class="p-wide">Bồn<select id="p-tank" class="field"><option value="">Tự nhập thông số</option></select></label>
+            <label>Dung tích (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.01" min="0" /></label>
+            <label>Nạp tới mức (%)<input type="number" id="p-pct" class="field num" value="90" step="1" min="0" max="100" /></label>
             <!-- Đây là ô từng phải gõ tay. Giờ nó lấy được số ĐO ĐƯỢC từ lịch sử
                  của chính bồn đang chọn; nút vẫn để người vận hành quyết định
                  chứ không tự ghi đè con số họ vừa nhập. -->
-            <label>Dùng trung bình/ngày (m³)<input type="number" id="p-use" class="field num" value="7.4" step="0.1" min="0" />
+            <label>Mức tiêu thụ/ngày (m³)<input type="number" id="p-use" class="field num" value="7.4" step="0.1" min="0" />
               <span class="p-measure">
-                <button type="button" id="p-use-measured" disabled>Dùng số đo được</button>
+                <button type="button" id="p-use-measured" disabled>Áp dụng số đo thực tế</button>
                 <span class="note" id="p-use-note">chọn bồn để lấy số đo</span>
               </span>
             </label>
-            <label>Dự trữ tối thiểu (m³)<input type="number" id="p-res" class="field num" value="10" step="0.1" min="0" /></label>
-            <label>Mức bắt đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" /></label>
+            <label>Mức dự trữ (m³)<input type="number" id="p-res" class="field num" value="10" step="0.1" min="0" /></label>
+            <label>Thể tích ban đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" /></label>
             <label>Ngày bắt đầu<input type="date" id="p-date" class="field" /></label>
-            <label>Giờ nạp trong ngày<input type="time" id="p-time" class="field" step="1" value="08:00:00" /></label>
-            <label>Số ngày<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="62" /></label>
-            <label>Mức sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
+            <label>Giờ nạp<input type="time" id="p-time" class="field" step="1" value="08:00:00" /></label>
+            <label>Số ngày lập kế hoạch<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="62" /></label>
+            <label>Thể tích sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
           </form>
           <div class="plan-summary" id="plan-summary"></div>
           <p class="plan-warn" id="plan-warn" hidden></p>
@@ -785,19 +780,21 @@
                một đề xuất không giải thích được thì không ai dám dùng. -->
           <div id="plan-assist"></div>
           <p class="plan-help">
-            <b>Cách hoạt động:</b> nạp khi mức chạm <b>ngưỡng kích hoạt</b> — trong khoảng
-            <b>dự trữ tối thiểu → dự trữ + mức dùng/ngày</b> (trừ Chủ Nhật không giao); riêng
-            <b>Thứ 7</b> nạp sớm một nhịp để không tụt dưới mức dự trữ vào Chủ Nhật.
-            Ô mức <span class="lg lg-trig">vàng</span> = đang ở ngưỡng kích hoạt nạp;
-            <span class="lg lg-low">đỏ</span> = dưới mức dự trữ.
-            Cột <b>Nghỉ</b>: ngày không tiêu thụ LNG. Cột <b>Chủ động nạp</b>: chỉ định nạp ngày đó bất kể mức.
+            <b>Nguyên tắc lập kế hoạch.</b> Hệ thống xếp lịch nạp khi thể tích đầu ngày rơi vào
+            <b>ngưỡng kích hoạt</b> (từ mức dự trữ đến mức dự trữ cộng một ngày tiêu thụ), trừ
+            Chủ Nhật không giao hàng. Thứ Bảy được nạp sớm một nhịp để không tụt dưới mức dự trữ
+            vào Chủ Nhật.
+            Ô <span class="lg lg-trig">vàng</span>: đang ở ngưỡng kích hoạt.
+            Ô <span class="lg lg-low">đỏ</span>: dưới mức dự trữ.
+            Cột <b>Ngày nghỉ</b>: ngày không tiêu thụ. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
+            bất kể thể tích.
           </p>
           <div class="plan-table-wrap">
             <table class="plan-table">
               <thead>
                 <tr>
-                  <th>Ngày</th><th>Thứ</th><th class="r">Mức đầu ngày (m³)</th>
-                  <th class="c">Nghỉ</th><th class="c">Chủ động nạp</th><th>Kết quả</th><th>Thời điểm nạp</th><th class="r">Cần đặt (m³)</th>
+                  <th>Ngày</th><th>Thứ</th><th class="r">Thể tích đầu ngày (m³)</th>
+                  <th class="c">Ngày nghỉ</th><th class="c">Nạp chỉ định</th><th>Hoạt động</th><th>Thời điểm nạp</th><th class="r">Lượng đặt (m³)</th>
                 </tr>
               </thead>
               <tbody id="plan-body"></tbody>
@@ -811,16 +808,16 @@
            không bao giờ lệch với số đo. -->
       <section id="view-reports" class="reports" hidden aria-label="Báo cáo và nhật ký">
         <div class="pane-head">
-          <h1>Báo cáo &amp; nhật ký</h1>
-          <span class="meta">tải file CSV mở trực tiếp bằng Excel</span>
+          <h1>Báo cáo</h1>
+          <span class="meta">Xuất dữ liệu định dạng CSV, mở trực tiếp bằng Excel</span>
         </div>
         <div class="rep-scroll">
           <div class="rep-card">
             <h3>Xuất báo cáo</h3>
             <p class="hint">
-              File CSV mã hoá UTF-8 có BOM và mốc thời gian theo giờ Việt Nam nên Excel
-              mở là đọc được ngay, không lỗi font. Nếu máy dùng dấu <b>;</b> làm dấu phân
-              tách thì chọn lại ở ô bên dưới.
+              File dùng mã hoá UTF-8 và mốc thời gian theo giờ Việt Nam, mở bằng Excel
+              không lỗi phông chữ. Nếu máy của bạn dùng dấu chấm phẩy làm dấu phân tách,
+              hãy chọn lại ở ô tương ứng.
             </p>
             <div class="rep-row">
               <label>Bồn
@@ -839,7 +836,7 @@
             <div class="rep-row" style="margin-top:10px">
               <button type="button" class="btn-dl" id="dl-tanks">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
-                Tổng hợp bồn + dự báo
+                Báo cáo tổng hợp bồn
               </button>
               <button type="button" class="btn-dl" id="dl-refills">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
@@ -847,7 +844,7 @@
               </button>
               <button type="button" class="btn-dl" id="dl-telemetry">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
-                Số liệu đo chi tiết
+                Dữ liệu đo chi tiết
               </button>
             </div>
           </div>
@@ -855,13 +852,12 @@
           <div class="rep-card">
             <h3>Nhật ký nạp (90 ngày)</h3>
             <p class="hint">
-              Phát hiện tự động từ bước nhảy tăng của mức trong telemetry — không nhập tay,
-              nên luôn khớp với thực tế đo được.
+              Hệ thống tự nhận diện các lần nạp từ dữ liệu đo, không cần nhập tay.
             </p>
             <div class="mini-wrap">
               <table class="mini">
-                <thead><tr><th>Thời điểm</th><th class="r">Trước</th><th class="r">Sau</th><th class="r">Lượng nạp</th></tr></thead>
-                <tbody id="refill-body"><tr><td colspan="4" class="empty">Chọn bồn để xem.</td></tr></tbody>
+                <thead><tr><th>Thời điểm</th><th class="r">Trước khi nạp (m³)</th><th class="r">Sau khi nạp (m³)</th><th class="r">Lượng nạp (m³)</th></tr></thead>
+                <tbody id="refill-body"><tr><td colspan="4" class="empty">Chọn bồn để xem nhật ký.</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -869,13 +865,13 @@
           <div class="rep-card">
             <h3>Lịch giao hàng</h3>
             <p class="hint">
-              Gom các bồn cần nạp trong tầm nhìn thành từng chuyến theo tải xe, xếp bồn gấp
-              nhất lên chuyến đầu. Chưa tối ưu tuyến đường vì hệ thống chưa có toạ độ kho.
+              Hệ thống gom các bồn cần nạp thành từng chuyến theo sức chứa xe, ưu tiên bồn
+              cấp thiết nhất ở chuyến đầu. Chưa tối ưu tuyến đường do hệ thống chưa có toạ độ kho.
             </p>
             <div class="rep-row">
-              <label>Tải xe (m³)<input type="number" id="rep-truck" class="field num" value="20" step="0.5" min="1" /></label>
-              <label>Tầm nhìn (ngày)<input type="number" id="rep-horizon" class="field num" value="7" step="1" min="1" max="90" /></label>
-              <button type="button" class="btn-dl" id="btn-trips">Tính lịch giao</button>
+              <label>Sức chứa xe (m³)<input type="number" id="rep-truck" class="field num" value="20" step="0.5" min="1" /></label>
+              <label>Phạm vi (ngày)<input type="number" id="rep-horizon" class="field num" value="7" step="1" min="1" max="90" /></label>
+              <button type="button" class="btn-dl" id="btn-trips">Lập lịch giao</button>
             </div>
             <div id="trip-list"></div>
           </div>
@@ -888,153 +884,161 @@
       <section id="view-settings" class="settings" hidden aria-label="Cài đặt">
         <div class="pane-head">
           <h1>Cài đặt</h1>
-          <span class="meta" id="set-meta">lưu là có hiệu lực ngay, không cần deploy lại</span>
+          <span class="meta" id="set-meta">Thay đổi có hiệu lực ngay cho toàn hệ thống</span>
         </div>
         <div class="set-scroll">
+          <p class="set-note">
+            Các thông số dưới đây chi phối cách hệ thống giám sát bồn, dự báo tiêu thụ và
+            gửi cảnh báo. Mỗi ô ghi rõ giá trị đang là <b>Tuỳ chỉnh</b> (do người vận hành
+            đặt) hay <b>Mặc định</b> (theo cấu hình triển khai).
+          </p>
 
           <div class="rep-card">
-            <h3>Gửi cảnh báo qua email</h3>
+            <h3>Người nhận cảnh báo</h3>
             <p class="hint">
-              Nhập địa chỉ nhận rồi bấm <b>Lưu &amp; gửi thử</b> — thư thử đi ngay để bạn
-              biết cấu hình đúng hay chưa. Cảnh báo thật gửi khi bồn sắp cạn, hold time
-              ngắn, mức thấp, hoặc thiết bị mất liên lạc.
+              Hệ thống gửi cảnh báo tới các địa chỉ này khi bồn sắp cạn, thời gian giữ áp
+              còn ngắn, mức chứa xuống thấp, hoặc thiết bị mất kết nối.
             </p>
             <p class="set-note" id="set-smtp-state"></p>
             <div class="set-grid">
               <label class="wide">
-                <span class="set-lbl">Địa chỉ nhận (nhiều địa chỉ cách nhau bằng dấu phẩy)
-                  <span class="src" data-src="alert_email_to">env</span></span>
+                <span class="set-lbl">Địa chỉ nhận · phân tách bằng dấu phẩy
+                  <span class="src" data-src="alert_email_to">Mặc định</span></span>
                 <input type="text" id="s-emails" class="field" placeholder="ten@congty.com, ten2@congty.com" maxlength="1000" />
               </label>
               <label>
-                <span class="set-lbl">Bật gửi thông báo <span class="src" data-src="notify_enabled">env</span></span>
-                <select id="s-notify" class="field"><option value="true">Bật</option><option value="false">Tắt</option></select>
+                <span class="set-lbl">Trạng thái gửi cảnh báo <span class="src" data-src="notify_enabled">Mặc định</span></span>
+                <select id="s-notify" class="field"><option value="true">Đang bật</option><option value="false">Đang tắt</option></select>
               </label>
               <label>
-                <span class="set-lbl">Không gửi lại trong (giờ) <span class="src" data-src="alert_resend_hours">env</span></span>
+                <span class="set-lbl">Chu kỳ nhắc lại (giờ) <span class="src" data-src="alert_resend_hours">Mặc định</span></span>
                 <input type="number" id="s-resend" class="field num" min="1" max="168" step="1" />
               </label>
             </div>
 
-            <p class="set-note" style="margin-top:10px">
-              <b>Máy chủ gửi thư.</b> Đây là phần duy nhất cần bạn tự tạo: mọi nhà cung cấp
-              mail đều đòi một mật khẩu ứng dụng / API key, không hệ thống nào tạo hộ được.
-              Với Gmail: bật xác thực 2 bước, tạo <i>App password</i> 16 ký tự, rồi dán vào ô
-              mật khẩu bên dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
+            <p class="set-note" style="margin-top:12px">
+              <b>Máy chủ thư điện tử.</b> Hệ thống dùng máy chủ này để phát cảnh báo. Nhà cung
+              cấp thư điện tử yêu cầu một mật khẩu ứng dụng riêng, cần được tạo từ tài khoản
+              của bạn. Với Gmail: bật xác thực hai bước, tạo mật khẩu ứng dụng 16 ký tự, sau
+              đó nhập vào ô bên dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
             </p>
             <div class="set-grid">
               <label>
-                <span class="set-lbl">Máy chủ SMTP <span class="src" data-src="smtp_host">env</span></span>
+                <span class="set-lbl">Địa chỉ máy chủ <span class="src" data-src="smtp_host">Mặc định</span></span>
                 <input type="text" id="s-host" class="field" placeholder="smtp.gmail.com" maxlength="255" />
               </label>
               <label>
-                <span class="set-lbl">Cổng <span class="src" data-src="smtp_port">env</span></span>
+                <span class="set-lbl">Cổng kết nối <span class="src" data-src="smtp_port">Mặc định</span></span>
                 <input type="number" id="s-port" class="field num" min="1" max="65535" step="1" />
               </label>
               <label>
-                <span class="set-lbl">Tài khoản <span class="src" data-src="smtp_user">env</span></span>
+                <span class="set-lbl">Tài khoản đăng nhập <span class="src" data-src="smtp_user">Mặc định</span></span>
                 <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" />
               </label>
               <label>
-                <span class="set-lbl">Mật khẩu ứng dụng <span class="src" id="s-pass-state">chưa lưu</span></span>
-                <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="để trống = giữ nguyên" />
+                <span class="set-lbl">Mật khẩu ứng dụng <span class="src" id="s-pass-state">Chưa thiết lập</span></span>
+                <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="Bỏ trống để giữ nguyên" />
               </label>
               <label>
-                <span class="set-lbl">Địa chỉ gửi (From) <span class="src" data-src="smtp_from">env</span></span>
+                <span class="set-lbl">Địa chỉ gửi <span class="src" data-src="smtp_from">Mặc định</span></span>
                 <input type="text" id="s-from" class="field" maxlength="255" />
               </label>
               <label>
-                <span class="set-lbl">STARTTLS <span class="src" data-src="smtp_starttls">env</span></span>
-                <select id="s-tls" class="field"><option value="true">Bật (cổng 587)</option><option value="false">Tắt (cổng 465 dùng SSL)</option></select>
+                <span class="set-lbl">Bảo mật kết nối <span class="src" data-src="smtp_starttls">Mặc định</span></span>
+                <select id="s-tls" class="field"><option value="true">STARTTLS · cổng 587</option><option value="false">SSL/TLS · cổng 465</option></select>
               </label>
             </div>
             <div class="set-actions">
-              <button type="button" class="btn-primary-sm" id="s-save-test">Lưu &amp; gửi thử</button>
-              <button type="button" class="btn-dl" id="s-save">Chỉ lưu</button>
+              <button type="button" class="btn-primary-sm" id="s-save-test">Lưu và gửi thư kiểm tra</button>
+              <button type="button" class="btn-dl" id="s-save">Lưu</button>
             </div>
             <p class="set-msg" id="s-msg" hidden></p>
           </div>
 
           <div class="rep-card">
-            <h3>Thông số bồn &amp; an toàn LNG</h3>
+            <h3>Thông số bồn</h3>
             <p class="hint">
-              <b>Áp van an toàn</b> quyết định con số Hold time — phải khớp thông số bồn thật,
-              nếu không cột đó đúng công thức nhưng sai ngưỡng.
+              <b>Áp suất van an toàn</b> là cơ sở tính thời gian giữ áp. Giá trị này phải khớp
+              thông số kỹ thuật của bồn thực tế.
             </p>
             <div class="set-grid">
               <label>
-                <span class="set-lbl">Áp van an toàn (MPa) <span class="src" data-src="lng_relief_pressure_mpa">env</span></span>
+                <span class="set-lbl">Áp suất van an toàn (MPa) <span class="src" data-src="lng_relief_pressure_mpa">Mặc định</span></span>
                 <input type="number" id="s-relief" class="field num" min="0.01" max="10" step="0.01" />
               </label>
               <label>
-                <span class="set-lbl">Nạp tối đa (% dung tích) <span class="src" data-src="lng_max_fill_percent">env</span></span>
+                <span class="set-lbl">Mức nạp tối đa (% dung tích) <span class="src" data-src="lng_max_fill_percent">Mặc định</span></span>
                 <input type="number" id="s-maxfill" class="field num" min="1" max="100" step="1" />
               </label>
               <label>
-                <span class="set-lbl">Mức dự trữ (% dung tích) <span class="src" data-src="forecast_reserve_percent">env</span></span>
+                <span class="set-lbl">Mức dự trữ (% dung tích) <span class="src" data-src="forecast_reserve_percent">Mặc định</span></span>
                 <input type="number" id="s-reserve" class="field num" min="0" max="100" step="1" />
               </label>
             </div>
           </div>
 
           <div class="rep-card">
-            <h3>Đặt hàng &amp; dự báo</h3>
+            <h3>Chính sách đặt hàng</h3>
             <p class="hint">
-              Các số này là đầu vào của trợ lý đề xuất: điểm đặt hàng lại = thất thoát trong
-              lead time + dự trữ an toàn (z × σ × √lead time).
+              Hệ thống dùng các thông số này để xác định điểm đặt hàng lại và lượng đặt
+              khuyến nghị cho từng bồn.
             </p>
             <div class="set-grid">
               <label>
-                <span class="set-lbl">Lead time giao hàng (ngày) <span class="src" data-src="forecast_lead_time_days">env</span></span>
+                <span class="set-lbl">Thời gian giao hàng (ngày) <span class="src" data-src="forecast_lead_time_days">Mặc định</span></span>
                 <input type="number" id="s-lead" class="field num" min="0" max="30" step="0.5" />
               </label>
               <label>
-                <span class="set-lbl">Mức phục vụ (%) <span class="src" data-src="forecast_service_level">env</span></span>
+                <span class="set-lbl">Mức phục vụ (%) <span class="src" data-src="forecast_service_level">Mặc định</span></span>
                 <select id="s-service" class="field">
-                  <option value="50">50 — không đệm</option>
+                  <option value="50">50 · không dự trữ an toàn</option>
                   <option value="80">80</option>
                   <option value="90">90</option>
-                  <option value="95">95 — chuẩn ngành</option>
-                  <option value="99">99 — rất an toàn</option>
+                  <option value="95">95 · thông dụng</option>
+                  <option value="99">99 · an toàn cao</option>
                 </select>
               </label>
               <label>
-                <span class="set-lbl">Cửa sổ lịch sử (ngày) <span class="src" data-src="forecast_window_days">env</span></span>
+                <span class="set-lbl">Phạm vi dữ liệu lịch sử (ngày) <span class="src" data-src="forecast_window_days">Mặc định</span></span>
                 <input type="number" id="s-window" class="field num" min="1" max="365" step="1" />
               </label>
               <label>
-                <span class="set-lbl">Tải xe (m³) <span class="src" data-src="truck_capacity_l">env</span></span>
+                <span class="set-lbl">Sức chứa xe (m³) <span class="src" data-src="truck_capacity_l">Mặc định</span></span>
                 <input type="number" id="s-truck" class="field num" min="0.5" step="0.5" />
               </label>
               <label>
-                <span class="set-lbl">Số liệu cũ quá (giờ) thì ngừng dự báo <span class="src" data-src="forecast_max_reading_age_hours">env</span></span>
+                <span class="set-lbl">Ngưỡng dữ liệu lỗi thời (giờ) <span class="src" data-src="forecast_max_reading_age_hours">Mặc định</span></span>
                 <input type="number" id="s-age" class="field num" min="1" max="8760" step="1" />
               </label>
             </div>
           </div>
 
           <div class="rep-card">
-            <h3>Ngưỡng cảnh báo thiết bị</h3>
+            <h3>Ngưỡng cảnh báo</h3>
+            <p class="hint">
+              Vượt các ngưỡng này, hệ thống phát cảnh báo trên bảng điều khiển và gửi tới
+              địa chỉ nhận đã khai báo.
+            </p>
             <div class="set-grid">
               <label>
-                <span class="set-lbl">Coi là offline sau (phút) <span class="src" data-src="online_stale_minutes">env</span></span>
+                <span class="set-lbl">Ngưỡng mất kết nối (phút) <span class="src" data-src="online_stale_minutes">Mặc định</span></span>
                 <input type="number" id="s-stale" class="field num" min="1" step="1" />
               </label>
               <label>
-                <span class="set-lbl">Mức thấp dưới (%) <span class="src" data-src="alert_low_volume_percent">env</span></span>
+                <span class="set-lbl">Ngưỡng mức chứa thấp (%) <span class="src" data-src="alert_low_volume_percent">Mặc định</span></span>
                 <input type="number" id="s-lowvol" class="field num" min="0" max="100" step="0.5" />
               </label>
               <label>
-                <span class="set-lbl">Pin yếu dưới (V) <span class="src" data-src="alert_low_battery_v">env</span></span>
+                <span class="set-lbl">Ngưỡng pin yếu (V) <span class="src" data-src="alert_low_battery_v">Mặc định</span></span>
                 <input type="number" id="s-lowbat" class="field num" min="0" step="0.01" />
               </label>
               <label>
-                <span class="set-lbl">Tín hiệu yếu dưới (%) <span class="src" data-src="alert_low_signal_percent">env</span></span>
+                <span class="set-lbl">Ngưỡng tín hiệu yếu (%) <span class="src" data-src="alert_low_signal_percent">Mặc định</span></span>
                 <input type="number" id="s-lowsig" class="field num" min="0" max="100" step="1" />
               </label>
             </div>
             <div class="set-actions">
-              <button type="button" class="btn-primary-sm" id="s-save2">Lưu thông số</button>
+              <button type="button" class="btn-primary-sm" id="s-save2">Lưu</button>
               <span class="set-note" id="s-msg2"></span>
             </div>
           </div>
@@ -1265,8 +1269,8 @@
       if (Number.isNaN(d.getTime())) return "--";
       return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
-    const CONF_VI = { high: "tin cậy cao", medium: "tin cậy vừa", low: "tin cậy thấp", none: "chưa đủ dữ liệu" };
-    const METHOD_VI = { measured: "đo được", reference: "tham chiếu", insufficient: "chưa đủ dữ liệu" };
+    const CONF_VI = { high: "Độ tin cậy cao", medium: "Độ tin cậy trung bình", low: "Độ tin cậy thấp", none: "Chưa đủ dữ liệu" };
+    const METHOD_VI = { measured: "Đo được", reference: "Tham chiếu", insufficient: "Chưa đủ dữ liệu" };
     const URG_VI = { now: "Cần đặt ngay", soon: "Sắp phải đặt", ok: "Chưa cần đặt", unknown: "Chưa đủ dữ liệu" };
     const confClass = (c) => (c === "high" ? "m" : c === "none" ? "n" : "r");
 
@@ -1290,14 +1294,14 @@
       const dot = document.getElementById("health-dot");
       const text = document.getElementById("health-text");
       const banner = document.getElementById("health-banner");
-      if (!health) { text.textContent = "máy: --"; dot.className = "dot"; banner.classList.remove("show"); return; }
-      const map = { ok: "máy ổn", degraded: "máy suy giảm", error: "máy lỗi" };
+      if (!health) { text.textContent = "Hệ thống: --"; dot.className = "dot"; banner.classList.remove("show"); return; }
+      const map = { ok: "Hệ thống bình thường", degraded: "Hệ thống suy giảm", error: "Hệ thống lỗi" };
       text.textContent = map[health.status] || map.degraded;
       dot.className = "dot " + (health.status === "ok" ? "ok" : health.status === "error" ? "bad" : "warn");
       const ingestEl = document.getElementById("ingest-label");
       const ingest = health.ingest && health.ingest.detail
         ? health.ingest.detail
-        : (health.last_ingest_at ? "lấy số liệu: " + fmtTime(health.last_ingest_at) : "chưa lấy số liệu");
+        : (health.last_ingest_at ? "Thu thập cuối: " + fmtTime(health.last_ingest_at) : "Chưa thu thập dữ liệu");
       ingestEl.textContent = ingest; ingestEl.hidden = false;
       if (health.status === "ok") { banner.classList.remove("show"); return; }
       const parts = [];
@@ -1347,7 +1351,7 @@
     function renderTankList() {
       const container = document.getElementById("tank-list");
       if (!tanks.length) {
-        container.innerHTML = `<tr><td colspan="5" class="empty">Chưa có bồn nào trong hệ thống</td></tr>`;
+        container.innerHTML = `<tr><td colspan="5" class="empty">Chưa có bồn nào trong hệ thống.</td></tr>`;
         return;
       }
       container.innerHTML = sortedTanks().map(tank => {
@@ -1367,7 +1371,7 @@
               </div>
             </td>
             <td class="r">${runPill(tank.psn)}</td>
-            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "online" : "offline"}</span></td>
+            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Mất kết nối"}</span></td>
             <td>${esc(fmtAgo(tank.last_seen_at))}</td>
           </tr>`;
       }).join("");
@@ -1389,18 +1393,18 @@
       if (f && f.stale) {
         const age = f.reading_age_days;
         const why = age != null
-          ? `Số liệu đã cũ ${fmtDays(age)} — không chiếu dự báo từ dữ liệu này`
-          : "Chưa có lần đọc nào";
-        return `<span class="runpill" title="${esc(why)}">cũ</span>`;
+          ? `Dữ liệu lỗi thời ${fmtDays(age)} — hệ thống không dự báo từ dữ liệu này`
+          : "Chưa có lần đo nào";
+        return `<span class="runpill" title="${esc(why)}">Lỗi thời</span>`;
       }
       const d = f && f.runout ? f.runout.days_to_reserve : null;
       if (d === null || d === undefined) {
-        const why = f ? "Chưa đo được mức dùng/ngày từ lịch sử" : "Đang tính…";
+        const why = f ? "Chưa đo được mức tiêu thụ từ lịch sử" : "Đang tính…";
         return `<span class="runpill" title="${esc(why)}">--</span>`;
       }
       const cls = d <= 1 ? "crit" : d <= 3 ? "warn" : "ok";
       const tip = `Còn ${fmtDays(d)} tới mức dự trữ ${fmtM3(f.reserve_l)} m³`
-        + (f.runout.days_to_empty != null ? ` · cạn hẳn sau ${fmtDays(f.runout.days_to_empty)}` : "");
+        + (f.runout.days_to_empty != null ? ` · cạn hoàn toàn sau ${fmtDays(f.runout.days_to_empty)}` : "");
       return `<span class="runpill ${cls}" title="${esc(tip)}">${esc(fmtDays(d))}</span>`;
     }
 
@@ -1411,16 +1415,16 @@
       const urg = s.urgency || "unknown";
       const reasons = (s.reasons || []).map(r => `<li>${esc(r)}</li>`).join("");
       const lead = s.order_l != null
-        ? `<b>${esc(fmtM3(s.order_l))} m³</b><span>đặt vào ${esc(fmtWhen(s.order_at))}</span>`
-          + (s.deliver_at ? `<span class="fc-sub">giao ${esc(fmtWhen(s.deliver_at))}</span>` : "")
-        : `<b>--</b><span>chưa đủ dữ liệu để đề xuất lượng đặt</span>`;
+        ? `<b>${esc(fmtM3(s.order_l))} m³</b><span>đặt lúc ${esc(fmtWhen(s.order_at))}</span>`
+          + (s.deliver_at ? `<span class="fc-sub">giao lúc ${esc(fmtWhen(s.deliver_at))}</span>` : "")
+        : `<b>--</b><span>Chưa đủ dữ liệu để đề xuất lượng đặt</span>`;
       return `
         <div class="fc-sug ${esc(urg)}">
           <div class="lead">
             <span class="tagline">${esc(title)} · ${esc(URG_VI[urg] || urg)}</span>
           </div>
           <div class="lead">${lead}</div>
-          ${reasons ? `<details class="fc-why"><summary>Vì sao ra con số này</summary><ol>${reasons}</ol></details>` : ""}
+          ${reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
         </div>`;
     }
 
@@ -1430,17 +1434,17 @@
       if (!box) return;
       const f = fcOf(psn);
       if (!f) {
-        box.innerHTML = `<p class="empty">Đang tính từ lịch sử…</p>`;
+        box.innerHTML = `<p class="empty">Đang tính từ dữ liệu lịch sử…</p>`;
         win.textContent = "—"; win.className = "fc-badge n";
         return;
       }
       const c = f.consumption || {}, i = f.idle || {}, r = f.runout || {}, h = f.hold || {};
       if (f.stale) {
         win.textContent = f.reading_age_days != null
-          ? "số liệu cũ " + fmtDays(f.reading_age_days) : "chưa có số liệu";
+          ? "Dữ liệu lỗi thời " + fmtDays(f.reading_age_days) : "Chưa có dữ liệu";
         win.className = "fc-badge r";
       } else {
-        win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày · phủ ${Math.round((c.coverage || 0) * 100)}%`;
+        win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày dữ liệu · độ phủ ${Math.round((c.coverage || 0) * 100)}%`;
         win.className = "fc-badge " + confClass(c.confidence);
       }
       // Số liệu cũ: nói thẳng và KHÔNG vẽ 4 thẻ dự báo. Chúng đều là phép chiếu từ
@@ -1450,11 +1454,11 @@
         const age = f.reading_age_days;
         box.innerHTML = `
           <p class="fc-stale">
-            Lần đọc gần nhất <b>${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"}</b> —
-            quá cũ để dự báo. Thiết bị đang mất liên lạc; cần kiểm tra pin và ăng-ten
-            trước khi tin vào bất kỳ con số dự báo nào của bồn này.
+            Lần đo cuối <b>${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"}</b>.
+            Dữ liệu đã lỗi thời nên hệ thống không đưa ra dự báo cho bồn này.
+            Cần kiểm tra nguồn điện và ăng-ten của thiết bị đo.
           </p>
-          <p class="fc-sub">Mức đo cuối: ${esc(fmtM3(f.volume_l))} m³ / ${esc(fmtM3(f.capacity_l))} m³
+          <p class="fc-sub">Thể tích lần đo cuối: ${esc(fmtM3(f.volume_l))} m³ / ${esc(fmtM3(f.capacity_l))} m³
             (${f.fill_percent == null ? "--" : esc(Number(f.fill_percent).toFixed(2))}%)</p>`;
         return;
       }
@@ -1467,14 +1471,14 @@
       const tiles = `
         <div class="fc-grid">
           <div class="fc-tile${runCls}">
-            <dt>Còn tới mức dự trữ</dt>
+            <dt>Thời gian tới mức dự trữ</dt>
             <dd>${esc(fmtDays(dres))}</dd>
             <div class="fc-sub">${r.days_to_empty != null
-              ? "cạn hẳn " + esc(fmtDays(r.days_to_empty)) + " · " + esc(fmtWhen(r.empty_at))
-              : "chưa đo được mức dùng"}</div>
+              ? "Cạn hoàn toàn sau " + esc(fmtDays(r.days_to_empty)) + " · " + esc(fmtWhen(r.empty_at))
+              : "Chưa đo được mức tiêu thụ"}</div>
           </div>
           <div class="fc-tile">
-            <dt>Mức dùng/ngày</dt>
+            <dt>Mức tiêu thụ/ngày</dt>
             <dd>${esc(fmtM3(c.daily_use_l))}<small>m³</small></dd>
             <div class="fc-sub">
               <span class="fc-badge ${confClass(c.confidence)}">${esc(CONF_VI[c.confidence] || "--")}</span>
@@ -1482,19 +1486,19 @@
             </div>
           </div>
           <div class="fc-tile">
-            <dt>Bay hơi (boil-off)</dt>
+            <dt>Bay hơi tự nhiên</dt>
             <dd>${bor == null ? "--" : esc(Number(bor).toFixed(3))}<small>%/ngày</small></dd>
             <div class="fc-sub">
               <span class="fc-badge ${i.method === "measured" ? "m" : i.method === "reference" ? "r" : "n"}">${esc(METHOD_VI[i.method] || "--")}</span>
-              ${i.idle_windows ? " " + i.idle_windows + " cửa sổ nghỉ" : ""}
+              ${i.idle_windows ? " " + i.idle_windows + " chu kỳ nghỉ" : ""}
             </div>
           </div>
           <div class="fc-tile${holdCls}">
-            <dt>Hold time</dt>
+            <dt>Thời gian giữ áp</dt>
             <dd>${esc(fmtDays(h.days))}</dd>
             <div class="fc-sub">${h.days == null
-              ? "áp chưa tăng rõ để đo"
-              : "tới van an toàn " + esc(Number(h.relief_mpa).toFixed(2)) + " MPa"}</div>
+              ? "Chưa đo được tốc độ tăng áp"
+              : "Tới áp suất van an toàn " + esc(Number(h.relief_mpa).toFixed(2)) + " MPa"}</div>
           </div>
         </div>`;
 
@@ -1504,7 +1508,7 @@
              (${esc(fmtM3(last.before_l))} → ${esc(fmtM3(last.after_l))} m³)</p>`
         : "";
 
-      box.innerHTML = tiles + suggestionHtml(f, "Đề xuất đặt hàng") + lastLine;
+      box.innerHTML = tiles + suggestionHtml(f, "Khuyến nghị đặt hàng") + lastLine;
     }
 
     async function refreshForecast() {
@@ -1543,10 +1547,10 @@
             <h2>${esc(tankName(detail))}</h2>
             <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
           </div>
-          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "online" : "offline"}</span>
+          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Mất kết nối"}</span>
         </div>
         <dl class="readouts">
-          <div class="readout${pctClass}"><dt>Mức</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
+          <div class="readout${pctClass}"><dt>Mức chứa</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
           <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3))}<small>m³ / ${esc(detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3))}</small></dd></div>
           <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
           <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
@@ -1554,24 +1558,24 @@
         ${alertBlock}`;
       document.getElementById("tank-specs").innerHTML = `
         <div class="meta-grid">
-          ${row("Mực lỏng", esc(fmtNum(detail.level_mmwc, "mmWC")))}
+          ${row("Chiều cao cột lỏng", esc(fmtNum(detail.level_mmwc, "mmWC")))}
           ${row("Áp suất vi sai", esc(fmtNum(detail.diff_pressure_kpa, "kPa")))}
           ${row("Chân không", esc(fmtNum(detail.vacuum_pa, "Pa")))}
-          ${row("Pin", esc(fmtNum(detail.battery_v, "V")))}
-          ${row("Tín hiệu", esc(fmtNum(detail.signal_percent, "%")))}
-          ${row("Firmware", esc(detail.software_version ?? "--"))}
-          ${row("Phần cứng", esc(detail.hardware_version ?? "--"))}
+          ${row("Điện áp pin", esc(fmtNum(detail.battery_v, "V")))}
+          ${row("Cường độ tín hiệu", esc(fmtNum(detail.signal_percent, "%")))}
+          ${row("Phiên bản firmware", esc(detail.software_version ?? "--"))}
+          ${row("Phiên bản phần cứng", esc(detail.hardware_version ?? "--"))}
           ${row("Modem", esc(detail.modem_number ?? "--"))}
-          ${row("SIM", esc(detail.sim_iccid ?? "--"))}
-          ${row("Cập nhật cuối", esc(fmtTime(detail.last_seen_at)))}
+          ${row("Số SIM", esc(detail.sim_iccid ?? "--"))}
+          ${row("Lần đo cuối", esc(fmtTime(detail.last_seen_at)))}
         </div>
         <form class="rename" onsubmit="saveTerminal(event)">
-          <label for="name-edit">Tên do người vận hành đặt</label>
+          <label for="name-edit">Tên bồn</label>
           <div class="rename-row">
             <input id="name-edit" class="field" name="name" maxlength="128" value="${esc(detail.name ?? "")}" />
-            <button type="submit" class="btn" id="btn-save">Lưu tên</button>
+            <button type="submit" class="btn" id="btn-save">Lưu</button>
           </div>
-          <p class="hint">Lần lấy số liệu sau không ghi đè tên này.</p>
+          <p class="hint">Tên này không bị ghi đè khi hệ thống thu thập dữ liệu.</p>
         </form>`;
     }
 
@@ -1671,13 +1675,13 @@
       if (widened) {
         const first = new Date(items[0].sampled_at).toLocaleDateString("vi-VN");
         const last = new Date(items[items.length - 1].sampled_at).toLocaleDateString("vi-VN");
-        note.textContent = `Không có dữ liệu trong khoảng đang chọn — đang hiện toàn bộ lịch sử thật gần nhất (${first} → ${last}).`;
+        note.textContent = `Khoảng đã chọn không có dữ liệu đo — đang hiển thị toàn bộ lịch sử gần nhất (${first} → ${last}).`;
         note.hidden = false;
       } else {
         note.hidden = true;
       }
       wrap.title = widened
-        ? "Cửa sổ chọn không có điểm đo — đang hiển thị lịch sử thật 90 ngày gần nhất"
+        ? "Khoảng đã chọn không có dữ liệu đo — đang hiển thị lịch sử 90 ngày gần nhất"
         : "";
 
       const labels = items.map(r => new Date(r.sampled_at)
@@ -1726,7 +1730,6 @@
       const container = document.getElementById("alert-list");
       const chip = document.getElementById("btn-alerts");
       const chipBadge = document.getElementById("alert-badge");
-      const navBadge = document.getElementById("nav-alert-badge");
       // Đếm theo SỐ BỒN có cảnh báo (không phải số dòng cảnh báo) để khớp với KPI
       // header và với số dòng popover (gom theo bồn). Nguồn là allAlerts() = cảnh
       // báo thiết bị + cảnh báo dự báo, đúng tập mà KPI header cũng dùng.
@@ -1735,7 +1738,6 @@
       const count = new Set(merged.map(a => a.psn)).size;
       chip.classList.toggle("has", total > 0);
       chipBadge.textContent = count;
-      if (navBadge) { navBadge.textContent = count; navBadge.hidden = total === 0; }
       if (!total) {
         container.innerHTML = `<p class="empty-al">Không có cảnh báo nào. Mọi bồn đang bình thường.</p>`;
         return;
@@ -1790,7 +1792,7 @@
         summary = s; tanks = t.items; alerts = a; health = h;
         clearError();
         const lu = document.getElementById("last-update");
-        lu.textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+        lu.textContent = "Làm mới " + new Date().toLocaleTimeString("vi-VN");
         lu.hidden = false;
         renderHealth(); renderStats(); renderAlerts(); renderPsnOptions(); renderPlanTankOptions();
         renderTankList();
@@ -1866,8 +1868,8 @@
         `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num" style="font-size:17px">${band}</b></div>`;
       const warn = document.getElementById("plan-warn");
       if (rows.length && rows[0].level < R) {
-        warn.textContent = `Mức bắt đầu ${round2(rows[0].level)} m³ đang DƯỚI mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
-          + `Công thức chỉ tự lên lịch khi mức ≥ dự trữ; hãy tick "Chủ động nạp" để đưa vào kế hoạch.`;
+        warn.textContent = `Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
+          + `Hệ thống chỉ tự xếp lịch khi thể tích đạt mức dự trữ; tích cột "Nạp chỉ định" để đưa vào kế hoạch.`;
         warn.hidden = false;
       } else {
         warn.hidden = true;
@@ -1884,7 +1886,7 @@
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
           <td class="${cls}">${lvl}</td>
           <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
-          <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Chủ động nạp"></td>
+          <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
           <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
       }).join("");
@@ -1893,7 +1895,7 @@
       const sel = document.getElementById("p-tank");
       if (!sel) return;
       const keep = sel.value;
-      sel.innerHTML = `<option value="">— Nhập tay —</option>` + tanks.map(t =>
+      sel.innerHTML = `<option value="">Tự nhập thông số</option>` + tanks.map(t =>
         `<option value="${esc(t.psn)}">${esc(t.name || t.psn)}</option>`).join("");
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
     }
@@ -1940,16 +1942,16 @@
       const f = psn ? fcOf(psn) : null;
       const c = f ? f.consumption : null;
       const v = c ? c.daily_use_l : null;
-      if (!psn) { btn.disabled = true; note.textContent = "chọn bồn để lấy số đo"; return; }
-      if (!f) { btn.disabled = true; note.textContent = "đang tính từ lịch sử…"; return; }
+      if (!psn) { btn.disabled = true; note.textContent = "Chọn bồn để lấy số đo thực tế"; return; }
+      if (!f) { btn.disabled = true; note.textContent = "Đang tính từ dữ liệu lịch sử…"; return; }
       if (v == null || v <= 0) {
         btn.disabled = true;
-        note.textContent = "chưa đo được (thiết bị offline hoặc thiếu dữ liệu)";
+        note.textContent = "Chưa đo được — thiết bị mất kết nối hoặc thiếu dữ liệu";
         return;
       }
       btn.disabled = false;
       btn.dataset.value = round2(v / 1000);
-      note.textContent = `đo được ${fmtM3(v)} m³/ngày · ${CONF_VI[c.confidence] || ""}`;
+      note.textContent = `Số đo thực tế ${fmtM3(v)} m³/ngày · ${CONF_VI[c.confidence] || ""}`;
     }
 
     function useMeasuredDaily() {
@@ -1968,12 +1970,12 @@
       if (!f) { box.innerHTML = ""; return; }
       if (f.stale) {
         box.innerHTML = `<p class="plan-warn" style="display:block">
-          Bồn này đang mất liên lạc${f.reading_age_days != null ? " (" + esc(fmtDays(f.reading_age_days)) + " không có dữ liệu)" : ""} —
-          trợ lý không đề xuất từ số liệu cũ. Kế hoạch bên dưới vẫn tính đúng theo các
-          thông số bạn nhập.</p>`;
+          Bồn này mất kết nối${f.reading_age_days != null ? " " + esc(fmtDays(f.reading_age_days)) : ""}.
+          Hệ thống không đưa ra khuyến nghị từ dữ liệu lỗi thời. Kế hoạch bên dưới vẫn được
+          tính theo các thông số bạn nhập.</p>`;
         return;
       }
-      box.innerHTML = suggestionHtml(f, "Trợ lý đề xuất");
+      box.innerHTML = suggestionHtml(f, "Khuyến nghị đặt hàng");
     }
     /* ---------- BÁO CÁO & NHẬT KÝ ---------- */
 
@@ -2004,7 +2006,7 @@
         if (!r.ok) {
           let d = "";
           try { d = apiErrText(await r.json()); } catch (_) {}
-          showError(`Không tải được báo cáo (${r.status})${d ? " — " + d : ""}`);
+          showError(`Không xuất được báo cáo (${r.status})${d ? " — " + d : ""}`);
           return;
         }
         const cd = r.headers.get("Content-Disposition") || "";
@@ -2038,7 +2040,7 @@
               <td class="num">${esc(fmtM3(e.before_l))}</td>
               <td class="num">${esc(fmtM3(e.after_l))}</td>
               <td class="num">+${esc(fmtM3(e.amount_l))}</td></tr>`).join("")
-          : `<tr><td colspan="4" class="empty">Không phát hiện lần nạp nào trong 90 ngày.</td></tr>`;
+          : `<tr><td colspan="4" class="empty">Không có lần nạp nào trong 90 ngày gần nhất.</td></tr>`;
       } catch (e) {
         if (e.name === "AuthError") return;
         body.innerHTML = `<tr><td colspan="4" class="empty">${esc(e.message)}</td></tr>`;
@@ -2050,26 +2052,26 @@
       if (!box) return;
       const truckM3 = Math.max(1, parseFloat(document.getElementById("rep-truck").value) || 20);
       const horizon = Math.max(1, Math.min(90, parseInt(document.getElementById("rep-horizon").value, 10) || 7));
-      box.innerHTML = `<p class="hint">Đang tính…</p>`;
+      box.innerHTML = `<p class="hint">Đang lập lịch…</p>`;
       try {
         const p = await api(`/api/delivery-plan?truck_capacity_l=${truckM3 * 1000}&horizon_days=${horizon}`);
         if (!p.trips || !p.trips.length) {
-          box.innerHTML = `<p class="hint">Không bồn nào cần nạp trong ${horizon} ngày tới.</p>`;
+          box.innerHTML = `<p class="hint">Không có bồn nào cần nạp trong ${horizon} ngày tới.</p>`;
           return;
         }
         box.innerHTML = p.trips.map(t => `
           <div class="trip">
             <div class="thead">
-              <span>Chuyến ${t.seq} — ${t.stops.length} điểm</span>
+              <span>Chuyến ${t.seq} · ${t.stops.length} điểm giao</span>
               <span><b>${esc(fmtM3(t.total_l))}</b> / ${esc(fmtM3(t.truck_capacity_l))} m³</span>
             </div>
             ${t.stops.map(s => `
               <div class="stop ${esc(s.urgency)}">
-                <span>${esc(s.name || s.psn)} · ${esc(fmtDays(s.days_to_reserve))} tới dự trữ</span>
+                <span>${esc(s.name || s.psn)} · còn ${esc(fmtDays(s.days_to_reserve))} tới mức dự trữ</span>
                 <span class="q">${esc(fmtM3(s.order_l))} m³</span>
               </div>`).join("")}
           </div>`).join("")
-          + `<p class="hint" style="margin-top:8px">Tổng ${esc(fmtM3(p.total_l))} m³ trên ${p.trips.length} chuyến, ${p.stops} điểm giao.</p>`;
+          + `<p class="hint" style="margin-top:8px">Tổng ${esc(fmtM3(p.total_l))} m³ · ${p.trips.length} chuyến · ${p.stops} điểm giao.</p>`;
       } catch (e) {
         if (e.name === "AuthError") return;
         box.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
@@ -2131,27 +2133,27 @@
         // Nhãn nguồn: người dùng thấy ngay ô nào do mình đặt, ô nào còn theo .env.
         document.querySelectorAll(".src[data-src]").forEach(tag => {
           const src = d.sources[tag.dataset.src] || "env";
-          tag.textContent = src === "app" ? "app" : "env";
+          tag.textContent = src === "app" ? "Tuỳ chỉnh" : "Mặc định";
           tag.classList.toggle("app", src === "app");
         });
         const ps = document.getElementById("s-pass-state");
-        ps.textContent = d.smtp_password_set ? "đã lưu" : "chưa lưu";
+        ps.textContent = d.smtp_password_set ? "Đã thiết lập" : "Chưa thiết lập";
         ps.classList.toggle("app", !!d.smtp_password_set);
 
         const state = document.getElementById("set-smtp-state");
         state.textContent = d.smtp_ready
-          ? "Cấu hình đủ để gửi. Bấm Lưu & gửi thử để kiểm tra thật."
-          : "Chưa gửi được: " + (d.smtp_blocked_reason || "thiếu cấu hình");
+          ? "Cấu hình đầy đủ. Gửi thư kiểm tra để xác nhận kết nối."
+          : "Chưa gửi được cảnh báo — " + (d.smtp_blocked_reason || "thiếu cấu hình");
         state.style.color = d.smtp_ready ? "var(--ok)" : "var(--warn)";
 
         const meta = document.getElementById("set-meta");
         meta.textContent = d.updated_at
-          ? `sửa lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " bởi " + d.updated_by : ""}`
-          : "lưu là có hiệu lực ngay, không cần deploy lại";
+          ? `Cập nhật lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " · " + d.updated_by : ""}`
+          : "Thay đổi có hiệu lực ngay cho toàn hệ thống";
         settingsLoaded = true;
       } catch (e) {
         if (e.name === "AuthError") return;
-        setMsg("s-msg", "Không tải được cài đặt: " + e.message, "bad");
+        setMsg("s-msg", "Không tải được cấu hình — " + e.message, "bad");
       }
     }
 
@@ -2209,8 +2211,8 @@
       btns.forEach(b => b.disabled = true);
       try {
         await saveSettings(EMAIL_KEYS, "s-msg");
-        if (!alsoTest) { setMsg("s-msg", "Đã lưu.", "ok"); return; }
-        setMsg("s-msg", "Đã lưu. Đang gửi thư thử…", "");
+        if (!alsoTest) { setMsg("s-msg", "Đã lưu cấu hình.", "ok"); return; }
+        setMsg("s-msg", "Đã lưu. Đang gửi thư kiểm tra…", "");
         const r = await api("/api/settings/test-email", { method: "POST" });
         setMsg("s-msg", r.message, r.ok ? "ok" : "bad");
       } catch (e) {
@@ -2224,7 +2226,7 @@
       const btn = document.getElementById("s-save2");
       btn.disabled = true;
       try {
-        await saveSettings(PARAM_KEYS, "s-msg2", "Đã lưu — dự báo sẽ tính lại theo số mới.");
+        await saveSettings(PARAM_KEYS, "s-msg2", "Đã lưu. Hệ thống sẽ tính lại dự báo theo thông số mới.");
         // Ngưỡng vừa đổi ảnh hưởng trực tiếp dự báo -> lấy lại ngay để số trên
         // dashboard không còn theo cấu hình cũ.
         refreshForecast();
@@ -2287,7 +2289,6 @@
       document.getElementById("hamburger").addEventListener("click", openDrawer);
       document.getElementById("drawer-scrim").addEventListener("click", closeDrawer);
       document.getElementById("btn-alerts").addEventListener("click", (e) => { e.stopPropagation(); toggleAlerts(); });
-      document.getElementById("nav-alerts").addEventListener("click", (e) => { e.stopPropagation(); toggleAlerts(true); closeDrawer(); });
       document.getElementById("action-strip").addEventListener("click", (e) => e.stopPropagation());
       document.addEventListener("click", () => toggleAlerts(false));
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") { toggleAlerts(false); closeDrawer(); } });
@@ -2320,10 +2321,10 @@
         dlCsv(`/api/export/refills.csv?window_days=90&delimiter=${repDelim()}`, "nhat_ky_nap.csv"));
       document.getElementById("dl-telemetry").addEventListener("click", () => {
         const psn = document.getElementById("rep-tank").value;
-        if (!psn) { showError("Chưa chọn bồn để xuất số liệu đo."); return; }
+        if (!psn) { showError("Chưa chọn bồn để xuất dữ liệu đo."); return; }
         const from = document.getElementById("rep-from").value;
         const to = document.getElementById("rep-to").value;
-        if (!from || !to) { showError("Chọn đủ khoảng từ ngày / đến ngày."); return; }
+        if (!from || !to) { showError("Vui lòng chọn đủ khoảng thời gian từ ngày và đến ngày."); return; }
         // `to` lấy hết ngày (23:59:59), nếu không thì ngày cuối chỉ được nửa đêm và
         // người ta tưởng mất dữ liệu. Server localize datetime naive theo APP_TZ.
         const q = new URLSearchParams({

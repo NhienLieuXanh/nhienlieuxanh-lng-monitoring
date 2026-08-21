@@ -594,7 +594,7 @@ def suggest_order(
             lead_time_days=lead_time_days,
             service_level=service_level,
             urgency="unknown",
-            reasons=["Chưa biết dung tích bồn nên không tính được lượng đặt."],
+            reasons=["Chưa khai báo dung tích bồn nên không tính được lượng đặt."],
         )
     if daily_use is None or daily_use <= 0 or volume_l is None:
         # Không đo được mức dùng thì KHÔNG biết "khi nào" — nhưng nếu mức đã dưới
@@ -605,8 +605,8 @@ def suggest_order(
         target = capacity_l * max_fill_percent / 100.0
         floor = reserve_l if reserve_l is not None else 0.0
         no_use = (
-            "Chưa đo được mức dùng/ngày từ lịch sử (thiết bị offline hoặc chưa có "
-            "đủ dữ liệu sụt giảm) nên KHÔNG dự báo được thời điểm cần đặt."
+            "Chưa đo được mức tiêu thụ/ngày từ dữ liệu lịch sử (thiết bị mất kết nối hoặc "
+            "chưa đủ dữ liệu) nên không dự báo được thời điểm cần đặt hàng."
         )
         if volume_l is not None and volume_l < floor:
             return OrderSuggestion(
@@ -623,11 +623,11 @@ def suggest_order(
                 urgency="now",
                 reasons=[
                     no_use,
-                    f"Nhưng mức hiện tại {volume_l / 1000:.2f} m³ ĐÃ dưới mức dự trữ "
-                    f"{floor / 1000:.2f} m³ — cần đặt ngay, không cần dự báo.",
-                    f"Lượng đặt = mức đích {target / 1000:.2f} m³ "
-                    f"({max_fill_percent:g}% dung tích, chừa ullage) − mức hiện tại.",
-                    "⚠ Chưa có dự trữ an toàn thống kê (cần đo được biến động tiêu thụ).",
+                    f"Tuy nhiên thể tích hiện tại {volume_l / 1000:.2f} m³ đã dưới mức dự trữ "
+                    f"{floor / 1000:.2f} m³ — cần đặt hàng ngay.",
+                    f"Lượng đặt = thể tích đích {target / 1000:.2f} m³ "
+                    f"({max_fill_percent:g}% dung tích, chừa khoảng hơi) trừ thể tích hiện tại.",
+                    "Chưa tính được dự trữ an toàn — cần đo được biến động tiêu thụ.",
                 ],
             )
         return OrderSuggestion(
@@ -642,16 +642,16 @@ def suggest_order(
             urgency="unknown",
             reasons=[
                 no_use,
-                f"Mức hiện tại còn trên mức dự trữ {floor / 1000:.2f} m³ nên chưa "
-                "cần đặt; theo dõi tiếp khi thiết bị có dữ liệu.",
+                f"Thể tích hiện tại còn trên mức dự trữ {floor / 1000:.2f} m³ nên chưa cần "
+                "đặt hàng; hệ thống tiếp tục theo dõi khi thiết bị có dữ liệu.",
             ],
         )
 
     loss = daily_use + bor
     reasons.append(
-        f"Thất thoát {loss / 1000:.2f} m³/ngày = rút {daily_use / 1000:.2f} "
-        f"+ bay hơi {bor / 1000:.2f} m³/ngày"
-        + (" (bay hơi tham chiếu 0.05%/ngày)" if idle.method == "reference" else "")
+        f"Thất thoát {loss / 1000:.2f} m³/ngày = tiêu thụ {daily_use / 1000:.2f} "
+        f"+ bay hơi tự nhiên {bor / 1000:.2f} m³/ngày"
+        + (" (bay hơi lấy theo giá trị tham chiếu 0.05%/ngày)" if idle.method == "reference" else "")
     )
 
     z = Z_BY_SERVICE_LEVEL.get(service_level, 1.645)
@@ -659,31 +659,31 @@ def suggest_order(
     if sd is None:
         sd = daily_use * 0.25
         reasons.append(
-            f"Chưa đủ ngày đầy dữ liệu để đo biến động; giả định σ = 25% mức dùng "
-            f"= {sd / 1000:.2f} m³/ngày"
+            f"Chưa đủ số ngày dữ liệu đầy đủ để đo biến động; giả định độ lệch chuẩn "
+            f"bằng 25% mức tiêu thụ = {sd / 1000:.2f} m³/ngày"
         )
     else:
         reasons.append(
-            f"Biến động đo được σ = {sd / 1000:.2f} m³/ngày "
-            f"({consumption.full_days} ngày đầy dữ liệu)"
+            f"Biến động tiêu thụ đo được: độ lệch chuẩn {sd / 1000:.2f} m³/ngày "
+            f"({consumption.full_days} ngày dữ liệu đầy đủ)"
         )
 
     safety = z * sd * math.sqrt(max(lead_time_days, 0.0))
     reasons.append(
-        f"Dự trữ an toàn = z({service_level}%)={z:.3f} × σ × √{lead_time_days:g} "
-        f"= {safety / 1000:.2f} m³"
+        f"Dự trữ an toàn = {z:.3f} (mức phục vụ {service_level}%) × độ lệch chuẩn × "
+        f"căn bậc hai của {lead_time_days:g} ngày = {safety / 1000:.2f} m³"
     )
 
     rop = loss * lead_time_days + safety
     if reserve_l is not None and reserve_l > rop:
         reasons.append(
             f"Mức dự trữ do người vận hành đặt ({reserve_l / 1000:.2f} m³) cao hơn "
-            f"điểm đặt tính được ({rop / 1000:.2f} m³) — lấy theo người vận hành"
+            f"điểm đặt hàng tính được ({rop / 1000:.2f} m³) — áp dụng theo người vận hành"
         )
         rop = reserve_l
     else:
         reasons.append(
-            f"Điểm đặt hàng lại = thất thoát trong {lead_time_days:g} ngày lead time "
+            f"Điểm đặt hàng lại = thất thoát trong {lead_time_days:g} ngày giao hàng "
             f"+ dự trữ an toàn = {rop / 1000:.2f} m³"
         )
 
@@ -701,7 +701,7 @@ def suggest_order(
     if days_to_rop <= 0:
         urgency = "now"
         reasons.append(
-            f"Mức hiện tại {volume_l / 1000:.2f} m³ ĐÃ dưới điểm đặt — cần đặt ngay"
+            f"Thể tích hiện tại {volume_l / 1000:.2f} m³ đã dưới điểm đặt hàng — cần đặt ngay"
         )
     elif days_to_rop <= 2:
         urgency = "soon"
@@ -711,13 +711,13 @@ def suggest_order(
         reasons.append(f"Còn {days_to_rop:.1f} ngày nữa tới điểm đặt hàng lại")
 
     reasons.append(
-        f"Lượng đặt = mức đích {target / 1000:.2f} m³ ({max_fill_percent:g}% dung "
-        f"tích, chừa ullage) − mức dự kiến lúc giao {level_at_delivery / 1000:.2f} m³"
+        f"Lượng đặt = thể tích đích {target / 1000:.2f} m³ ({max_fill_percent:g}% dung tích, "
+        f"chừa khoảng hơi) trừ thể tích dự kiến lúc giao {level_at_delivery / 1000:.2f} m³"
     )
     if consumption.confidence in ("low", "none"):
         reasons.append(
-            "⚠ Độ tin cậy thấp: dữ liệu lịch sử còn mỏng, hãy đối chiếu với thực tế "
-            "trước khi chốt đơn"
+            "Lưu ý: độ tin cậy thấp do dữ liệu lịch sử còn ít — cần đối chiếu với thực tế "
+            "trước khi chốt đơn hàng"
         )
 
     return OrderSuggestion(
@@ -817,7 +817,7 @@ def forecast_alerts(
         out.append(
             ForecastAlert(
                 f.psn, "HOLD_TIME", sev,
-                f"Hold time còn {h:.1f} ngày — áp suất sẽ chạm van an toàn "
+                f"Thời gian giữ áp còn {h:.1f} ngày — áp suất sẽ chạm van an toàn "
                 f"{f.hold.relief_mpa:g} MPa và bồn phải xả",
                 h, hold_days,
             )
@@ -832,7 +832,7 @@ def forecast_alerts(
             out.append(
                 ForecastAlert(
                     f.psn, "BOIL_OFF_HIGH", "warning",
-                    f"Bay hơi {bor:.3f}%/ngày vượt ngưỡng {bor_percent_max:g}% "
+                    f"Bay hơi tự nhiên {bor:.3f}%/ngày vượt ngưỡng {bor_percent_max:g}% "
                     "— nghi chân không lớp cách nhiệt suy giảm, cần kiểm tra bồn",
                     bor, bor_percent_max,
                 )

@@ -159,7 +159,7 @@ def export_refills(
                 ]
             )
     out.sort(key=lambda r: str(r[0]), reverse=True)
-    header = ["thoi_diem", "psn", "ten_bon", "truoc_m3", "sau_m3", "luong_nap_m3"]
+    header = ["thoi_diem", "psn", "ten_bon", "the_tich_truoc_m3", "the_tich_sau_m3", "luong_nap_m3"]
     fname = f"nhat_ky_nap_{now:%Y%m%d}.csv"
     return _csv(out, header, filename=fname, delimiter=_DELIMS[delimiter])
 
@@ -246,21 +246,21 @@ def export_tanks(
         "psn",
         "ten_bon",
         "trang_thai",
-        "lan_cuoi_nhan_du_lieu",
+        "lan_do_cuoi",
         "dung_tich_m3",
-        "muc_hien_tai_m3",
+        "the_tich_hien_tai_m3",
         "phan_tram_day",
-        "muc_dung_ngay_m3",
+        "muc_tieu_thu_ngay_m3",
         "do_tin_cay",
         "do_phu_du_lieu_pct",
-        "bay_hoi_pct_ngay",
+        "bay_hoi_tu_nhien_pct_ngay",
         "nguon_bay_hoi",
         "tuoi_du_lieu_ngay",
         "du_lieu_qua_cu",
         "ngay_toi_du_tru",
         "ngay_toi_can",
         "du_kien_can_luc",
-        "hold_time_ngay",
+        "thoi_gian_giu_ap_ngay",
         "de_xuat_dat_m3",
         "de_xuat_dat_luc",
         "muc_do_gap",

@@ -50,7 +50,7 @@ NOTIFY_CODES = frozenset(
 )
 
 _SEV_ORDER = {"critical": 0, "warning": 1, "info": 2}
-_SEV_LABEL = {"critical": "NGUY CẤP", "warning": "CẢNH BÁO", "info": "THÔNG TIN"}
+_SEV_LABEL = {"critical": "NGHIÊM TRỌNG", "warning": "CẢNH BÁO", "info": "THÔNG TIN"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,15 +242,15 @@ def render_email(
     """
     crit = [n for n in notices if n.severity == "critical"]
     head = crit[0] if crit else notices[0]
-    tag = "NGUY CẤP" if crit else "CẢNH BÁO"
+    tag = "NGHIÊM TRỌNG" if crit else "CẢNH BÁO"
     who = head.name or head.psn
-    extra = f" (+{len(notices) - 1} cảnh báo khác)" if len(notices) > 1 else ""
+    extra = f" (và {len(notices) - 1} cảnh báo khác)" if len(notices) > 1 else ""
     subject = f"[{tag}] {who}: {head.message}{extra}"
 
     local = now.astimezone(settings.tzinfo)
     lines = [
-        f"Thời điểm: {local:%d/%m/%Y %H:%M:%S} ({settings.app_tz})",
-        f"Số cảnh báo: {len(notices)}",
+        f"Thời điểm: {local:%d/%m/%Y %H:%M:%S} (giờ {settings.app_tz})",
+        f"Tổng số cảnh báo: {len(notices)}",
         "",
     ]
     for n in notices:
@@ -259,8 +259,8 @@ def render_email(
         lines.append(f"    {n.message}")
     lines += [
         "",
-        f"Không gửi lại cùng một cảnh báo trong {settings.alert_resend_hours} giờ.",
-        "Email tự động từ hệ thống theo dõi bồn LNG nội bộ.",
+        f"Hệ thống không nhắc lại cùng một cảnh báo trong {settings.alert_resend_hours} giờ.",
+        "Thư tự động từ hệ thống giám sát bồn LNG. Vui lòng không trả lời thư này.",
     ]
     return subject, "\n".join(lines)
 
