@@ -440,6 +440,8 @@
     .fc-tile dd small { font-size: .66rem; font-weight: 400; color: var(--muted); margin-left: 3px; }
     .fc-tile.crit dd { color: var(--crit); }
     .fc-tile.warn dd { color: var(--warn); }
+    .fc-stale { font-size: .78rem; line-height: 1.6; color: var(--muted); }
+    .fc-stale b { color: var(--warn); }
     .fc-sub { font-size: .66rem; color: var(--faint); margin-top: 2px; }
 
     /* Nhãn nguồn số: "đo được" vs "tham chiếu" phải nhìn là phân biệt được ngay,
@@ -1399,8 +1401,8 @@
       if (f.stale) {
         const age = f.reading_age_days;
         box.innerHTML = `
-          <p class="empty">
-            Lần đọc gần nhất ${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"} —
+          <p class="fc-stale">
+            Lần đọc gần nhất <b>${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"}</b> —
             quá cũ để dự báo. Thiết bị đang mất liên lạc; cần kiểm tra pin và ăng-ten
             trước khi tin vào bất kỳ con số dự báo nào của bồn này.
           </p>
