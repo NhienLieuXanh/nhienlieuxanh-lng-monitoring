@@ -94,15 +94,17 @@
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
     body { font-size: var(--fs-body);
-      color: var(--fg); font: 14.5px/1.5 var(--font); background: var(--bg);
+      color: var(--fg); background: var(--bg);
+      /* KHÔNG dùng shorthand `font:` ở đây: nó ghi đè font-size khai báo phía
+         trên và từng làm cỡ nền cả app thành 14.5px, lệch khỏi thang. */
+      font-family: var(--font); font-size: var(--fs-md); line-height: 1.5;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
       touch-action: manipulation; overflow: hidden;
     }
-    /* Ô nhập, select và nút KHÔNG khai báo cỡ chữ thì rơi về mặc định của trình
-       duyệt (đo được 14.5px) — lệch thang, và chữ trong ô nhập khác cỡ với nhãn
-       ngay trên nó. Kéo cả nhóm form vào thang; các selector theo class
-       (.nav-item, .page-title, .btn-dl…) vẫn thắng nhờ độ đặc hiệu cao hơn. */
-    input, select, textarea, button { font-family: inherit; font-size: var(--fs-body); }
+    /* Ô nhập, select và nút không khai báo cỡ chữ thì rơi về mặc định trình duyệt
+       (đo được 14.5px). `font: inherit` cho chúng theo đúng ngữ cảnh của nhãn bao
+       quanh; selector theo class (.nav-item, .btn-dl…) vẫn thắng nhờ độ đặc hiệu. */
+    input, select, textarea, button { font: inherit; }
     .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
     .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
     .skip:focus { left: 0; top: 0; }
@@ -385,6 +387,9 @@
     .ps-tile span { font-size: var(--fs-micro); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
     .ps-tile b { font-size: var(--fs-xl); font-family: var(--mono); font-weight: 700; color: var(--fg); letter-spacing: -.02em; }
     .ps-tile.hi b { color: var(--brand); }
+    /* Ô này chứa cả một dải giá trị nên dài hơn các ô khác; hạ một bậc trong
+       thang thay vì ghim px inline trong JS. */
+    .ps-tile b.tight { font-size: var(--fs-body); }
     .plan-help { margin: 0; font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 10px 12px; }
     .plan-warn { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 9px 12px; }
     .plan-warn[hidden] { display: none; }
@@ -1899,7 +1904,7 @@
         `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
         `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
-        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num" style="font-size:17px">${band}</b></div>`;
+        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num tight">${band}</b></div>`;
       const warn = document.getElementById("plan-warn");
       if (rows.length && rows[0].level < R) {
         warn.textContent = `Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
