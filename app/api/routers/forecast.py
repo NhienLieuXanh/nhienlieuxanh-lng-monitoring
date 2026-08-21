@@ -138,6 +138,8 @@ def _build(
         service_level=p.service_level,
         relief_mpa=p.relief_mpa,
         max_fill_percent=p.max_fill_percent,
+        reading_at=latest.sampled_at if latest else None,
+        max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
     )
 
 
@@ -166,6 +168,8 @@ def _to_out(
         hold=HoldTimeOut.model_validate(f.hold),
         suggestion=SuggestionOut.model_validate(f.suggestion),
         # Mới nhất lên đầu: đây là nhật ký, người đọc quan tâm lần nạp vừa rồi.
+        reading_age_days=f.reading_age_days,
+        stale=f.stale,
         refills=[RefillOut.model_validate(r) for r in reversed(f.refills)],
         alerts=[
             AlertOut(

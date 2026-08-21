@@ -437,6 +437,57 @@ def test_build_forecast_survives_dead_device() -> None:
     assert f.suggestion.urgency == "unknown"
 
 
+def test_stale_reading_suppresses_forward_alerts() -> None:
+    """Số liệu cũ -> KHÔNG phát RUNOUT/HOLD_TIME.
+
+    Ca thật phát hiện khi test e2e: hai bồn offline hàng tháng, mức đo cuối 61 L.
+    Chiếu "còn 0 ngày tới mức dự trữ" từ con số đó rồi gửi email là sai — bồn có
+    thể đã được nạp tay từ lâu. Cảnh báo đúng ở đây là OFFLINE, và nó do
+    ``domain/alerts.py`` phát, không phải module này.
+    """
+    s = _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8)
+    old = build_forecast(
+        s,
+        psn="2604200016",
+        volume_l=61.0,
+        capacity_l=CAP,
+        pressure_mpa=0.071,
+        now=T0 + timedelta(days=40),
+        tz=VN,
+        reading_at=T0 + timedelta(days=8),  # đọc cách đây 32 ngày
+    )
+    assert old.stale is True
+    assert old.reading_age_days is not None and old.reading_age_days > 31
+    assert [a.code for a in old.alerts] == []
+    # Con số vẫn được tính và vẫn phát ra — UI hiện kèm nhãn "dữ liệu cũ" thay vì
+    # ẩn đi, để người xem biết vì sao không có dự báo dùng được.
+    assert old.runout.days_to_reserve is not None
+
+    fresh = build_forecast(
+        s,
+        psn="2604200016",
+        volume_l=61.0,
+        capacity_l=CAP,
+        pressure_mpa=0.071,
+        now=T0 + timedelta(days=8),
+        tz=VN,
+        reading_at=T0 + timedelta(days=8),  # vừa đọc xong
+    )
+    assert fresh.stale is False
+    assert "RUNOUT" in [a.code for a in fresh.alerts]
+
+
+def test_no_reading_at_is_treated_as_stale() -> None:
+    """Không biết lần đọc lúc nào -> im lặng, không cảnh báo. Mặc định an toàn."""
+    f = build_forecast(
+        _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8),
+        psn="X", volume_l=61.0, capacity_l=CAP, pressure_mpa=0.07,
+        now=T0 + timedelta(days=8), tz=VN,
+    )
+    assert f.stale is True and f.reading_age_days is None
+    assert f.alerts == []
+
+
 def _stub(psn: str, days: float, order: float) -> Forecast:
     """Forecast thật, rồi thay hai con số để test riêng phần chia chuyến."""
     f = build_forecast(
@@ -447,6 +498,7 @@ def _stub(psn: str, days: float, order: float) -> Forecast:
         pressure_mpa=0.07,
         now=T0,
         tz=VN,
+        reading_at=T0,  # dữ liệu tươi, nếu không sẽ bị loại vì stale
     )
     return replace(
         f,
@@ -471,6 +523,14 @@ def test_plan_trips_splits_by_truck_capacity() -> None:
     assert trips[1].total_l == 6000.0
     assert all(t.total_l <= t.truck_capacity_l for t in trips)
     assert trips[0].stops[0].name == "Bồn B"
+
+
+def test_plan_trips_excludes_stale_tanks() -> None:
+    """Không điều xe theo mức đo đã chết — bồn đó cần người kiểm tra thiết bị."""
+    fresh = _stub("FRESH", 1.0, 5000.0)
+    stale = replace(_stub("STALE", 1.0, 5000.0), stale=True)
+    trips = plan_trips([fresh, stale], truck_capacity_l=20_000.0, horizon_days=7.0)
+    assert [s.psn for t in trips for s in t.stops] == ["FRESH"]
 
 
 def test_plan_trips_empty_inputs() -> None:

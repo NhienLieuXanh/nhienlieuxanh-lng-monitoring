@@ -206,6 +206,8 @@ def export_tanks(
             service_level=settings.forecast_service_level,
             relief_mpa=settings.lng_relief_pressure_mpa,
             max_fill_percent=settings.lng_max_fill_percent,
+            reading_at=lt.sampled_at if lt else None,
+            max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
         )
         fp = fill_percent(lt.volume_l if lt else None, t.capacity_l)
         out.append(

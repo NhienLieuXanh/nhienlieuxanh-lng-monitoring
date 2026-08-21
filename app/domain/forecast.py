@@ -723,6 +723,15 @@ class ForecastAlert:
     threshold: float | None = None
 
 
+#: Lần đọc cũ hơn ngưỡng này thì mọi dự báo hướng tới tương lai bị đánh dấu
+#: ``stale`` và KHÔNG phát cảnh báo. Phát hiện khi test e2e trên thiết bị thật:
+#: hai bồn đã offline hàng tháng, và chiếu "còn 11.7 ngày tới cạn" từ một con số
+#: đo từ tháng trước là bịa — bồn có thể đã được nạp đầy bằng tay từ lâu. Trạng
+#: thái thật ở đây là "mất liên lạc", và đã có cảnh báo OFFLINE lo việc đó.
+#: 24 giờ (không phải 90 phút như ngưỡng online/offline): một lần đọc cách đây
+#: vài giờ vẫn đủ để dự báo nhiều ngày, chỉ mất liên lạc cả ngày mới thành vô nghĩa.
+MAX_READING_AGE_DAYS = 1.0
+
 #: Ngưỡng cảnh báo cạn: dưới 3 ngày là hết thời gian xoay xe trong thực tế.
 ALERT_RUNOUT_DAYS = 3.0
 #: Hold time tối thiểu. 5 ngày là mức sàn mà quy chuẩn bồn lạnh sâu ở Mỹ/Canada
@@ -740,10 +749,23 @@ def forecast_alerts(
     hold_days: float = ALERT_HOLD_DAYS,
     bor_percent_max: float = ALERT_BOR_PERCENT_MAX,
 ) -> list[ForecastAlert]:
-    """Ba cảnh báo mà giám sát bồn thường KHÔNG có, và LNG thì bắt buộc phải có."""
+    """Ba cảnh báo mà giám sát bồn thường KHÔNG có, và LNG thì bắt buộc phải có.
+
+    Số liệu cũ (``f.stale``) thì RUNOUT và HOLD_TIME **không phát**: cả hai là suy
+    diễn từ MỨC và ÁP hiện tại, mà "hiện tại" ở đây có thể là số của tháng trước.
+    Gửi email "còn 0 ngày tới cạn" dựa trên số liệu chết là cách nhanh nhất để
+    người nhận mất tin vào toàn bộ hệ thống cảnh báo. Việc mất liên lạc đã có
+    cảnh báo OFFLINE riêng, đúng bản chất vấn đề hơn.
+
+    BOIL_OFF_HIGH thì KHÔNG bị chặn: nó suy từ các cửa sổ nghỉ trong lịch sử, là
+    một kết luận về tình trạng cách nhiệt của bồn, không phải về mức hiện tại.
+    """
     out: list[ForecastAlert] = []
 
     d = f.runout.days_to_reserve
+    if f.stale:
+        d = None
+
     if d is not None and d <= runout_days:
         sev = "critical" if d <= 1.0 else "warning"
         out.append(
@@ -755,7 +777,7 @@ def forecast_alerts(
             )
         )
 
-    h = f.hold.days
+    h = None if f.stale else f.hold.days
     if h is not None and h <= hold_days:
         sev = "critical" if h <= 1.0 else "warning"
         out.append(
@@ -798,6 +820,13 @@ class Forecast:
     suggestion: OrderSuggestion
     refills: list[RefillEvent]
     generated_at: datetime
+    #: Thời điểm của lần đọc mà mọi con số "hiện tại" dựa vào.
+    reading_at: datetime | None = None
+    reading_age_days: float | None = None
+    #: True = lần đọc quá cũ để chiếu về tương lai. Không phải lỗi, là sự thật cần
+    #: nói ra: mọi con số runout/hold time bên dưới chỉ là "nếu bồn vẫn đang chạy
+    #: như lúc đó". Cảnh báo bị chặn khi cờ này bật (xem forecast_alerts).
+    stale: bool = False
     alerts: list[ForecastAlert] = field(default_factory=list)
 
 
@@ -816,8 +845,15 @@ def build_forecast(
     service_level: int = 95,
     relief_mpa: float = DEFAULT_RELIEF_PRESSURE_MPA,
     max_fill_percent: float = DEFAULT_MAX_FILL_PERCENT,
+    reading_at: datetime | None = None,
+    max_reading_age_days: float = MAX_READING_AGE_DAYS,
 ) -> Forecast:
-    """Chạy toàn bộ chuỗi dự báo cho một bồn."""
+    """Chạy toàn bộ chuỗi dự báo cho một bồn.
+
+    ``reading_at`` là thời điểm của lần đọc cấp ``volume_l``/``pressure_mpa``. Cũ
+    hơn ``max_reading_age_days`` thì kết quả bị đánh dấu ``stale`` và cảnh báo bị
+    chặn — xem ``MAX_READING_AGE_DAYS``.
+    """
     cons = estimate_consumption(samples, capacity_l=capacity_l, tz=tz)
     idle = estimate_idle_trend(samples, capacity_l=capacity_l)
     res = reserve_l
@@ -849,6 +885,10 @@ def build_forecast(
     fill = None
     if volume_l is not None and capacity_l and capacity_l > 0:
         fill = volume_l / capacity_l * 100.0
+    age = None if reading_at is None else (now - reading_at).total_seconds() / 86400.0
+    # reading_at là None -> coi là stale: không có lần đọc nào thì không có cơ sở
+    # nào để nói về tương lai. Mặc định an toàn là im lặng, không phải cảnh báo.
+    stale = age is None or age > max_reading_age_days
     f = Forecast(
         psn=psn,
         volume_l=volume_l,
@@ -862,6 +902,9 @@ def build_forecast(
         suggestion=sug,
         refills=detect_refills(samples, capacity_l=capacity_l),
         generated_at=now,
+        reading_at=reading_at,
+        reading_age_days=age,
+        stale=stale,
     )
     # Cảnh báo phải nằm TRONG payload dự báo, không tính lại ở tầng trên: nếu
     # dashboard và notifier mỗi bên tự suy thì chúng sẽ lệch nhau đúng vào lúc
@@ -904,13 +947,18 @@ def plan_trips(
     nằm ở chuyến đầu. Cố ý KHÔNG tối ưu tuyến đường: khoảng cách giữa các kho
     chưa có trong dữ liệu, nên một "tối ưu" theo thứ tự PSN sẽ chỉ là số đẹp mà
     vô nghĩa. Khi nào có toạ độ kho thì thêm bước sắp tuyến ở đây.
+
+    Bồn có ``stale`` bị LOẠI: điều một chuyến xe với lượng hàng tính từ mức đo
+    tháng trước là một hành động vận hành thật dựa trên số liệu đã chết. Bồn đó
+    cần người gọi kiểm tra thiết bị, không cần một dòng trong lịch giao.
     """
     if truck_capacity_l <= 0:
         return []
     cand = [
         f
         for f in forecasts
-        if f.suggestion.order_l
+        if not f.stale
+        and f.suggestion.order_l
         and f.suggestion.order_l > 0
         and f.runout.days_to_reserve is not None
         and f.runout.days_to_reserve <= horizon_days

@@ -322,6 +322,11 @@ class ForecastOut(BaseModel):
     hold: HoldTimeOut
     suggestion: SuggestionOut
     refills: list[RefillOut] = Field(default_factory=list)
+    # Tuổi của lần đọc mà mọi con số 'hiện tại' dựa vào, và cờ nói rằng nó đã
+    # quá cũ để chiếu về tương lai. Phát ra ngoài để UI nói thẳng điều đó thay
+    # vì trình bày một dự báo từ số liệu chết như thể nó còn đúng.
+    reading_age_days: OptNum = None
+    stale: bool = False
     # Cảnh báo suy từ dự báo (RUNOUT / HOLD_TIME / BOIL_OFF_HIGH). Cùng shape với
     # AlertOut để dashboard gộp được vào một danh sách mà không cần map.
     alerts: list[AlertOut] = Field(default_factory=list)

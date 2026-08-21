@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     forecast_lead_time_days: float = Field(1.0, ge=0)
     # Mức phục vụ cho dự trữ an toàn. 95% là mặc định ngành kho vận.
     forecast_service_level: int = 95
+    # Lần đọc cũ hơn mức này thì dự báo bị đánh dấu stale và KHÔNG phát cảnh
+    # báo runout/hold time — xem forecast.MAX_READING_AGE_DAYS.
+    forecast_max_reading_age_hours: float = Field(24.0, gt=0)
     # Áp suất van an toàn của bồn. Hold time đo từ áp hiện tại tới ngưỡng này —
     # con số này PHẢI khớp thông số bồn thật, mặc định chỉ là điểm khởi đầu.
     lng_relief_pressure_mpa: float = 0.8

@@ -141,6 +141,8 @@ def collect_notices(
             service_level=settings.forecast_service_level,
             relief_mpa=settings.lng_relief_pressure_mpa,
             max_fill_percent=settings.lng_max_fill_percent,
+            reading_at=lt.sampled_at if lt else None,
+            max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
         )
         for fa in f.alerts:
             out.append(Notice(t.psn, t.name, fa.code, fa.severity, fa.message))

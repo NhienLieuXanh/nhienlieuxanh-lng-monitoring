@@ -1139,6 +1139,16 @@
     // (RUNOUT critical <= 1 ngày, warning <= 3 ngày) để màu và chuông không nói khác nhau.
     function runPill(psn) {
       const f = fcOf(psn);
+      // Số liệu cũ -> KHÔNG hiện một con số dự báo trông như đang sống. Server đã
+      // chặn cảnh báo trong ca này; UI phải nói cùng một điều, nếu không người xem
+      // sẽ tin vào con số mà hệ thống đã tự coi là không dùng được.
+      if (f && f.stale) {
+        const age = f.reading_age_days;
+        const why = age != null
+          ? `Số liệu đã cũ ${fmtDays(age)} — không chiếu dự báo từ dữ liệu này`
+          : "Chưa có lần đọc nào";
+        return `<span class="runpill" title="${esc(why)}">cũ</span>`;
+      }
       const d = f && f.runout ? f.runout.days_to_reserve : null;
       if (d === null || d === undefined) {
         const why = f ? "Chưa đo được mức dùng/ngày từ lịch sử" : "Đang tính…";
@@ -1181,8 +1191,29 @@
         return;
       }
       const c = f.consumption || {}, i = f.idle || {}, r = f.runout || {}, h = f.hold || {};
-      win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày · phủ ${Math.round((c.coverage || 0) * 100)}%`;
-      win.className = "fc-badge " + confClass(c.confidence);
+      if (f.stale) {
+        win.textContent = f.reading_age_days != null
+          ? "số liệu cũ " + fmtDays(f.reading_age_days) : "chưa có số liệu";
+        win.className = "fc-badge r";
+      } else {
+        win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày · phủ ${Math.round((c.coverage || 0) * 100)}%`;
+        win.className = "fc-badge " + confClass(c.confidence);
+      }
+      // Số liệu cũ: nói thẳng và KHÔNG vẽ 4 thẻ dự báo. Chúng đều là phép chiếu từ
+      // mức/áp "hiện tại", mà ở đây "hiện tại" là số của nhiều ngày trước — trình
+      // bày chúng như dự báo còn hiệu lực là điều duy nhất không được làm.
+      if (f.stale) {
+        const age = f.reading_age_days;
+        box.innerHTML = `
+          <p class="empty">
+            Lần đọc gần nhất ${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"} —
+            quá cũ để dự báo. Thiết bị đang mất liên lạc; cần kiểm tra pin và ăng-ten
+            trước khi tin vào bất kỳ con số dự báo nào của bồn này.
+          </p>
+          <p class="fc-sub">Mức đo cuối: ${esc(fmtM3(f.volume_l))} m³ / ${esc(fmtM3(f.capacity_l))} m³
+            (${f.fill_percent == null ? "--" : esc(Number(f.fill_percent).toFixed(2))}%)</p>`;
+        return;
+      }
 
       const dres = r.days_to_reserve;
       const runCls = dres == null ? "" : dres <= 1 ? " crit" : dres <= 3 ? " warn" : "";
@@ -1690,7 +1721,15 @@
       if (!box) return;
       const psn = document.getElementById("p-tank").value;
       const f = psn ? fcOf(psn) : null;
-      box.innerHTML = f ? suggestionHtml(f, "Trợ lý đề xuất") : "";
+      if (!f) { box.innerHTML = ""; return; }
+      if (f.stale) {
+        box.innerHTML = `<p class="plan-warn" style="display:block">
+          Bồn này đang mất liên lạc${f.reading_age_days != null ? " (" + esc(fmtDays(f.reading_age_days)) + " không có dữ liệu)" : ""} —
+          trợ lý không đề xuất từ số liệu cũ. Kế hoạch bên dưới vẫn tính đúng theo các
+          thông số bạn nhập.</p>`;
+        return;
+      }
+      box.innerHTML = suggestionHtml(f, "Trợ lý đề xuất");
     }
     /* ---------- BÁO CÁO & NHẬT KÝ ---------- */
 
