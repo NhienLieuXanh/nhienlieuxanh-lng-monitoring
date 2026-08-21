@@ -294,7 +294,7 @@
     .lvl-bar { width: 46px; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
     .lvl-bar > i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
     .lvl-bar.low > i { background: var(--warn); } .lvl-bar.empty > i { background: var(--crit); }
-    .st { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+    .st { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: var(--fs-sm); font-weight: 700; padding: 2px 9px; border-radius: 999px; }
     .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     .st.on { color: var(--ok); background: var(--ok-bg); } .st.off { color: var(--crit); background: var(--crit-bg); }
     .empty { padding: 22px 16px; color: var(--muted); }
@@ -304,8 +304,12 @@
        xuống dưới mà không sinh scroll -> summary "Chi tiết" không bấm được. */
     .inspect { background: var(--bg); min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
     .inspect > .card { min-width: 0; flex: 0 0 auto; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
-    .hero { padding: 15px 16px; }
+    /* Padding đặt ngay ở .card, không để từng thẻ tự khai: #fc-card từng thiếu
+       hẳn padding nên chữ dán vào viền trong khi thẻ bên cạnh thụt vào 14-16px.
+       Có mặc định ở đây thì thẻ thêm sau không lặp lại lỗi đó. */
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+            padding: 12px 14px; }
+    .hero { padding: 13px 14px; }
     .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .hero h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -.02em; }
     .hero .ids { color: var(--muted); font-size: var(--fs-body); margin-top: 3px; }
@@ -324,6 +328,8 @@
     .local-alerts .warn { color: var(--warn); background: var(--warn-bg); }
 
     .chart-panel { padding: 12px 14px 10px; min-width: 0; }
+    /* .specs tự quản padding qua summary/body nên bỏ mặc định của .card. */
+    .specs { padding: 0; }
     .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .chart-head h2 { margin: 0; font-size: var(--fs-body); font-weight: 700; }
     .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
@@ -522,7 +528,8 @@
 
     /* Pill "còn lại" trong danh sách bồn — thay cột áp suất, vì áp suất đã có ở
        readout chi tiết còn "còn bao nhiêu ngày" thì không có ở đâu khác. */
-    table.tanks td:nth-child(5), table.tanks td:nth-child(3) { white-space: nowrap; }
+    table.tanks td:nth-child(3), table.tanks td:nth-child(4),
+    table.tanks td:nth-child(5) { white-space: nowrap; }
     .runpill { display: inline-block; font-family: var(--mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
                padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
     .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
@@ -679,7 +686,7 @@
       <div class="kpis" aria-label="Tóm tắt">
         <span class="kpi"><b class="num" id="stat-total">--</b> bồn</span>
         <span class="kpi ok"><b class="num" id="stat-online">--</b> trực tuyến</span>
-        <span class="kpi bad"><b class="num" id="stat-offline">--</b> mất kết nối</span>
+        <span class="kpi bad"><b class="num" id="stat-offline">--</b> ngoại tuyến</span>
         <span class="kpi bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
         <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
         <span id="stat-critical" hidden></span>
@@ -931,7 +938,7 @@
             <h3>Người nhận cảnh báo</h3>
             <p class="hint">
               Hệ thống gửi cảnh báo tới các địa chỉ này khi bồn sắp cạn, thời gian giữ áp
-              còn ngắn, mức chứa xuống thấp, hoặc thiết bị mất kết nối.
+              còn ngắn, mức chứa xuống thấp, hoặc thiết bị ngoại tuyến.
             </p>
             <div class="set-grid">
               <label class="wide">
@@ -1065,7 +1072,7 @@
             </p>
             <div class="set-grid">
               <label>
-                <span class="set-lbl">Ngưỡng mất kết nối (phút) <span class="src" data-src="online_stale_minutes">Mặc định</span></span>
+                <span class="set-lbl">Ngưỡng ngoại tuyến (phút) <span class="src" data-src="online_stale_minutes">Mặc định</span></span>
                 <input type="number" id="s-stale" class="field num" min="1" step="1" />
               </label>
               <label>
@@ -1415,7 +1422,7 @@
               </div>
             </td>
             <td class="r">${runPill(tank.psn)}</td>
-            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Mất kết nối"}</span></td>
+            <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span></td>
             <td>${esc(fmtAgo(tank.last_seen_at))}</td>
           </tr>`;
       }).join("");
@@ -1591,7 +1598,7 @@
             <h2>${esc(tankName(detail))}</h2>
             <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
           </div>
-          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Mất kết nối"}</span>
+          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
         </div>
         <dl class="readouts">
           <div class="readout${pctClass}"><dt>Mức chứa</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
@@ -1990,7 +1997,7 @@
       if (!f) { btn.disabled = true; note.textContent = "Đang tính từ dữ liệu lịch sử…"; return; }
       if (v == null || v <= 0) {
         btn.disabled = true;
-        note.textContent = "Chưa đo được — thiết bị mất kết nối hoặc thiếu dữ liệu";
+        note.textContent = "Chưa đo được — thiết bị ngoại tuyến hoặc thiếu dữ liệu";
         return;
       }
       btn.disabled = false;
@@ -2014,7 +2021,7 @@
       if (!f) { box.innerHTML = ""; return; }
       if (f.stale) {
         box.innerHTML = `<p class="plan-warn" style="display:block">
-          Bồn này mất kết nối${f.reading_age_days != null ? " " + esc(fmtDays(f.reading_age_days)) : ""}.
+          Bồn này ngoại tuyến${f.reading_age_days != null ? " " + esc(fmtDays(f.reading_age_days)) : ""}.
           Hệ thống không đưa ra khuyến nghị từ dữ liệu lỗi thời. Kế hoạch bên dưới vẫn được
           tính theo các thông số bạn nhập.</p>`;
         return;

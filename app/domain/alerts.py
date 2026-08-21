@@ -79,7 +79,7 @@ def evaluate(
             hours = (now - snap.last_seen_at).total_seconds() / 3600.0
             detail = f"không có dữ liệu trong {hours:.0f} giờ"
         out.append(Alert(snap.psn, AlertCode.OFFLINE, Severity.WARNING,
-                         f"Mất kết nối thiết bị — {detail}"))
+                         f"Thiết bị ngoại tuyến — {detail}"))
 
     # Ưu tiên fill_percent (server tự tính từ volume_l/capacity_l) hơn số vendor
     # gửi: nó là con số ta kiểm chứng được, và chính nó phát hiện lỗi thang 0-1

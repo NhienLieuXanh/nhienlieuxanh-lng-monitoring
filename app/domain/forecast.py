@@ -605,7 +605,7 @@ def suggest_order(
         target = capacity_l * max_fill_percent / 100.0
         floor = reserve_l if reserve_l is not None else 0.0
         no_use = (
-            "Chưa đo được mức tiêu thụ/ngày từ dữ liệu lịch sử (thiết bị mất kết nối hoặc "
+            "Chưa đo được mức tiêu thụ/ngày từ dữ liệu lịch sử (thiết bị ngoại tuyến hoặc "
             "chưa đủ dữ liệu) nên không dự báo được thời điểm cần đặt hàng."
         )
         if volume_l is not None and volume_l < floor:
