@@ -497,7 +497,8 @@
        nếu không một hằng số 0.05%/ngày sẽ bị đọc như một phép đo. */
     .fc-badge { display: inline-block; font-size: var(--fs-micro); font-weight: 600; letter-spacing: .05em;
                 text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
-                border: 1px solid var(--line); color: var(--muted); }
+                border: 1px solid var(--line); color: var(--muted);
+                flex: 0 0 auto; white-space: nowrap; }
     .fc-badge.m { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
     .fc-badge.r { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
     .fc-badge.n { color: var(--faint); }
@@ -579,9 +580,13 @@
     /* Nhãn cho biết giá trị đang lấy từ đâu — câu hỏi đầu tiên của bất kỳ ai mở
        một trang cấu hình có hai nguồn (app và biến môi trường). */
     .src { font-size: var(--fs-micro); font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
-           padding: 0 5px; border-radius: 999px; border: 1px solid var(--line); color: var(--faint); }
+           padding: 0 5px; border-radius: 999px; border: 1px solid var(--line); color: var(--faint);
+           flex: 0 0 auto; white-space: nowrap; }
     .src.app { color: var(--brand); border-color: var(--brand); }
-    .set-lbl { display: flex; align-items: center; gap: 5px; justify-content: space-between; }
+        /* Badge phải đứng NGAY SAU chữ và không bao giờ gãy dòng: space-between đẩy
+       nó ra lề khi nhãn xuống dòng, còn flex-shrink mặc định làm chữ trong pill
+       gãy làm hai. */
+    .set-lbl { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
     .set-note { font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; }
     .set-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
     .set-msg { font-size: var(--fs-body); padding: 8px 11px; border-radius: var(--r-sm); border: 1px solid var(--line);
