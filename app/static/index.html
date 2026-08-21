@@ -360,6 +360,8 @@
     .ps-tile b { font-size: 24px; font-family: var(--mono); font-weight: 700; color: var(--fg); letter-spacing: -.02em; }
     .ps-tile.hi b { color: var(--brand); }
     .plan-help { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 10px 12px; }
+    .plan-warn { margin: 0; font-size: 13px; font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 9px 12px; }
+    .plan-warn[hidden] { display: none; }
     .plan-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: auto; }
     .plan-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
     .plan-table th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
@@ -618,6 +620,7 @@
             <label>Mức sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
           </form>
           <div class="plan-summary" id="plan-summary"></div>
+          <p class="plan-warn" id="plan-warn" hidden></p>
           <p class="plan-help">
             <b>Cách hoạt động:</b> nạp khi mức chạm <b>ngưỡng kích hoạt</b> — trong khoảng
             <b>dự trữ tối thiểu → dự trữ + mức dùng/ngày</b> (trừ Chủ Nhật không giao); riêng
@@ -1234,6 +1237,14 @@
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
         `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
         `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num" style="font-size:17px">${band}</b></div>`;
+      const warn = document.getElementById("plan-warn");
+      if (rows.length && rows[0].level < R) {
+        warn.textContent = `Mức bắt đầu ${round2(rows[0].level)} m³ đang DƯỚI mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
+          + `Công thức chỉ tự lên lịch khi mức ≥ dự trữ; hãy tick "Chủ động nạp" để đưa vào kế hoạch.`;
+        warn.hidden = false;
+      } else {
+        warn.hidden = true;
+      }
       document.getElementById("plan-body").innerHTML = rows.map(r => {
         const lvl = round2(r.level);
         let cls = "r num";
