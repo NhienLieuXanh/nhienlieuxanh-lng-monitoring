@@ -404,7 +404,10 @@
     /* ============ RESPONSIVE ============ */
     @media (max-width: 980px) {
       body { overflow: auto; }
-      .app-shell { grid-template-columns: 1fr; grid-template-areas: "head" "main"; height: auto; min-height: 100dvh; }
+      /* minmax(0, 1fr) chứ KHÔNG phải 1fr: `1fr` là `minmax(auto, 1fr)` nên có sàn
+         min-content, và bảng bồn (5 cột, 2 cột nowrap) đẩy cột grid rộng hơn màn
+         hình -> cả trang cuộn ngang. Đo được 311px tràn ở bề rộng 502px. */
+      .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "main"; height: auto; min-height: 100dvh; }
       #hamburger { display: inline-flex; }
       .sidebar {
         position: fixed; top: 0; bottom: 0; left: 0; width: 244px; --rail-w: 244px;
@@ -420,9 +423,10 @@
       .drawer-scrim { position: fixed; inset: 0; background: var(--scrim); z-index: calc(var(--z-rail) - 1); display: none; }
       body.drawer-open .drawer-scrim { display: block; }
       .side-foot { display: none; }
-      .workspace { grid-template-columns: 1fr; }
-      .fleet { border-right: 0; border-bottom: 1px solid var(--line); }
-      .fleet-scroll { max-height: 42vh; }
+      .workspace { grid-template-columns: minmax(0, 1fr); }
+      .fleet { border-right: 0; border-bottom: 1px solid var(--line); min-width: 0; }
+      /* Bảng rộng thì cuộn TRONG panel của nó, không đẩy cả trang cuộn ngang. */
+      .fleet-scroll { max-height: 42vh; overflow-x: auto; }
       .kpis { display: none; }
     }
     @media (min-width: 981px) { .drawer-scrim { display: none; } }
