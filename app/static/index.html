@@ -7,313 +7,397 @@
   <link rel="icon" href="logo-gx.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    // Đặt theme TRƯỚC khi vẽ để không nháy sáng/tối. Mặc định "tối" (phòng điều khiển).
+    (function () {
+      try {
+        var t = localStorage.getItem("nlx-theme");
+        document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+        if (localStorage.getItem("nlx-rail") === "1") document.documentElement.classList.add("rail-collapsed");
+      } catch (_) { document.documentElement.setAttribute("data-theme", "dark"); }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
+    /* ============ TOKENS ============ */
     :root {
-      --bg: #e4e6eb;
-      --surface: #ffffff;
-      --line: #cfd3da;
-      --line-strong: #9aa1ad;
-      --fg: #10151c;
-      --muted: #3d4654;
-      --faint: #6b7380;
-      --brand: #0d4fb5;
-      --ok: #15732c;
-      --ok-bg: #def5e4;
-      --warn: #8a3f00;
-      --crit: #9f160e;
-      --crit-bg: #fde8e6;
-      --warn-bg: #fff1d6;
-      --sel: #dce9fb;
-      --ring: #0d4fb5;
+      /* dark = mặc định (phòng điều khiển) */
+      --bg: #0b1120;
+      --surface: #111a2e;
+      --surface-2: #0d1526;
+      --surface-3: #17223a;
+      --line: #223049;
+      --line-soft: #1a2740;
+      --fg: #e8edf5;
+      --muted: #93a1b8;
+      --faint: #64748b;
+      --brand: #4f8ff7;
+      --brand-strong: #3b82f6;
+      --nlx: #34d399;
+      --ok: #34d399;      --ok-bg: rgba(52,211,153,.13);   --ok-line: rgba(52,211,153,.30);
+      --warn: #fbbf24;    --warn-bg: rgba(251,191,36,.13);  --warn-line: rgba(251,191,36,.30);
+      --crit: #f87171;    --crit-bg: rgba(248,113,113,.13); --crit-line: rgba(248,113,113,.32);
+      --sel: rgba(79,143,247,.15);
+      --ring: #4f8ff7;
+      --shadow: 0 10px 30px rgba(0,0,0,.45);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,.30);
+      --chart-vol: #4f8ff7; --chart-pres: #93a1b8; --grid: rgba(147,161,184,.10); --axis: #64748b;
+      --scrim: rgba(4,8,16,.62);
+
       --header-h: 56px;
+      --rail-w: 234px;
       --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
       --mono: "IBM Plex Mono", ui-monospace, monospace;
-      --z-header: 40;
-      --z-login: 1000;
+      --r: 8px; --r-sm: 6px;
+      --z-rail: 30; --z-header: 40; --z-pop: 60; --z-login: 1000;
     }
+    :root[data-theme="light"] {
+      --bg: #eef1f5;
+      --surface: #ffffff;
+      --surface-2: #f5f7fa;
+      --surface-3: #eef2f7;
+      --line: #dbe1ea;
+      --line-soft: #e7ebf1;
+      --fg: #0f1a2c;
+      --muted: #516074;
+      --faint: #7b8798;
+      --brand: #0d4fb5;
+      --brand-strong: #0d4fb5;
+      --nlx: #15803d;
+      --ok: #15803d;   --ok-bg: #e3f5e9;   --ok-line: #b7e4c3;
+      --warn: #b45309; --warn-bg: #fbeecf; --warn-line: #ead3a0;
+      --crit: #c02718; --crit-bg: #fdeae7; --crit-line: #f2c4bd;
+      --sel: #e0edfd;
+      --ring: #0d4fb5;
+      --shadow: 0 10px 30px rgba(15,26,44,.14);
+      --shadow-sm: 0 2px 8px rgba(15,26,44,.08);
+      --chart-vol: #1558c0; --chart-pres: #64748b; --grid: rgba(15,26,44,.07); --axis: #64748b;
+      --scrim: rgba(11,18,32,.42);
+    }
+    :root.rail-collapsed { --rail-w: 62px; }
+
     *, *::before, *::after { box-sizing: border-box; }
-    html, body {
-      margin: 0; height: 100%; color: var(--fg);
-      font: 15px/1.45 var(--font);
-      background: var(--bg);
-      -webkit-font-smoothing: antialiased;
-      touch-action: manipulation;
-    }
-    @media (min-width: 900px) {
-      html, body { overflow: hidden; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      color: var(--fg); font: 14.5px/1.5 var(--font); background: var(--bg);
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+      touch-action: manipulation; overflow: hidden;
     }
     .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
-    .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 100; }
-    .skip:focus { left: 8px; top: 8px; }
+    .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
+    .skip:focus { left: 0; top: 0; }
 
-    header.topbar {
-      height: var(--header-h);
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      padding: 0 16px; background: #f7f8fa; border-bottom: 1px solid var(--line);
-    }
-    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 0 auto; }
-    .brand img { width: 36px; height: 36px; object-fit: contain; }
-    .brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.02em; white-space: nowrap; line-height: 1.15; }
-    .brand-name .gas { color: #0d4fb5; }
-    .brand-name .nlx { color: #15732c; }
-    .brand-sub { display: block; color: var(--muted); font-size: 12px; font-weight: 500; margin-top: 1px; }
-    .statusline {
-      display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
-      color: var(--muted); font-size: 13px; flex-wrap: wrap;
-    }
-    .statusline .stat {
-      display: inline-flex; align-items: baseline; gap: 5px;
-      padding: 3px 8px; background: #fff; border: 1px solid var(--line);
-    }
-    .statusline .stat b { color: var(--fg); font-weight: 700; font-size: 16px; line-height: 1; }
-    .statusline .stat.ok { background: var(--ok-bg); border-color: #b7e4c3; }
-    .statusline .stat.ok b { color: var(--ok); }
-    .statusline .stat.bad { background: var(--crit-bg); border-color: #f0c2bc; }
-    .statusline .stat.bad b { color: var(--crit); }
-    .statusline .stat.vol { background: transparent; border-color: transparent; padding-left: 4px; }
-    .top-actions { display: flex; align-items: center; gap: 8px; }
-    .who { color: var(--muted); font-size: 12px; }
-    .who[hidden] { display: none; }
-
+    /* ============ BUTTONS ============ */
     button, .btn {
-      appearance: none; font: inherit; cursor: pointer;
-      border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg);
-      min-height: 32px; padding: 0 12px; border-radius: 4px;
+      appearance: none; font: inherit; cursor: pointer; color: var(--fg);
+      border: 1px solid var(--line); background: var(--surface-3);
+      min-height: 32px; padding: 0 12px; border-radius: var(--r-sm);
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: background .13s ease, border-color .13s ease, transform .06s ease, color .13s ease;
     }
-    button:hover, .btn:hover { background: #f3f4f6; }
-    button:focus-visible, .btn:focus-visible, .field:focus-visible, tr.tank:focus-visible {
-      outline: 2px solid var(--ring); outline-offset: 1px;
-    }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .btn-primary:hover { background: #0f46a0; }
+    button:hover, .btn:hover { border-color: var(--faint); background: var(--surface); }
+    button:active, .btn:active { transform: translateY(1px); }
+    button:focus-visible, .btn:focus-visible, .field:focus-visible,
+    tr.tank:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--brand-strong); border-color: var(--brand-strong); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.08); background: var(--brand-strong); }
     .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
-    .btn-quiet:hover { background: #eceef1; color: var(--fg); }
+    .btn-quiet:hover { background: var(--surface-3); color: var(--fg); }
+    .icon-btn { min-height: 34px; width: 34px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
+    .icon-btn svg { width: 17px; height: 17px; }
+    svg { flex: 0 0 auto; }
 
-    main.app {
-      display: grid; gap: 0;
-      min-height: calc(100dvh - var(--header-h));
+    /* ============ APP SHELL ============ */
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--rail-w) 1fr;
+      grid-template-rows: var(--header-h) 1fr;
+      grid-template-areas: "side head" "side main";
+      height: 100dvh; width: 100vw;
+      transition: grid-template-columns .18s cubic-bezier(.4,0,.2,1);
     }
-    @media (min-width: 900px) {
-      main.app { grid-template-rows: auto 1fr; height: calc(100dvh - var(--header-h)); }
-    }
+    body.is-locked .app-shell { display: none; }
 
-    .action-strip {
-      display: none; background: var(--crit-bg); border-bottom: 1px solid #f0c2bc;
-      padding: 6px 16px;
-    }
-    .action-strip.show { display: block; }
-    .action-strip.warn { background: var(--warn-bg); border-bottom-color: #ead3a0; }
-    .action-strip h2 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--crit); }
-    .action-list { display: flex; flex-direction: column; gap: 2px; }
-    .action-list button {
-      display: flex; gap: 16px; align-items: baseline; justify-content: flex-start;
-      width: 100%; text-align: left; border: 0; background: transparent;
-      min-height: 30px; padding: 4px 0; border-radius: 0; color: inherit;
-    }
-    .action-list button:hover { background: rgba(255,255,255,0.45); }
-    .action-list .where { font-weight: 700; color: var(--fg); min-width: 14ch; }
-    .action-list .msg { color: var(--fg); font-weight: 500; }
-    .action-list .code { display: none; }
-
-    .banner {
-      display: none; margin: 8px 16px 0; padding: 8px 10px; font-size: 13px;
-      border: 1px solid var(--line); background: #fff;
-    }
-    .banner.show { display: block; }
-    .banner.err { background: var(--crit-bg); border-color: #f0c2bc; color: var(--crit); }
-    .banner.warn { background: var(--warn-bg); border-color: #ead3a0; color: var(--warn); }
-
-    .workspace {
-      display: grid; min-height: 0;
-    }
-    @media (min-width: 900px) {
-      .workspace { grid-template-columns: minmax(380px, 44%) 1fr; }
-    }
-
-    .fleet {
+    /* ============ SIDEBAR ============ */
+    .sidebar {
+      grid-area: side; z-index: var(--z-rail);
       background: var(--surface); border-right: 1px solid var(--line);
-      display: flex; flex-direction: column; min-width: 0;
+      display: flex; flex-direction: column; min-width: 0; overflow: hidden;
     }
-    .pane-head {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-      padding: 10px 16px 8px; border-bottom: 1px solid var(--line);
+    .side-brand {
+      display: flex; align-items: center; gap: 10px; height: var(--header-h);
+      padding: 0 14px; border-bottom: 1px solid var(--line-soft); flex: 0 0 auto; overflow: hidden;
     }
-    .pane-head h1, .pane-head h2 {
-      margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--fg);
+    .side-brand img { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
+    .side-brand .txt { min-width: 0; white-space: nowrap; }
+    .side-brand .name { font-weight: 700; font-size: 15px; letter-spacing: -.01em; line-height: 1.1; }
+    .side-brand .name .gas { color: var(--brand); } .side-brand .name .nlx { color: var(--nlx); }
+    .side-brand .sub { color: var(--muted); font-size: 11px; }
+    .nav { flex: 1; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .nav-group { color: var(--faint); font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 12px 10px 4px; white-space: nowrap; }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+      min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+      background: transparent; color: var(--muted); font-weight: 500; font-size: 14px; white-space: nowrap;
     }
-    .pane-head .meta { color: var(--muted); font-size: 12px; }
+    .nav-item svg { width: 18px; height: 18px; stroke-width: 1.9; }
+    .nav-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .nav-item:hover { background: var(--surface-3); color: var(--fg); }
+    .nav-item.active { background: var(--sel); color: var(--brand); font-weight: 600; }
+    .nav-item.active svg { color: var(--brand); }
+    .nav-item.soon { opacity: .55; cursor: default; }
+    .nav-item.soon:hover { background: transparent; color: var(--muted); }
+    .nav-item .badge {
+      margin-left: auto; min-width: 20px; height: 19px; padding: 0 6px; border-radius: 999px;
+      background: var(--crit); color: #fff; font-size: 11px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono);
+    }
+    .nav-item .tag {
+      margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+      color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;
+    }
+    .side-foot { border-top: 1px solid var(--line-soft); padding: 8px; flex: 0 0 auto; }
+    .rail-toggle {
+      width: 100%; justify-content: flex-start; gap: 11px; min-height: 38px; padding: 0 10px;
+      border: 0; background: transparent; color: var(--muted); border-radius: var(--r-sm); white-space: nowrap;
+    }
+    .rail-toggle svg { width: 18px; height: 18px; transition: transform .18s ease; }
+    .rail-toggle:hover { background: var(--surface-3); color: var(--fg); }
+    :root.rail-collapsed .rail-toggle svg { transform: rotate(180deg); }
+    /* collapsed rail: chỉ còn icon */
+    :root.rail-collapsed .side-brand .txt,
+    :root.rail-collapsed .nav-item .lbl,
+    :root.rail-collapsed .nav-item .badge,
+    :root.rail-collapsed .nav-item .tag,
+    :root.rail-collapsed .nav-group,
+    :root.rail-collapsed .rail-toggle .lbl { display: none; }
+    :root.rail-collapsed .nav-item, :root.rail-collapsed .rail-toggle { justify-content: center; padding: 0; gap: 0; }
+    :root.rail-collapsed .side-brand { justify-content: center; padding: 0; }
 
-    table.tanks {
-      width: 100%; border-collapse: collapse; font-size: 14px;
+    /* ============ HEADER ============ */
+    header.topbar {
+      grid-area: head; z-index: var(--z-header);
+      display: flex; align-items: center; gap: 12px; padding: 0 14px;
+      background: var(--surface); border-bottom: 1px solid var(--line);
     }
+    .page-title { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; flex: 0 0 auto; }
+    .kpis { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; overflow: hidden; }
+    .kpi {
+      display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap;
+      padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--surface-2); font-size: 12px; color: var(--muted);
+    }
+    .kpi b { font-size: 14px; font-weight: 700; color: var(--fg); line-height: 1; }
+    .kpi.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
+    .kpi.ok b { color: var(--ok); }
+    .kpi.bad { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
+    .kpi.bad b { color: var(--crit); }
+    .kpi.vol { border-style: dashed; }
+    .kpi.vol b { color: var(--brand); }
+    .head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .meta-chip { color: var(--muted); font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+    .meta-chip[hidden] { display: none; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
+    .dot.bad { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-bg); }
+    .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg); }
+    .user-chip { color: var(--fg); font-weight: 600; font-size: 13px; }
+    .alert-chip { position: relative; }
+    .alert-chip .badge {
+      position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
+      border-radius: 999px; background: var(--crit); color: #fff; font-size: 10.5px; font-weight: 700;
+      display: none; align-items: center; justify-content: center; font-family: var(--mono);
+    }
+    .alert-chip.has .badge { display: inline-flex; }
+    .alert-chip.has svg { color: var(--crit); }
+
+    #hamburger { display: none; }
+
+    /* ============ ALERTS POPOVER ============ */
+    .alerts-pop {
+      position: fixed; top: calc(var(--header-h) + 6px); right: 12px; width: min(420px, calc(100vw - 24px));
+      max-height: min(60vh, 460px); overflow: auto; z-index: var(--z-pop);
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+      box-shadow: var(--shadow); padding: 8px; display: none;
+    }
+    .alerts-pop.show { display: block; }
+    .alerts-pop h2 { margin: 4px 8px 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .alerts-pop .empty-al { padding: 14px 10px; color: var(--muted); font-size: 13px; }
+    .action-list { display: flex; flex-direction: column; gap: 3px; }
+    .action-list button {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left;
+      border: 1px solid transparent; background: transparent; min-height: 40px; padding: 7px 9px; border-radius: var(--r-sm); color: inherit;
+    }
+    .action-list button:hover { background: var(--surface-3); border-color: var(--line); }
+    .action-list .where { font-weight: 700; color: var(--fg); display: inline-flex; align-items: center; gap: 7px; }
+    .action-list .where .sev { width: 7px; height: 7px; border-radius: 50%; }
+    .action-list .where .sev.crit { background: var(--crit); } .action-list .where .sev.warn { background: var(--warn); }
+    .action-list .msg { color: var(--muted); font-size: 12.5px; }
+
+    /* ============ MAIN / WORKSPACE ============ */
+    main.app { grid-area: main; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .banner { display: none; margin: 8px 12px 0; padding: 8px 11px; font-size: 13px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); }
+    .banner.show { display: block; }
+    .banner.err { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
+    .banner.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+
+    .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(330px, 37%) 1fr; }
+
+    /* Fleet (danh sách bồn) */
+    .fleet { background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .pane-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 11px 14px; border-bottom: 1px solid var(--line-soft); flex: 0 0 auto;
+    }
+    .pane-head h1, .pane-head h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--fg); }
+    .pane-head .meta { color: var(--faint); font-size: 12px; }
+    .fleet-scroll { overflow: auto; flex: 1; min-height: 0; }
+    table.tanks { width: 100%; border-collapse: collapse; font-size: 14px; }
     table.tanks th {
-      text-align: left; font-weight: 600; color: var(--muted); font-size: 11px;
-      padding: 8px 12px; border-bottom: 1px solid var(--line); background: #f7f8fa;
-      position: sticky; top: 0; text-transform: uppercase; letter-spacing: 0.03em;
+      text-align: left; font-weight: 600; color: var(--faint); font-size: 10.5px;
+      padding: 8px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2);
+      position: sticky; top: 0; z-index: 1; text-transform: uppercase; letter-spacing: .05em;
     }
     table.tanks th.r, table.tanks td.r { text-align: right; }
-    table.tanks td { padding: 10px 12px; border-bottom: 1px solid #e7eaee; vertical-align: middle; }
-    tr.tank { cursor: pointer; }
-    tr.tank:hover { background: #f4f6f8; }
+    table.tanks td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+    tr.tank { cursor: pointer; transition: background .1s ease; }
+    tr.tank:hover { background: var(--surface-3); }
     tr.tank.is-selected { background: var(--sel); }
     tr.tank.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
-    .tname { font-weight: 700; font-size: 14px; color: var(--fg); }
-    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: 11px; font-weight: 400; }
-    td.r .num { font-weight: 700; font-size: 15px; color: var(--fg); }
-    .lvl {
-      display: flex; align-items: center; gap: 8px; justify-content: flex-end;
-    }
-    .lvl-bar {
-      width: 52px; height: 6px; background: #e2e5ea; position: relative;
-    }
-    .lvl-bar > i {
-      position: absolute; left: 0; top: 0; bottom: 0; background: #8b93a0;
-    }
-    .lvl-bar.low > i { background: var(--warn); }
-    .lvl-bar.empty > i { background: var(--crit); }
-    .st {
-      display: inline-block; font-size: 12px; font-weight: 700;
-      padding: 2px 8px; line-height: 1.4; letter-spacing: 0.01em;
-    }
-    .st.on { color: var(--ok); background: var(--ok-bg); }
-    .st.off { color: var(--crit); background: var(--crit-bg); }
-    .fleet-scroll { overflow: auto; flex: 1; }
-    .empty { padding: 20px 16px; color: var(--muted); }
+    .tname { font-weight: 600; font-size: 14px; color: var(--fg); }
+    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: 11px; }
+    td.r .num { font-weight: 700; font-size: 14px; color: var(--fg); }
+    .lvl { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .lvl-bar { width: 46px; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+    .lvl-bar > i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+    .lvl-bar.low > i { background: var(--warn); } .lvl-bar.empty > i { background: var(--crit); }
+    .st { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+    .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .st.on { color: var(--ok); background: var(--ok-bg); } .st.off { color: var(--crit); background: var(--crit-bg); }
+    .empty { padding: 22px 16px; color: var(--muted); }
 
-    .inspect {
-      background: #f3f4f6; min-width: 0; overflow: auto; padding: 12px 16px 24px;
-      display: grid; gap: 12px; align-content: start;
-    }
-    .hero {
-      background: var(--surface); border: 1px solid var(--line); padding: 14px 16px;
-    }
+    /* Inspect (chi tiết) */
+    .inspect { background: var(--bg); min-width: 0; min-height: 0; overflow: auto; padding: 14px; display: grid; gap: 12px; align-content: start; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+    .hero { padding: 15px 16px; }
     .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-    .hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-    .hero .ids { color: var(--muted); font-size: 13px; margin-top: 3px; font-weight: 500; }
-    .readouts {
-      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
-      margin-top: 16px;
-    }
-    @media (max-width: 700px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
-    .readout { padding: 8px 10px; background: #f4f6f8; }
-    .readout dt { color: var(--muted); font-size: 11px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-    .readout dd { margin: 4px 0 0; font-size: 28px; font-weight: 700; font-family: var(--mono); letter-spacing: -0.03em; color: var(--fg); }
-    .readout dd small { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 4px; }
-    .readout.bad { background: var(--crit-bg); }
+    .hero h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+    .hero .ids { color: var(--muted); font-size: 13px; margin-top: 3px; }
+    .readouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 15px; }
+    @media (max-width: 760px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+    .readout { padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: var(--r-sm); }
+    .readout dt { color: var(--muted); font-size: 10.5px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .readout dd { margin: 5px 0 0; font-size: 26px; font-weight: 700; font-family: var(--mono); letter-spacing: -.03em; color: var(--fg); line-height: 1; }
+    .readout dd small { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 3px; letter-spacing: 0; }
+    .readout.bad { background: var(--crit-bg); border-color: var(--crit-line); }
     .readout.bad dd { color: var(--crit); }
-
-    .chart-panel {
-      background: var(--surface); border: 1px solid var(--line); padding: 10px 12px 8px;
-    }
-    .chart-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .seg { display: inline-flex; border: 1px solid var(--line-strong); }
-    .seg button {
-      min-height: 28px; padding: 0 10px; border: 0; border-right: 1px solid var(--line);
-      background: #fff; color: var(--muted); border-radius: 0; font-size: 12px;
-    }
-    .seg button:last-child { border-right: 0; }
-    .seg button[aria-pressed="true"] { background: #1b2430; color: #fff; }
-    .chart-box { position: relative; height: 220px; }
-    .chart-empty, .chart-skel {
-      display: none; height: 220px; align-items: center; justify-content: center;
-      color: var(--muted); font-size: 13px; text-align: center; padding: 16px;
-    }
-    .chart-empty.show, .chart-skel.show { display: flex; }
-    .chart-box.hidden { display: none; }
-    .skel { background: linear-gradient(90deg, #eee 25%, #e2e2e2 50%, #eee 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
-    @keyframes shimmer { to { background-position: -200% 0; } }
-
-    .meta-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
-      background: var(--surface); border: 1px solid var(--line);
-    }
-    @media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
-    .meta-grid .row {
-      display: flex; justify-content: space-between; gap: 12px;
-      padding: 8px 12px; border-bottom: 1px solid #eef0f3; font-size: 14px;
-    }
-    .meta-grid .row:nth-child(odd) { background: #fafbfc; }
-    .meta-grid dt { color: var(--muted); font-weight: 500; }
-    .meta-grid dd { margin: 0; text-align: right; font-weight: 700; color: var(--fg); font-family: var(--mono); font-size: 13px; }
-    .meta-grid dd.ok { color: var(--ok); }
-    .meta-grid dd.off { color: var(--crit); }
-
-    .rename {
-      background: var(--surface); border: 1px solid var(--line); padding: 10px 12px;
-      display: grid; gap: 6px;
-    }
-    .rename label { font-size: 12px; color: var(--muted); }
-    .rename-row { display: flex; gap: 8px; }
-    .field {
-      flex: 1; min-height: 32px; border: 1px solid var(--line-strong);
-      background: #fff; color: var(--fg); padding: 0 10px; font: inherit; border-radius: 4px;
-    }
-    .hint { margin: 0; color: var(--faint); font-size: 12px; }
-    .local-alerts { display: grid; gap: 6px; margin-top: 12px; }
-    .local-alerts p {
-      margin: 0; font-size: 13px; font-weight: 600; padding: 6px 8px;
-    }
+    .local-alerts { display: grid; gap: 6px; margin-top: 13px; }
+    .local-alerts p { margin: 0; font-size: 13px; font-weight: 600; padding: 7px 10px; border-radius: var(--r-sm); display: flex; gap: 8px; align-items: center; }
+    .local-alerts p::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
     .local-alerts .crit { color: var(--crit); background: var(--crit-bg); }
     .local-alerts .warn { color: var(--warn); background: var(--warn-bg); }
 
-    /* login — only decorative surface */
+    .chart-panel { padding: 12px 14px 10px; }
+    .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .chart-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+    .seg button { min-height: 28px; padding: 0 11px; border: 0; border-right: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 0; font-size: 12px; }
+    .seg button:last-child { border-right: 0; }
+    .seg button:hover { background: var(--surface-3); }
+    .seg button[aria-pressed="true"] { background: var(--brand-strong); color: #fff; }
+    .chart-box { position: relative; height: 232px; }
+    .chart-empty, .chart-skel { display: none; height: 232px; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; padding: 16px; }
+    .chart-empty.show, .chart-skel.show { display: flex; }
+    .chart-box.hidden { display: none; }
+    .chart-skel.skel { border-radius: var(--r-sm); background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* Chi tiết kỹ thuật — thu gọn được */
+    .specs { overflow: hidden; }
+    .specs > summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px; font-weight: 700; font-size: 13px; color: var(--fg); user-select: none;
+    }
+    .specs > summary::-webkit-details-marker { display: none; }
+    .specs > summary .chev { width: 16px; height: 16px; margin-left: auto; color: var(--muted); transition: transform .18s ease; }
+    .specs[open] > summary .chev { transform: rotate(90deg); }
+    .specs > summary:hover { background: var(--surface-3); }
+    .specs-body { border-top: 1px solid var(--line-soft); padding: 12px 14px; display: grid; gap: 12px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+    @media (max-width: 760px) { .meta-grid { grid-template-columns: 1fr; } }
+    .meta-grid .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+    .meta-grid dt { color: var(--muted); font-weight: 500; }
+    .meta-grid dd { margin: 0; text-align: right; font-weight: 700; color: var(--fg); font-family: var(--mono); font-size: 13px; }
+    .rename { display: grid; gap: 7px; }
+    .rename label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .rename-row { display: flex; gap: 8px; }
+    .field { flex: 1; min-height: 34px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); padding: 0 11px; font: inherit; border-radius: var(--r-sm); }
+    .field:focus { border-color: var(--ring); }
+    .hint { margin: 0; color: var(--faint); font-size: 12px; }
+
+    /* ============ LOGIN ============ */
     .login-gate {
-      position: fixed; inset: 0; z-index: var(--z-login);
-      display: grid; place-items: center; padding: 24px;
+      position: fixed; inset: 0; z-index: var(--z-login); display: grid; place-items: center; padding: 24px;
       background-color: #0b1d36;
-      background-image:
-        linear-gradient(105deg, rgba(11, 29, 54, 0.62) 0%, rgba(11, 29, 54, 0.28) 46%, rgba(18, 48, 86, 0.55) 100%),
-        url("login-bg.jpg");
+      background-image: linear-gradient(115deg, rgba(8,20,40,.78) 0%, rgba(8,20,40,.45) 48%, rgba(16,44,82,.62) 100%), url("login-bg.jpg");
       background-size: cover; background-position: center;
     }
     .login-gate[hidden] { display: none; }
-    body.is-locked .topbar,
-    body.is-locked main { display: none; }
-    .login-card {
-      width: min(400px, 100%);
-      background: #fff; border-radius: 8px; padding: 28px 24px 22px;
-      box-shadow: 0 16px 48px rgba(11, 29, 54, 0.28);
-    }
-    .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-bottom: 20px; }
-    .login-brand img { width: 64px; height: 64px; object-fit: contain; }
-    .login-brand h1 { font-size: 18px; margin: 0; }
+    .login-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 30px 26px 24px; box-shadow: var(--shadow); }
+    .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-bottom: 22px; }
+    .login-brand img { width: 60px; height: 60px; object-fit: contain; }
+    .login-brand h1 { font-size: 18px; margin: 0; font-weight: 700; }
+    .login-brand h1 .gas { color: var(--brand); } .login-brand h1 .nlx { color: var(--nlx); }
     .login-brand p { margin: 0; color: var(--muted); font-size: 13px; max-width: 34ch; }
-    .login-form { display: grid; gap: 12px; }
-    .login-form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .login-form { display: grid; gap: 13px; }
+    .login-form label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); font-weight: 600; }
     .pass-wrap { position: relative; display: flex; align-items: center; }
-    .pass-wrap .field { width: 100%; padding-right: 52px; min-height: 40px; }
-    .login-form .field { min-height: 40px; }
-    .pass-toggle {
-      position: absolute; right: 2px; top: 2px; bottom: 2px; width: 44px;
-      border: 0; background: transparent; color: var(--muted); font-size: 12px;
-    }
-    .login-form .btn-primary { width: 100%; min-height: 40px; margin-top: 4px; }
-    .login-error { display: none; margin: 0; padding: 8px 10px; background: var(--crit-bg); color: var(--crit); font-size: 13px; }
+    .pass-wrap .field { width: 100%; padding-right: 54px; min-height: 42px; }
+    .login-form .field { min-height: 42px; }
+    .pass-toggle { position: absolute; right: 3px; top: 3px; bottom: 3px; width: 46px; border: 0; background: transparent; color: var(--muted); font-size: 12px; min-height: 0; }
+    .login-form .btn-primary { width: 100%; min-height: 42px; margin-top: 6px; justify-content: center; }
+    .login-error { display: none; margin: 0; padding: 9px 11px; background: var(--crit-bg); border: 1px solid var(--crit-line); color: var(--crit); font-size: 13px; border-radius: var(--r-sm); }
     .login-error.show { display: block; }
 
-    @media (max-width: 899px) {
-      header.topbar { height: auto; flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
-      .brand img { width: 32px; height: 32px; }
-      .brand-name { font-size: 16px; }
-      .statusline { display: none; }
-      .top-actions { margin-left: auto; }
+    /* ============ RESPONSIVE ============ */
+    @media (max-width: 980px) {
+      body { overflow: auto; }
+      .app-shell { grid-template-columns: 1fr; grid-template-areas: "head" "main"; height: auto; min-height: 100dvh; }
+      #hamburger { display: inline-flex; }
+      .sidebar {
+        position: fixed; top: 0; bottom: 0; left: 0; width: 244px; --rail-w: 244px;
+        transform: translateX(-100%); transition: transform .2s cubic-bezier(.4,0,.2,1); box-shadow: var(--shadow);
+      }
+      :root.rail-collapsed .sidebar { --rail-w: 244px; }
+      :root.rail-collapsed .side-brand .txt, :root.rail-collapsed .nav-item .lbl,
+      :root.rail-collapsed .nav-item .badge, :root.rail-collapsed .nav-item .tag,
+      :root.rail-collapsed .nav-group, :root.rail-collapsed .rail-toggle .lbl { display: revert; }
+      :root.rail-collapsed .nav-item, :root.rail-collapsed .rail-toggle, :root.rail-collapsed .side-brand { justify-content: flex-start; padding: 0 10px; gap: 11px; }
+      :root.rail-collapsed .side-brand { padding: 0 14px; }
+      body.drawer-open .sidebar { transform: translateX(0); }
+      .drawer-scrim { position: fixed; inset: 0; background: var(--scrim); z-index: calc(var(--z-rail) - 1); display: none; }
+      body.drawer-open .drawer-scrim { display: block; }
+      .side-foot { display: none; }
+      .workspace { grid-template-columns: 1fr; }
+      .fleet { border-right: 0; border-bottom: 1px solid var(--line); }
+      .fleet-scroll { max-height: 42vh; }
+      .kpis { display: none; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation: none !important; transition: none !important; }
-    }
+    @media (min-width: 981px) { .drawer-scrim { display: none; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   </style>
 </head>
 <body class="is-locked">
   <a class="skip" href="#main">Bỏ qua tới nội dung</a>
 
+  <!-- LOGIN -->
   <div id="login-gate" class="login-gate" role="dialog" aria-modal="true" aria-labelledby="login-title">
     <div class="login-card">
       <div class="login-brand">
-        <img src="logo-gx.png" width="64" height="64" alt="GAS Nhiên Liệu Xanh" />
-        <h1 id="login-title" class="brand-name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></h1>
+        <img src="logo-gx.png" width="60" height="60" alt="GAS Nhiên Liệu Xanh" />
+        <h1 id="login-title"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></h1>
         <p>Giám sát bồn LNG nội bộ. Đăng nhập bằng tài khoản giám sát thiết bị của công ty.</p>
       </div>
       <form class="login-form" id="login-form" autocomplete="on">
@@ -332,69 +416,121 @@
     </div>
   </div>
 
-  <header class="topbar">
-    <div class="brand">
-      <img src="logo-gx.png" width="36" height="36" alt="" />
-      <div>
-        <div class="brand-name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></div>
-        <div class="brand-sub">Giám sát bồn LNG</div>
+  <div class="drawer-scrim" id="drawer-scrim" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" aria-label="Điều hướng">
+      <div class="side-brand">
+        <img src="logo-gx.png" width="30" height="30" alt="" />
+        <div class="txt">
+          <div class="name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></div>
+          <div class="sub">Giám sát LNG</div>
+        </div>
       </div>
-    </div>
-    <div class="statusline" aria-label="Tóm tắt">
-      <span class="stat"><b class="num" id="stat-total">--</b> bồn</span>
-      <span class="stat ok"><b class="num" id="stat-online">--</b> online</span>
-      <span class="stat bad"><b class="num" id="stat-offline">--</b> offline</span>
-      <span class="stat bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
-      <span class="stat vol num" id="stat-volume">--</span>
-      <span id="stat-critical" hidden></span>
-    </div>
-    <div class="top-actions">
-      <span id="health-pill" class="who" role="status">máy: --</span>
-      <span id="ingest-label" class="who">—</span>
-      <span id="last-update" class="who">Cập nhật: --</span>
-      <span id="user-chip" class="who" hidden> <span id="user-name"></span></span>
-      <button type="button" id="btn-refresh" class="btn" onclick="refreshData()">Làm mới</button>
-      <button type="button" id="btn-logout" class="btn-quiet">Đăng xuất</button>
-    </div>
-  </header>
+      <nav class="nav">
+        <button type="button" class="nav-item active" title="Bảng điều khiển">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+          <span class="lbl">Bảng điều khiển</span>
+        </button>
+        <button type="button" class="nav-item" id="nav-alerts" title="Cảnh báo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9a2 2 0 0 1 3.4 0l7.4 12.8a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span class="lbl">Cảnh báo</span>
+          <span class="badge" id="nav-alert-badge" hidden>0</span>
+        </button>
+        <div class="nav-group">Sắp có</div>
+        <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+          <span class="lbl">Lịch sử</span><span class="tag">SOON</span>
+        </button>
+        <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+          <span class="lbl">Báo cáo</span><span class="tag">SOON</span>
+        </button>
+        <button type="button" class="nav-item soon" tabindex="-1" title="Sắp có">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="lbl">Cài đặt</span><span class="tag">SOON</span>
+        </button>
+      </nav>
+      <div class="side-foot">
+        <button type="button" class="rail-toggle" id="rail-toggle" aria-label="Thu gọn menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+          <span class="lbl">Thu gọn</span>
+        </button>
+      </div>
+    </aside>
 
-  <main id="main" class="app">
-    <div id="error-banner" class="banner err" role="alert"></div>
-    <div id="health-banner" class="banner warn" role="status"></div>
+    <!-- HEADER -->
+    <header class="topbar">
+      <button type="button" id="hamburger" class="icon-btn" aria-label="Mở menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="page-title">Giám sát bồn LNG</div>
+      <div class="kpis" aria-label="Tóm tắt">
+        <span class="kpi"><b class="num" id="stat-total">--</b> bồn</span>
+        <span class="kpi ok"><b class="num" id="stat-online">--</b> online</span>
+        <span class="kpi bad"><b class="num" id="stat-offline">--</b> offline</span>
+        <span class="kpi bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
+        <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
+        <span id="stat-critical" hidden></span>
+      </div>
+      <div class="head-right">
+        <span class="meta-chip" id="health-pill" role="status"><span class="dot" id="health-dot"></span><span id="health-text">máy: --</span></span>
+        <span class="meta-chip" id="ingest-label" hidden></span>
+        <span class="meta-chip" id="last-update" hidden>--</span>
+        <button type="button" id="btn-alerts" class="icon-btn alert-chip" aria-label="Cảnh báo" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9a2 2 0 0 1 3.4 0l7.4 12.8a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span class="badge" id="alert-badge">0</span>
+        </button>
+        <button type="button" id="btn-theme" class="icon-btn" aria-label="Đổi giao diện sáng/tối" title="Sáng / Tối"></button>
+        <span id="user-chip" class="meta-chip user-chip" hidden><span id="user-name"></span></span>
+        <button type="button" id="btn-refresh" class="icon-btn" aria-label="Làm mới" title="Làm mới" onclick="refreshData()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        </button>
+        <button type="button" id="btn-logout" class="icon-btn btn-quiet" aria-label="Đăng xuất" title="Đăng xuất">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
+    </header>
 
-    <section id="action-strip" class="action-strip" aria-label="Cần xử lý">
+    <!-- ALERTS POPOVER -->
+    <div id="action-strip" class="alerts-pop" role="dialog" aria-label="Cảnh báo">
       <h2>Cần xử lý</h2>
       <div id="alert-list" class="action-list"></div>
-    </section>
+    </div>
 
-    <div class="workspace">
-      <aside class="fleet">
-        <div class="pane-head">
-          <h1>Bồn</h1>
-          <span class="meta">chọn một dòng để xem chi tiết</span>
-        </div>
-        <div class="fleet-scroll">
-          <table class="tanks">
-            <thead>
-              <tr>
-                <th>Tên</th>
-                <th class="r">Mức</th>
-                <th class="r">Áp suất</th>
-                <th>Trạng thái</th>
-                <th>Cập nhật</th>
-              </tr>
-            </thead>
-            <tbody id="tank-list"></tbody>
-          </table>
-        </div>
-      </aside>
+    <!-- MAIN -->
+    <main id="main" class="app">
+      <div id="error-banner" class="banner err" role="alert"></div>
+      <div id="health-banner" class="banner warn" role="status"></div>
 
-      <section class="inspect" aria-label="Chi tiết">
-        <div id="tank-detail"><p class="empty">Chọn một bồn bên trái.</p></div>
-        <div class="chart-panel" id="chart-panel">
-          <div class="pane-head" style="border:0;padding:0 0 8px">
-            <h2>Xu hướng theo lần đo cuối</h2>
-            <div class="chart-tools">
+      <div class="workspace">
+        <section class="fleet" aria-label="Danh sách bồn">
+          <div class="pane-head">
+            <h1>Bồn</h1>
+            <span class="meta">chọn một dòng để xem chi tiết</span>
+          </div>
+          <div class="fleet-scroll">
+            <table class="tanks">
+              <thead>
+                <tr>
+                  <th>Tên</th>
+                  <th class="r">Mức</th>
+                  <th class="r">Áp suất</th>
+                  <th>Trạng thái</th>
+                  <th>Cập nhật</th>
+                </tr>
+              </thead>
+              <tbody id="tank-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="inspect" aria-label="Chi tiết">
+          <div id="tank-detail" class="card hero"><p class="empty">Chọn một bồn bên trái.</p></div>
+          <div class="card chart-panel" id="chart-panel">
+            <div class="chart-head">
+              <h2>Xu hướng theo lần đo</h2>
               <div class="seg" role="group" aria-label="Khoảng thời gian biểu đồ">
                 <button type="button" data-range="24" aria-pressed="true">24 giờ</button>
                 <button type="button" data-range="168" aria-pressed="false">7 ngày</button>
@@ -402,17 +538,24 @@
               </div>
               <select id="chart-psn" class="field" onchange="selectTank(this.value)" aria-label="Chọn bồn cho biểu đồ" hidden></select>
             </div>
+            <div id="chart-empty" class="chart-empty">Không có điểm đo trong khoảng này. Thiết bị có thể đã offline lâu hơn cửa sổ đang chọn.</div>
+            <div id="chart-skel" class="chart-skel skel" aria-hidden="true"></div>
+            <div id="chart-wrap" class="chart-box">
+              <canvas id="historyChart" aria-label="Biểu đồ thể tích và áp suất"></canvas>
+            </div>
           </div>
-          <div id="chart-empty" class="chart-empty">Không có điểm đo trong khoảng này. Thiết bị có thể đã offline lâu hơn cửa sổ đang chọn.</div>
-          <div id="chart-skel" class="chart-skel skel" aria-hidden="true"></div>
-          <div id="chart-wrap" class="chart-box">
-            <canvas id="historyChart" aria-label="Biểu đồ thể tích và áp suất"></canvas>
-          </div>
-        </div>
-        <div id="tank-specs"></div>
-      </section>
-    </div>
-  </main>
+          <details class="card specs" id="tank-specs-wrap">
+            <summary>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>
+              Chi tiết kỹ thuật &amp; đổi tên
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </summary>
+            <div class="specs-body" id="tank-specs"></div>
+          </details>
+        </section>
+      </div>
+    </main>
+  </div>
 
   <script>
     const API = "";
@@ -426,12 +569,10 @@
     function esc(s) {
       if (s === null || s === undefined) return "";
       return String(s)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
     }
+    function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
     async function api(path, opts) {
       const r = await fetch(API + path, {
@@ -456,6 +597,41 @@
       return r.json();
     }
 
+    /* ---------- THEME ---------- */
+    const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+    function applyThemeIcon() {
+      const dark = document.documentElement.getAttribute("data-theme") !== "light";
+      const btn = document.getElementById("btn-theme");
+      if (btn) btn.innerHTML = dark ? SUN : MOON;
+    }
+    function toggleTheme() {
+      const dark = document.documentElement.getAttribute("data-theme") !== "light";
+      const next = dark ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("nlx-theme", next); } catch (_) {}
+      applyThemeIcon();
+      if (selectedPsn) renderChart();  // vẽ lại để đổi màu trục/đường theo theme
+    }
+
+    /* ---------- SIDEBAR / DRAWER ---------- */
+    function toggleRail() {
+      const c = document.documentElement.classList.toggle("rail-collapsed");
+      try { localStorage.setItem("nlx-rail", c ? "1" : "0"); } catch (_) {}
+    }
+    function openDrawer() { document.body.classList.add("drawer-open"); }
+    function closeDrawer() { document.body.classList.remove("drawer-open"); }
+
+    /* ---------- ALERTS POPOVER ---------- */
+    function toggleAlerts(force) {
+      const pop = document.getElementById("action-strip");
+      const btn = document.getElementById("btn-alerts");
+      const show = force === undefined ? !pop.classList.contains("show") : force;
+      pop.classList.toggle("show", show);
+      btn.setAttribute("aria-expanded", String(show));
+    }
+
+    /* ---------- LOGIN ---------- */
     function showLogin() {
       currentUser = null;
       document.body.classList.add("is-locked");
@@ -475,18 +651,12 @@
       label.textContent = name;
       chip.hidden = false;
     }
-    function startAutoRefresh() {
-      if (refreshTimer) return;
-      refreshTimer = setInterval(refreshData, 60000);
-    }
-    function stopAutoRefresh() {
-      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-    }
+    function startAutoRefresh() { if (!refreshTimer) refreshTimer = setInterval(refreshData, 60000); }
+    function stopAutoRefresh() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
     function setLoginError(msg) {
       const el = document.getElementById("login-error");
       if (!msg) { el.textContent = ""; el.classList.remove("show"); return; }
-      el.textContent = msg;
-      el.classList.add("show");
+      el.textContent = msg; el.classList.add("show");
     }
     async function doLogin(ev) {
       ev.preventDefault();
@@ -494,8 +664,7 @@
       const pass = document.getElementById("login-pass").value;
       const btn = document.getElementById("btn-login");
       setLoginError("");
-      btn.disabled = true;
-      btn.textContent = "Đang đăng nhập…";
+      btn.disabled = true; btn.textContent = "Đang đăng nhập…";
       try {
         const me = await api("/api/auth/login", {
           method: "POST",
@@ -512,8 +681,7 @@
         setLoginError(e.message || "Không đăng nhập được.");
         document.getElementById("login-pass").focus();
       } finally {
-        btn.disabled = false;
-        btn.textContent = "Đăng nhập";
+        btn.disabled = false; btn.textContent = "Đăng nhập";
       }
     }
     async function doLogout() {
@@ -544,13 +712,8 @@
       return (v === null || v === undefined) ? null : Number(v);
     }
     function fmtPct(p) { return p === null ? "--" : p.toFixed(2); }
-    function barHeight(p) { return p === null ? 0 : Math.min(100, Math.max(0, p)); }
-    function fmtNum(v, unit) {
-      return (v === null || v === undefined) ? "--" : `${Number(v)} ${unit}`;
-    }
-    function fmtTime(iso) {
-      return iso ? new Date(iso).toLocaleString("vi-VN") : "chưa bao giờ";
-    }
+    function fmtNum(v, unit) { return (v === null || v === undefined) ? "--" : `${Number(v)} ${unit}`; }
+    function fmtTime(iso) { return iso ? new Date(iso).toLocaleString("vi-VN") : "chưa bao giờ"; }
     function fmtAgo(iso) {
       if (!iso) return "chưa có";
       const ms = Date.now() - new Date(iso).getTime();
@@ -571,20 +734,18 @@
     function tankName(t) { return t.name || t.psn; }
 
     function renderHealth() {
-      const pill = document.getElementById("health-pill");
+      const dot = document.getElementById("health-dot");
+      const text = document.getElementById("health-text");
       const banner = document.getElementById("health-banner");
-      if (!health) { pill.textContent = "máy: --"; banner.classList.remove("show"); return; }
-      const map = {
-        ok: "máy ổn",
-        degraded: "máy suy giảm",
-        error: "máy lỗi",
-      };
-      pill.textContent = map[health.status] || map.degraded;
-      pill.style.color = health.status === "ok" ? "var(--ok)" : "var(--crit)";
+      if (!health) { text.textContent = "máy: --"; dot.className = "dot"; banner.classList.remove("show"); return; }
+      const map = { ok: "máy ổn", degraded: "máy suy giảm", error: "máy lỗi" };
+      text.textContent = map[health.status] || map.degraded;
+      dot.className = "dot " + (health.status === "ok" ? "ok" : health.status === "error" ? "bad" : "warn");
+      const ingestEl = document.getElementById("ingest-label");
       const ingest = health.ingest && health.ingest.detail
         ? health.ingest.detail
         : (health.last_ingest_at ? "lấy số liệu: " + fmtTime(health.last_ingest_at) : "chưa lấy số liệu");
-      document.getElementById("ingest-label").textContent = ingest;
+      ingestEl.textContent = ingest; ingestEl.hidden = false;
       if (health.status === "ok") { banner.classList.remove("show"); return; }
       const parts = [];
       if (health.database && !health.database.ok) parts.push("DB: " + (health.database.detail || "lỗi"));
@@ -604,7 +765,7 @@
       document.getElementById("stat-critical").textContent = summary.critical ?? 0;
       const vol = summary.total_volume_l;
       document.getElementById("stat-volume").textContent =
-        (vol === null || vol === undefined) ? "" : `${(Number(vol) / 1000).toFixed(3)} m³`;
+        (vol === null || vol === undefined) ? "--" : `${(Number(vol) / 1000).toFixed(3)} m³`;
       const on = document.getElementById("stat-online").parentElement;
       const off = document.getElementById("stat-offline").parentElement;
       const al = document.getElementById("stat-alert").parentElement;
@@ -640,7 +801,12 @@
               <span class="tname">${esc(tankName(tank))}</span>
               <span class="tpsn">${esc(tank.psn)}</span>
             </td>
-            <td class="r num">${esc(fmtPct(p))}%</td>
+            <td class="r">
+              <div class="lvl">
+                <span class="lvl-bar${barClass}"><i style="width:${p === null ? 0 : Math.min(100, Math.max(0, p))}%"></i></span>
+                <span class="num">${esc(fmtPct(p))}%</span>
+              </div>
+            </td>
             <td class="r num">${esc(tank.pressure_mpa == null ? "--" : Number(tank.pressure_mpa))}</td>
             <td><span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "online" : "offline"}</span></td>
             <td>${esc(fmtAgo(tank.last_seen_at))}</td>
@@ -663,22 +829,20 @@
       const pctClass = p !== null && p < 15 ? " bad" : "";
 
       document.getElementById("tank-detail").innerHTML = `
-        <div class="hero">
-          <div class="hero-top">
-            <div>
-              <h2>${esc(tankName(detail))}</h2>
-              <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
-            </div>
-            <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "online" : "offline"}</span>
+        <div class="hero-top">
+          <div>
+            <h2>${esc(tankName(detail))}</h2>
+            <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
           </div>
-          <dl class="readouts">
-            <div class="readout${pctClass}"><dt>Mức</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
-            <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3))}<small>m³ / ${esc(detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3))}</small></dd></div>
-            <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
-            <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
-          </dl>
-          ${alertBlock}
-        </div>`;
+          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "online" : "offline"}</span>
+        </div>
+        <dl class="readouts">
+          <div class="readout${pctClass}"><dt>Mức</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
+          <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3))}<small>m³ / ${esc(detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3))}</small></dd></div>
+          <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
+          <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
+        </dl>
+        ${alertBlock}`;
       document.getElementById("tank-specs").innerHTML = `
         <div class="meta-grid">
           ${row("Mực lỏng", esc(fmtNum(detail.level_mmwc, "mmWC")))}
@@ -717,7 +881,6 @@
       renderChart();  // dùng cache, không block
 
       // Bổ sung các field chỉ có ở /{psn} (firmware/modem/SIM) ở NỀN, không chặn UI.
-      // Không ghi đè nếu người dùng đang gõ tên.
       api("/api/terminals/" + encodeURIComponent(psn))
         .then(d => {
           detailCache[psn] = d;
@@ -760,8 +923,7 @@
       const skel = document.getElementById("chart-skel");
 
       // Lấy chuỗi 90 ngày MỘT LẦN cho mỗi PSN rồi cache. Skeleton chỉ hiện ở lần
-      // fetch đầu; đổi khoảng 24h/7d/30d sau đó chỉ lọc trong bộ nhớ -> tức thì,
-      // không round-trip, không waterfall.
+      // fetch đầu; đổi khoảng 24h/7d/30d sau đó chỉ lọc trong bộ nhớ -> tức thì.
       let all = chartCache[psn];
       if (all === undefined) {
         empty.classList.remove("show");
@@ -800,6 +962,7 @@
         .toLocaleString("vi-VN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
       const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l) / 1000);
       const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
+      const cVol = cssVar("--chart-vol"), cPres = cssVar("--chart-pres"), cGrid = cssVar("--grid"), cAxis = cssVar("--axis");
       const ctx = document.getElementById("historyChart").getContext("2d");
       if (chartInstance) chartInstance.destroy();
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -808,10 +971,10 @@
         data: {
           labels,
           datasets: [
-            { label: "Thể tích (m³)", data: volume, borderColor: "#1558c0",
+            { label: "Thể tích (m³)", data: volume, borderColor: cVol,
               backgroundColor: "transparent", tension: 0.15, yAxisID: "y",
-              spanGaps: true, borderWidth: 1.5, pointRadius: 0 },
-            { label: "Áp suất (MPa)", data: pressure, borderColor: "#5c6572",
+              spanGaps: true, borderWidth: 1.8, pointRadius: 0 },
+            { label: "Áp suất (MPa)", data: pressure, borderColor: cPres,
               backgroundColor: "transparent", tension: 0.15, yAxisID: "y1",
               spanGaps: true, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0 },
           ],
@@ -821,32 +984,35 @@
           animation: reduce ? false : { duration: 160 },
           interaction: { mode: "index", intersect: false },
           plugins: {
-            legend: { labels: { color: "#5c6572", usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            legend: { labels: { color: cAxis, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
             tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y}` } },
           },
           scales: {
             y:  { type: "linear", position: "left",
-                  title: { display: true, text: "m³", color: "#8a93a0", font: { size: 11 } },
-                  grid: { color: "rgba(27,36,48,0.06)" }, ticks: { color: "#8a93a0", font: { family: "IBM Plex Mono", size: 10 } } },
+                  title: { display: true, text: "m³", color: cAxis, font: { size: 11 } },
+                  grid: { color: cGrid }, ticks: { color: cAxis, font: { family: "IBM Plex Mono", size: 10 } } },
             y1: { type: "linear", position: "right",
-                  title: { display: true, text: "MPa", color: "#8a93a0", font: { size: 11 } },
-                  grid: { drawOnChartArea: false }, ticks: { color: "#8a93a0", font: { family: "IBM Plex Mono", size: 10 } } },
-            x:  { grid: { color: "rgba(27,36,48,0.04)" }, ticks: { color: "#8a93a0", maxRotation: 0, font: { size: 10 } } },
+                  title: { display: true, text: "MPa", color: cAxis, font: { size: 11 } },
+                  grid: { drawOnChartArea: false }, ticks: { color: cAxis, font: { family: "IBM Plex Mono", size: 10 } } },
+            x:  { grid: { color: cGrid }, ticks: { color: cAxis, maxRotation: 0, font: { size: 10 } } },
           },
         },
       });
     }
 
     function renderAlerts() {
-      const strip = document.getElementById("action-strip");
       const container = document.getElementById("alert-list");
-      if (!alerts.length) {
-        strip.classList.remove("show");
-        container.innerHTML = "";
+      const chip = document.getElementById("btn-alerts");
+      const chipBadge = document.getElementById("alert-badge");
+      const navBadge = document.getElementById("nav-alert-badge");
+      const n = alerts.length;
+      chip.classList.toggle("has", n > 0);
+      chipBadge.textContent = n;
+      if (navBadge) { navBadge.textContent = n; navBadge.hidden = n === 0; }
+      if (!n) {
+        container.innerHTML = `<p class="empty-al">Không có cảnh báo nào. Mọi bồn đang bình thường.</p>`;
         return;
       }
-      const hasCrit = alerts.some(a => a.severity === "critical");
-      strip.className = "action-strip show" + (hasCrit ? "" : " warn");
       const byPsn = [];
       for (const a of alerts) {
         let g = byPsn.find(x => x.psn === a.psn);
@@ -855,10 +1021,11 @@
       }
       container.innerHTML = byPsn.map(g => {
         const t = tanks.find(x => x.psn === g.psn);
+        const sev = worstSeverity(g.items) === "critical" ? "crit" : "warn";
         const msg = g.items.map(a => a.message.replace(/\s+/g, " ")).join(" · ");
         return `
-        <button type="button" onclick="selectTank('${esc(g.psn)}')">
-          <span class="where">${esc(t ? tankName(t) : g.psn)}</span>
+        <button type="button" onclick="selectTank('${esc(g.psn)}'); toggleAlerts(false);">
+          <span class="where"><span class="sev ${sev}"></span>${esc(t ? tankName(t) : g.psn)}</span>
           <span class="msg">${esc(msg)}</span>
         </button>`;
       }).join("");
@@ -895,8 +1062,9 @@
         ]);
         summary = s; tanks = t.items; alerts = a; health = h;
         clearError();
-        document.getElementById("last-update").textContent =
-          "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+        const lu = document.getElementById("last-update");
+        lu.textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+        lu.hidden = false;
         renderHealth(); renderStats(); renderAlerts(); renderPsnOptions();
         renderTankList();
         await selectTank(selectedPsn ?? (sortedTanks()[0] && sortedTanks()[0].psn));
@@ -922,15 +1090,27 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      applyThemeIcon();
       document.querySelectorAll(".seg button").forEach(btn => {
         btn.addEventListener("click", () => setRange(Number(btn.dataset.range)));
       });
       document.getElementById("login-form").addEventListener("submit", doLogin);
       document.getElementById("btn-pass").addEventListener("click", togglePass);
       document.getElementById("btn-logout").addEventListener("click", doLogout);
+      document.getElementById("btn-theme").addEventListener("click", toggleTheme);
+      document.getElementById("rail-toggle").addEventListener("click", toggleRail);
+      document.getElementById("hamburger").addEventListener("click", openDrawer);
+      document.getElementById("drawer-scrim").addEventListener("click", closeDrawer);
+      document.getElementById("btn-alerts").addEventListener("click", (e) => { e.stopPropagation(); toggleAlerts(); });
+      document.getElementById("nav-alerts").addEventListener("click", () => { toggleAlerts(true); closeDrawer(); });
+      document.getElementById("action-strip").addEventListener("click", (e) => e.stopPropagation());
+      document.addEventListener("click", () => toggleAlerts(false));
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") { toggleAlerts(false); closeDrawer(); } });
       document.getElementById("tank-list").addEventListener("keydown", (ev) => {
         if (ev.key === "Enter" && ev.target.dataset.psn) selectTank(ev.target.dataset.psn);
       });
+      // Đóng drawer khi chọn bồn (mobile)
+      document.getElementById("tank-list").addEventListener("click", closeDrawer);
       boot();
     });
   </script>
