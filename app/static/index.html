@@ -13,9 +13,9 @@
     (function () {
       try {
         var t = localStorage.getItem("nlx-theme");
-        document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
         if (localStorage.getItem("nlx-rail") === "1") document.documentElement.classList.add("rail-collapsed");
-      } catch (_) { document.documentElement.setAttribute("data-theme", "dark"); }
+      } catch (_) { document.documentElement.setAttribute("data-theme", "light"); }
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -312,6 +312,8 @@
     .seg button[aria-pressed="true"] { background: var(--brand-strong); color: #fff; }
     .chart-box { position: relative; height: 232px; min-width: 0; }
     .chart-box canvas { max-width: 100%; }
+    .chart-note { font-size: 12px; color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); padding: 5px 9px; border-radius: var(--r-sm); margin-bottom: 8px; }
+    .chart-note[hidden] { display: none; }
     .chart-empty, .chart-skel { display: none; height: 232px; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; padding: 16px; }
     .chart-empty.show, .chart-skel.show { display: flex; }
     .chart-box.hidden { display: none; }
@@ -542,6 +544,7 @@
               </div>
               <select id="chart-psn" class="field" onchange="selectTank(this.value)" aria-label="Chọn bồn cho biểu đồ" hidden></select>
             </div>
+            <div id="chart-note" class="chart-note" hidden></div>
             <div id="chart-empty" class="chart-empty">Không có điểm đo trong khoảng này. Thiết bị có thể đã offline lâu hơn cửa sổ đang chọn.</div>
             <div id="chart-skel" class="chart-skel skel" aria-hidden="true"></div>
             <div id="chart-wrap" class="chart-box">
@@ -925,6 +928,7 @@
       const empty = document.getElementById("chart-empty");
       const wrap = document.getElementById("chart-wrap");
       const skel = document.getElementById("chart-skel");
+      const note = document.getElementById("chart-note");
 
       // Lấy chuỗi 90 ngày MỘT LẦN cho mỗi PSN rồi cache. Skeleton chỉ hiện ở lần
       // fetch đầu; đổi khoảng 24h/7d/30d sau đó chỉ lọc trong bộ nhớ -> tức thì.
@@ -953,11 +957,22 @@
       if (!items.length) {
         empty.classList.add("show");
         wrap.classList.add("hidden");
+        note.hidden = true;
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
         return;
       }
       empty.classList.remove("show");
       wrap.classList.remove("hidden");
+      // Khi khoảng đang chọn không có điểm đo (thiết bị offline lâu), ta hiện toàn
+      // bộ lịch sử thật gần nhất — báo rõ để người xem không tưởng biểu đồ sai.
+      if (widened) {
+        const first = new Date(items[0].sampled_at).toLocaleDateString("vi-VN");
+        const last = new Date(items[items.length - 1].sampled_at).toLocaleDateString("vi-VN");
+        note.textContent = `Không có dữ liệu trong khoảng đang chọn — đang hiện toàn bộ lịch sử thật gần nhất (${first} → ${last}).`;
+        note.hidden = false;
+      } else {
+        note.hidden = true;
+      }
       wrap.title = widened
         ? "Cửa sổ chọn không có điểm đo — đang hiển thị lịch sử thật 90 ngày gần nhất"
         : "";
