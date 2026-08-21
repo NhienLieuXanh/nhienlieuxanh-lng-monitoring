@@ -17,10 +17,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    field_validator,
+    model_validator,
+)
 
 
 class TelemetryOut(BaseModel):
@@ -192,6 +199,177 @@ class IngestRunDetailOut(IngestRunOut):
 
     params: dict = Field(default_factory=dict)
     mapping_report: dict = Field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------- #
+# Dự báo
+# --------------------------------------------------------------------------- #
+
+# Số dẫn xuất (không phải giá trị vendor) nên dùng float, và làm tròn NGAY Ở
+# TẦNG SERIALIZE. Nếu để nguyên, JSON sẽ đầy `7103.999999999999` — vô hại về mặt
+# toán nhưng làm người đọc mất tin vào cả trang. Làm tròn ở đây thay vì ở từng
+# router để không có endpoint nào lỡ quên.
+Num = Annotated[float, PlainSerializer(lambda v: round(v, 4), return_type=float)]
+OptNum = Annotated[
+    float | None,
+    PlainSerializer(
+        lambda v: None if v is None else round(v, 4), return_type=float | None
+    ),
+]
+
+
+class ConsumptionOut(BaseModel):
+    """Mức dùng/ngày SUY TỪ LỊCH SỬ, thay cho con số gõ tay.
+
+    Phát kèm ``confidence``/``coverage``/``samples`` là cố ý: một con số dự báo
+    không có độ tin cậy đi kèm sẽ được đọc như số đo, và ở đây nó thường không
+    phải — thiết bị mất upload liên tục.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    daily_use_l: OptNum = None
+    daily_use_sd_l: OptNum = None
+    samples: int = 0
+    window_days: Num = 0.0
+    active_days: Num = 0.0
+    coverage: Num = 0.0
+    drawdown_l: Num = 0.0
+    refills: int = 0
+    refill_l: Num = 0.0
+    full_days: int = 0
+    confidence: Literal["high", "medium", "low", "none"] = "none"
+
+
+class IdleTrendOut(BaseModel):
+    """Boil-off và tốc độ tăng áp, đo trong các cửa sổ bồn nghỉ.
+
+    ``method`` phân biệt "đo được" với "lấy theo tham chiếu 0.05 %/ngày". Trộn
+    hai thứ này lại là cách nhanh nhất để một hằng số bị hiểu thành một phép đo.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    boil_off_l_per_day: OptNum = None
+    boil_off_percent_per_day: OptNum = None
+    pressure_rise_mpa_per_day: OptNum = None
+    idle_windows: int = 0
+    idle_hours: Num = 0.0
+    method: Literal["measured", "reference", "insufficient"] = "insufficient"
+
+
+class RunoutOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    daily_loss_l: OptNum = None
+    days_to_reserve: OptNum = None
+    days_to_empty: OptNum = None
+    reserve_at: datetime | None = None
+    empty_at: datetime | None = None
+
+
+class HoldTimeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    days: OptNum = None
+    current_mpa: OptNum = None
+    relief_mpa: Num = 0.8
+    rise_mpa_per_day: OptNum = None
+    headroom_mpa: OptNum = None
+    method: Literal["measured", "reference", "insufficient"] = "insufficient"
+
+
+class SuggestionOut(BaseModel):
+    """Đề xuất đặt hàng kèm ``reasons`` — mỗi con số truy được về đầu vào."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    order_l: OptNum = None
+    order_at: datetime | None = None
+    deliver_at: datetime | None = None
+    target_l: Num = 0.0
+    reorder_point_l: Num = 0.0
+    safety_stock_l: Num = 0.0
+    lead_time_days: Num = 1.0
+    service_level: int = 95
+    urgency: Literal["now", "soon", "ok", "unknown"] = "unknown"
+    reasons: list[str] = Field(default_factory=list)
+
+
+class RefillOut(BaseModel):
+    """Một lần nạp phát hiện từ telemetry — nhật ký nạp không cần nhập tay."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    at: datetime
+    before_l: Num
+    after_l: Num
+    amount_l: Num
+
+
+class ForecastOut(BaseModel):
+    psn: str
+    name: str | None = None
+    status: Literal["online", "offline"] = "offline"
+    sampled_at: datetime | None = None
+    volume_l: OptNum = None
+    capacity_l: OptNum = None
+    fill_percent: OptNum = None
+    reserve_l: Num = 0.0
+    consumption: ConsumptionOut
+    idle: IdleTrendOut
+    runout: RunoutOut
+    hold: HoldTimeOut
+    suggestion: SuggestionOut
+    refills: list[RefillOut] = Field(default_factory=list)
+    # Cảnh báo suy từ dự báo (RUNOUT / HOLD_TIME / BOIL_OFF_HIGH). Cùng shape với
+    # AlertOut để dashboard gộp được vào một danh sách mà không cần map.
+    alerts: list[AlertOut] = Field(default_factory=list)
+    generated_at: datetime
+
+
+class DeliveryStopOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    psn: str
+    name: str | None = None
+    order_l: Num
+    days_to_reserve: OptNum = None
+    urgency: Literal["now", "soon", "ok", "unknown"] = "unknown"
+
+
+class DeliveryTripOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seq: int
+    stops: list[DeliveryStopOut]
+    total_l: Num
+    truck_capacity_l: Num
+
+
+class DeliveryPlanOut(BaseModel):
+    truck_capacity_l: Num
+    horizon_days: Num
+    trips: list[DeliveryTripOut] = Field(default_factory=list)
+    total_l: Num = 0.0
+    stops: int = 0
+    generated_at: datetime
+
+
+class NotificationOut(BaseModel):
+    """Nhật ký thông báo đã gửi. Dùng cho kiểm toán và để chứng minh đã báo."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    psn: str
+    code: str
+    severity: str
+    channel: str
+    status: str
+    message: str | None = None
+    detail: str | None = None
+    sent_at: datetime
 
 
 class ActionOut(BaseModel):

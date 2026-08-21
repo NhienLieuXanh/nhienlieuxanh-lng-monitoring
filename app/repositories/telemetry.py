@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -154,6 +155,91 @@ def history(
         .all()
     )
     return list(items), int(total)
+
+
+def series(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int = 20_000,
+) -> list[tuple[datetime, float | None, float | None]]:
+    """Chuỗi (sampled_at, volume_l, pressure_mpa) tăng dần, cho tầng dự báo.
+
+    Cố ý KHÔNG tái dụng ``history()``: dự báo cần hàng nghìn điểm nhưng chỉ ba
+    cột, còn ``history()`` hydrate cả ORM object kèm ``raw_payload`` JSONB (~1 KB
+    mỗi dòng) và chạy thêm một ``COUNT(*)`` mà ở đây không ai dùng. Với 30 ngày x
+    48 điểm/ngày sự khác biệt là vài chục MB JSON bị đọc lên rồi bỏ đi.
+
+    ``limit`` là lưới an toàn chứ không phải phân trang: 20 000 điểm ~ hơn một năm
+    ở cadence 30 phút. Cắt ở đây là cắt phần CŨ NHẤT (ORDER BY DESC rồi đảo lại)
+    vì dự báo quan tâm dữ liệu mới nhất — cắt phần mới sẽ làm dự báo dựa trên quá
+    khứ xa và không ai nhận ra.
+    """
+    rows = session.execute(
+        select(Telemetry.sampled_at, Telemetry.volume_l, Telemetry.pressure_mpa)
+        .where(
+            Telemetry.psn == psn,
+            Telemetry.sampled_at >= start,
+            Telemetry.sampled_at <= end,
+        )
+        .order_by(Telemetry.sampled_at.desc())
+        .limit(limit)
+    ).all()
+    out = [
+        (at, None if v is None else float(v), None if p is None else float(p))
+        for at, v, p in rows
+    ]
+    out.reverse()
+    return out
+
+
+#: Cột và THỨ TỰ cột của báo cáo xuất ra. Cố định ở một chỗ để hai lần xuất cách
+#: nhau vài tháng vẫn diff được với nhau, và để không ai vô tình thêm
+#: ``raw_payload`` vào file gửi ra ngoài.
+EXPORT_COLUMNS = (
+    "sampled_at",
+    "volume_l",
+    "volume_percent",
+    "pressure_mpa",
+    "temperature_c",
+    "level_mmwc",
+    "diff_pressure_kpa",
+    "vacuum_pa",
+    "battery_v",
+    "signal_percent",
+)
+
+
+def export_rows(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int = 200_000,
+) -> list[Sequence[Any]]:
+    """Dòng thô cho báo cáo CSV, tăng dần theo thời gian.
+
+    Chỉ SELECT các cột trong ``EXPORT_COLUMNS`` — không hydrate ORM object nên
+    ``raw_payload`` (JSONB, key tiếng Trung) không thể lọt vào file xuất ra dù ai
+    sửa code phía trên thế nào. Đây là biện pháp cùng loại với
+    ``api/schemas.py``: chặn ở nơi dữ liệu được lấy, không dựa vào kỷ luật.
+    """
+    cols = [getattr(Telemetry, c) for c in EXPORT_COLUMNS]
+    return list(
+        session.execute(
+            select(*cols)
+            .where(
+                Telemetry.psn == psn,
+                Telemetry.sampled_at >= start,
+                Telemetry.sampled_at <= end,
+            )
+            .order_by(Telemetry.sampled_at.asc())
+            .limit(limit)
+        ).all()
+    )
 
 
 def max_sampled_at(session: Session, psns: list[str]) -> dict[str, datetime]:

@@ -1,0 +1,482 @@
+"""Test lớp dự báo. Hàm thuần nên không cần DB, không cần mock clock.
+
+Mọi con số ở đây được chọn để **tính nhẩm ra được**: nếu một assert fail thì biết
+ngay là công thức sai chứ không phải fixture sai.
+
+Bối cảnh dữ liệu thật (để các hằng số dưới đây không phải số ngẫu nhiên):
+dung tích 10 425 L, cadence vendor ~30 phút, mức dùng Excel của người vận hành
+7.4 m³/ngày = 7400 L/ngày.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from app.domain.forecast import (
+    DEFAULT_MAX_FILL_PERCENT,
+    Z_BY_SERVICE_LEVEL,
+    Forecast,
+    Sample,
+    build_forecast,
+    detect_refills,
+    estimate_consumption,
+    estimate_idle_trend,
+    hold_time,
+    noise_floor_l,
+    plan_trips,
+    refill_floor_l,
+    runout,
+    suggest_order,
+)
+
+UTC = ZoneInfo("UTC")
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+
+CAP = 10425.0
+T0 = datetime(2026, 8, 1, 0, 0, tzinfo=UTC)
+STEP = timedelta(minutes=30)
+
+
+def _series(
+    *,
+    start_l: float,
+    per_day_l: float,
+    hours: float,
+    step: timedelta = STEP,
+    pressure0: float | None = None,
+    pressure_per_day: float = 0.0,
+    t0: datetime = T0,
+) -> list[Sample]:
+    """Chuỗi tuyến tính: mức giảm ``per_day_l`` L/ngày, áp tăng đều nếu được cấp."""
+    n = round(hours * 3600 / step.total_seconds())
+    out: list[Sample] = []
+    for i in range(n + 1):
+        d = i * step.total_seconds() / 86400.0
+        out.append(
+            Sample(
+                at=t0 + i * step,
+                volume_l=start_l - per_day_l * d,
+                pressure_mpa=(
+                    None if pressure0 is None else pressure0 + pressure_per_day * d
+                ),
+            )
+        )
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Ngưỡng
+# --------------------------------------------------------------------------- #
+
+
+def test_thresholds_scale_with_capacity() -> None:
+    # 0.1% và 2% dung tích, có sàn tuyệt đối cho bồn rất nhỏ.
+    assert noise_floor_l(CAP) == 10.425
+    assert refill_floor_l(CAP) == 208.5
+    assert noise_floor_l(None) == 5.0
+    assert refill_floor_l(0) == 200.0
+    assert noise_floor_l(100.0) == 3.0  # sàn 3 L thắng 0.1 L
+
+
+# --------------------------------------------------------------------------- #
+# Tiêu thụ
+# --------------------------------------------------------------------------- #
+
+
+def test_consumption_constant_drawdown() -> None:
+    """24 giờ dữ liệu liên tục, giảm đúng 7400 L/ngày -> đo lại đúng 7400."""
+    s = _series(start_l=9000.0, per_day_l=7400.0, hours=24)
+    est = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    assert est.samples == 49
+    assert est.active_days == 1.0
+    assert est.coverage == 1.0
+    assert est.daily_use_l is not None
+    assert abs(est.daily_use_l - 7400.0) < 1e-6
+    assert est.refills == 0
+
+
+def test_consumption_ignores_refill_jump() -> None:
+    """Một lần nạp giữa cửa sổ không được tính thành 'tiêu thụ âm'.
+
+    Đây chính là lý do không hồi quy trên cả cửa sổ: hệ số góc hồi quy của chuỗi
+    này là DƯƠNG (mức cuối cao hơn mức đầu) nên hồi quy sẽ ra 'mức dùng âm'.
+    """
+    a = _series(start_l=3000.0, per_day_l=7400.0, hours=6)  # 3000 -> 1150
+    last = a[-1]
+    assert last.volume_l is not None
+    b = _series(start_l=9000.0, per_day_l=7400.0, hours=6, t0=last.at + STEP)
+    est = estimate_consumption(a + b, capacity_l=CAP, tz=VN)
+
+    assert est.refills == 1
+    assert est.refill_l > 7000  # ~9000 - 1150 trừ một bước rút
+    assert est.daily_use_l is not None
+    # Hai nhánh đều rút 7400 L/ngày; bước nạp bị loại nên kết quả vẫn là 7400.
+    assert abs(est.daily_use_l - 7400.0) < 5.0
+
+    refills = detect_refills(a + b, capacity_l=CAP)
+    assert len(refills) == 1
+    assert refills[0].after_l == 9000.0
+    assert refills[0].amount_l > 7000
+
+
+def test_consumption_excludes_offline_gap() -> None:
+    """Một tuần offline KHÔNG được kéo mức dùng/ngày xuống gần 0.
+
+    Chia theo bề rộng cửa sổ (8 ngày) sẽ ra ~925 L/ngày — sai 8 lần. Chia theo
+    active_days (1 ngày) ra đúng 7400.
+    """
+    a = _series(start_l=9000.0, per_day_l=7400.0, hours=12)
+    b = _series(start_l=1000.0, per_day_l=7400.0, hours=12, t0=T0 + timedelta(days=7))
+    est = estimate_consumption(a + b, capacity_l=CAP, tz=VN)
+
+    assert est.window_days > 7.0
+    assert abs(est.active_days - 1.0) < 1e-6  # 12h + 12h
+    assert est.coverage < 0.2
+    assert est.daily_use_l is not None
+    assert abs(est.daily_use_l - 7400.0) < 1e-6
+    # Khoảng trống không bị đếm thành lần nạp, cũng không thành cú rút khổng lồ.
+    assert est.refills == 0
+
+
+def test_consumption_deadband_rejects_sensor_noise() -> None:
+    """Dao động +/-5 L quanh 5000 (dưới deadband 10.425) -> không có tiêu thụ."""
+    s = [
+        Sample(at=T0 + i * STEP, volume_l=5000.0 + (5.0 if i % 2 else -5.0))
+        for i in range(49)
+    ]
+    est = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    assert est.drawdown_l == 0.0
+    assert est.daily_use_l is None
+    assert est.confidence == "none"
+
+
+def test_consumption_confidence_and_sigma() -> None:
+    """>= 7 ngày liên tục -> độ tin cậy cao và sigma đo được (không phải giả định)."""
+    s = _series(start_l=80_000.0, per_day_l=7400.0, hours=24 * 8)
+    est = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    assert est.confidence == "high"
+    assert est.full_days >= 5
+    assert est.daily_use_sd_l is not None
+    # Tiêu thụ hoàn toàn đều -> biến động theo ngày xấp xỉ 0.
+    assert est.daily_use_sd_l < 1.0
+
+
+def test_consumption_empty_and_single() -> None:
+    assert estimate_consumption([], capacity_l=CAP).daily_use_l is None
+    one = [Sample(at=T0, volume_l=100.0)]
+    assert estimate_consumption(one, capacity_l=CAP).daily_use_l is None
+    # Chỉ có volume None -> vẫn không nổ.
+    nones = [Sample(at=T0 + i * STEP) for i in range(10)]
+    assert estimate_consumption(nones, capacity_l=CAP).samples == 0
+
+
+# --------------------------------------------------------------------------- #
+# Boil-off & hold time
+# --------------------------------------------------------------------------- #
+
+
+def test_idle_trend_measures_boil_off_and_pressure() -> None:
+    """Bồn nghỉ 24 giờ: hao 5 L/ngày, áp tăng 0.02 MPa/ngày.
+
+    5 L/ngày = 0.104 L mỗi 30 phút — nằm SÂU dưới deadband 10.425 L, nên đây đúng
+    là ca mà hiệu số từng cặp không thấy gì và chỉ hồi quy mới đo được.
+    """
+    s = _series(
+        start_l=5000.0,
+        per_day_l=5.0,
+        hours=24,
+        pressure0=0.05,
+        pressure_per_day=0.02,
+    )
+    idle = estimate_idle_trend(s, capacity_l=CAP)
+
+    assert idle.method == "measured"
+    assert idle.idle_windows == 1
+    assert abs(idle.idle_hours - 24.0) < 1e-6
+    assert idle.boil_off_l_per_day is not None
+    assert abs(idle.boil_off_l_per_day - 5.0) < 1e-6
+    assert idle.boil_off_percent_per_day is not None
+    assert abs(idle.boil_off_percent_per_day - 5.0 / CAP * 100) < 1e-9
+    assert idle.pressure_rise_mpa_per_day is not None
+    assert abs(idle.pressure_rise_mpa_per_day - 0.02) < 1e-9
+
+
+def test_idle_trend_falls_back_to_reference_when_busy() -> None:
+    """Rút liên tục -> không có cửa sổ nghỉ -> boil-off tham chiếu, nhãn rõ ràng."""
+    s = _series(start_l=9000.0, per_day_l=7400.0, hours=24)
+    idle = estimate_idle_trend(s, capacity_l=CAP)
+    assert idle.idle_windows == 0
+    assert idle.method == "reference"
+    assert idle.boil_off_l_per_day is not None
+    assert abs(idle.boil_off_l_per_day - CAP * 0.0005) < 1e-9
+    assert idle.pressure_rise_mpa_per_day is None
+
+
+def test_idle_window_needs_six_hours() -> None:
+    """Nghỉ 3 giờ chưa đủ để hồi quy — quá ngắn thì nhiễu áp đảo hệ số góc."""
+    s = _series(start_l=5000.0, per_day_l=5.0, hours=3)
+    assert estimate_idle_trend(s, capacity_l=CAP).idle_windows == 0
+
+
+def test_hold_time_math() -> None:
+    h = hold_time(current_mpa=0.07, rise_mpa_per_day=0.02, relief_mpa=0.8)
+    assert h.method == "measured"
+    assert h.headroom_mpa is not None
+    assert abs(h.headroom_mpa - 0.73) < 1e-9
+    assert h.days is not None
+    assert abs(h.days - 36.5) < 1e-9
+
+
+def test_hold_time_undefined_not_infinite() -> None:
+    """Áp không tăng -> None ('chưa đủ dữ liệu'), TUYỆT ĐỐI không phải vô cực."""
+    assert hold_time(current_mpa=0.07, rise_mpa_per_day=None).days is None
+    assert hold_time(current_mpa=0.07, rise_mpa_per_day=0.0).days is None
+    assert hold_time(current_mpa=None, rise_mpa_per_day=0.02).days is None
+    # Đã vượt van an toàn -> 0 ngày, phải xả ngay.
+    over = hold_time(current_mpa=0.9, rise_mpa_per_day=0.02, relief_mpa=0.8)
+    assert over.days == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# Ngày tới cạn
+# --------------------------------------------------------------------------- #
+
+
+def test_runout_includes_boil_off() -> None:
+    """Thất thoát = rút + bay hơi. Bỏ bay hơi ra là dự báo lạc quan hơn thực tế."""
+    r = runout(
+        volume_l=8000.0,
+        reserve_l=1000.0,
+        daily_use_l=1000.0,
+        boil_off_l_per_day=0.0,
+        now=T0,
+    )
+    assert r.days_to_reserve == 7.0
+    assert r.days_to_empty == 8.0
+    assert r.reserve_at == T0 + timedelta(days=7)
+
+    r2 = runout(
+        volume_l=8000.0,
+        reserve_l=1000.0,
+        daily_use_l=1000.0,
+        boil_off_l_per_day=1000.0,
+        now=T0,
+    )
+    assert r2.daily_loss_l == 2000.0
+    assert r2.days_to_reserve == 3.5  # bay hơi làm cạn nhanh gấp đôi
+
+
+def test_runout_below_reserve_clamps_to_zero() -> None:
+    r = runout(
+        volume_l=500.0,
+        reserve_l=1000.0,
+        daily_use_l=1000.0,
+        boil_off_l_per_day=0.0,
+        now=T0,
+    )
+    assert r.days_to_reserve == 0.0
+    assert r.days_to_empty == 0.5
+
+
+def test_runout_unknown_when_no_usage() -> None:
+    r = runout(
+        volume_l=8000.0,
+        reserve_l=1000.0,
+        daily_use_l=None,
+        boil_off_l_per_day=None,
+        now=T0,
+    )
+    assert r.days_to_empty is None and r.empty_at is None
+
+
+# --------------------------------------------------------------------------- #
+# Đề xuất đặt hàng
+# --------------------------------------------------------------------------- #
+
+
+def test_suggestion_reorder_point_formula() -> None:
+    """Kiểm từng số hạng của ROP = thất thoát x lead time + z x sigma x sqrt(LT)."""
+    s = _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8)
+    cons = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    idle = estimate_idle_trend(s, capacity_l=CAP)  # busy -> reference BOR
+    assert cons.daily_use_l is not None
+
+    sug = suggest_order(
+        volume_l=9000.0,
+        capacity_l=CAP,
+        consumption=cons,
+        idle=idle,
+        now=T0,
+        lead_time_days=2.0,
+        service_level=95,
+        reserve_l=0.0,  # để mô hình quyết định, không bị sàn người vận hành đè
+    )
+    bor = CAP * 0.0005
+    loss = cons.daily_use_l + bor
+    sd = cons.daily_use_sd_l
+    assert sd is not None
+    expect_safety = Z_BY_SERVICE_LEVEL[95] * sd * (2.0**0.5)
+    assert abs(sug.safety_stock_l - expect_safety) < 1e-6
+    assert abs(sug.reorder_point_l - (loss * 2.0 + expect_safety)) < 1e-6
+
+    # Mức đích chừa ullage, không nạp tới 100%.
+    assert abs(sug.target_l - CAP * DEFAULT_MAX_FILL_PERCENT / 100.0) < 1e-9
+    assert sug.target_l < CAP
+    # Lượng đặt tính theo mức LÚC GIAO, nên phải > (đích - mức hiện tại).
+    assert sug.order_l is not None
+    assert sug.order_l > sug.target_l - 9000.0
+    assert sug.reasons  # luôn giải thích được
+
+
+def test_suggestion_operator_reserve_is_a_floor() -> None:
+    """Dự trữ người vận hành đặt cao hơn thì thắng — mô hình không hạ chính sách."""
+    s = _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8)
+    cons = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    idle = estimate_idle_trend(s, capacity_l=CAP)
+    sug = suggest_order(
+        volume_l=9000.0,
+        capacity_l=CAP,
+        consumption=cons,
+        idle=idle,
+        now=T0,
+        lead_time_days=1.0,
+        reserve_l=6000.0,
+    )
+    assert sug.reorder_point_l == 6000.0
+    assert any("người vận hành" in r for r in sug.reasons)
+
+
+def test_suggestion_urgency_now_when_below_reorder_point() -> None:
+    s = _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8)
+    cons = estimate_consumption(s, capacity_l=CAP, tz=VN)
+    idle = estimate_idle_trend(s, capacity_l=CAP)
+    sug = suggest_order(
+        volume_l=500.0,
+        capacity_l=CAP,
+        consumption=cons,
+        idle=idle,
+        now=T0,
+        lead_time_days=1.0,
+        reserve_l=2000.0,
+    )
+    assert sug.urgency == "now"
+    assert sug.order_at == T0  # đặt ngay, không lùi về quá khứ
+
+
+def test_suggestion_honest_when_no_data() -> None:
+    """Không đo được mức dùng -> KHÔNG bịa ra một con số."""
+    cons = estimate_consumption([], capacity_l=CAP)
+    idle = estimate_idle_trend([], capacity_l=CAP)
+    sug = suggest_order(
+        volume_l=60.0, capacity_l=CAP, consumption=cons, idle=idle, now=T0
+    )
+    assert sug.order_l is None
+    assert sug.urgency == "unknown"
+    assert any("Chưa đo được" in r for r in sug.reasons)
+
+    # Không biết dung tích -> cũng không bịa.
+    sug2 = suggest_order(
+        volume_l=60.0, capacity_l=None, consumption=cons, idle=idle, now=T0
+    )
+    assert sug2.order_l is None and sug2.urgency == "unknown"
+
+
+# --------------------------------------------------------------------------- #
+# Gộp + điều phối chuyến
+# --------------------------------------------------------------------------- #
+
+
+def test_build_forecast_end_to_end() -> None:
+    s = _series(
+        start_l=9000.0,
+        per_day_l=1000.0,
+        hours=24 * 8,
+        pressure0=0.07,
+        pressure_per_day=0.0,
+    )
+    f = build_forecast(
+        s,
+        psn="TEST0001",
+        volume_l=9000.0,
+        capacity_l=CAP,
+        pressure_mpa=0.07,
+        now=T0,
+        tz=VN,
+        reserve_percent=15.0,
+        lead_time_days=1.0,
+    )
+    assert f.psn == "TEST0001"
+    assert f.fill_percent is not None
+    assert abs(f.fill_percent - 9000.0 / CAP * 100) < 1e-9
+    assert abs(f.reserve_l - CAP * 0.15) < 1e-9
+    assert f.consumption.confidence == "high"
+    assert f.runout.days_to_empty is not None
+    assert f.suggestion.order_l is not None
+    # Áp phẳng trong lúc rút liên tục -> hold time không xác định, không phải vô cực.
+    assert f.hold.days is None
+
+
+def test_build_forecast_survives_dead_device() -> None:
+    """Ca THẬT hôm nay: bồn gần cạn, offline hàng tháng, chỉ một điểm dữ liệu."""
+    f = build_forecast(
+        [Sample(at=T0, volume_l=61.0, pressure_mpa=0.071)],
+        psn="2604200016",
+        volume_l=61.0,
+        capacity_l=CAP,
+        pressure_mpa=0.071,
+        now=T0 + timedelta(days=30),
+        tz=VN,
+    )
+    assert f.consumption.daily_use_l is None
+    assert f.consumption.confidence == "none"
+    # Vẫn cạn dần vì bay hơi tham chiếu, dù không đo được lượng rút.
+    assert f.runout.days_to_empty is not None
+    assert f.suggestion.order_l is None
+    assert f.suggestion.urgency == "unknown"
+
+
+def _stub(psn: str, days: float, order: float) -> Forecast:
+    """Forecast thật, rồi thay hai con số để test riêng phần chia chuyến."""
+    f = build_forecast(
+        _series(start_l=9000.0, per_day_l=1000.0, hours=24 * 8),
+        psn=psn,
+        volume_l=9000.0,
+        capacity_l=CAP,
+        pressure_mpa=0.07,
+        now=T0,
+        tz=VN,
+    )
+    return replace(
+        f,
+        runout=replace(f.runout, days_to_reserve=days),
+        suggestion=replace(f.suggestion, order_l=order),
+    )
+
+
+def test_plan_trips_splits_by_truck_capacity() -> None:
+    trips = plan_trips(
+        [_stub("A", 5.0, 6000.0), _stub("B", 1.0, 5000.0), _stub("C", 20.0, 5000.0)],
+        truck_capacity_l=10_000.0,
+        horizon_days=7.0,
+        names={"A": "Bồn A", "B": "Bồn B"},
+    )
+    # C ngoài tầm 7 ngày -> bị loại. B gấp hơn A -> đi trước.
+    stops = [s.psn for t in trips for s in t.stops]
+    assert stops == ["B", "A"]
+    # 5000 + 6000 > 10000 -> phải tách thành 2 chuyến.
+    assert len(trips) == 2
+    assert trips[0].total_l == 5000.0
+    assert trips[1].total_l == 6000.0
+    assert all(t.total_l <= t.truck_capacity_l for t in trips)
+    assert trips[0].stops[0].name == "Bồn B"
+
+
+def test_plan_trips_empty_inputs() -> None:
+    assert plan_trips([], truck_capacity_l=10_000.0) == []
+    f = build_forecast(
+        [], psn="X", volume_l=None, capacity_l=None, pressure_mpa=None, now=T0
+    )
+    assert plan_trips([f], truck_capacity_l=10_000.0) == []
+    assert plan_trips([f], truck_capacity_l=0.0) == []

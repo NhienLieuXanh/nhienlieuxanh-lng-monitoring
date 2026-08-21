@@ -116,6 +116,57 @@ class Terminal(Base):
     )
 
 
+class Notification(Base):
+    """Nhật ký thông báo đã gửi. Hai vai trò, cả hai đều bắt buộc.
+
+    1. **Chống spam.** Ingest chạy mỗi 10 phút và cảnh báo được suy lại mỗi vòng,
+       nên không có nơi lưu "đã gửi lúc nào" thì một bồn cạn sẽ tạo ra 144 email
+       mỗi ngày. Người nhận sẽ lọc hết vào thùng rác và cảnh báo mất tác dụng —
+       tệ hơn là không có cảnh báo, vì lúc đó ai cũng tưởng mình đang được báo.
+       Trên serverless (Vercel) trạng thái không thể nằm trong bộ nhớ process:
+       mỗi lần gọi là một process mới. Nên nó phải ở DB.
+    2. **Kiểm toán.** Trả lời được "đã báo cho ai, lúc nào, nội dung gì" — thứ
+       nhà đầu tư và bộ phận vận hành sẽ hỏi ngay sau một sự cố.
+
+    CỐ Ý KHÔNG có FK sang ``terminals``: dòng log phải ghi được ngay cả khi PSN
+    chưa được provision, và một lần insert log tuyệt đối không được thất bại vì
+    ràng buộc tham chiếu đúng lúc đang có sự cố.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=False), primary_key=True
+    )
+    psn: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Mã cảnh báo: RUNOUT / HOLD_TIME / BOIL_OFF_HIGH / LOW_VOLUME / OFFLINE...
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    channel: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'email'")
+    )
+    #: Chỉ hai giá trị: sent = đã bàn giao cho SMTP, failed = SMTP từ chối hoặc
+    #: lỗi mạng. CỐ Ý không có 'skipped': cảnh báo bị cửa chặn gửi lại xảy ra mỗi
+    #: vòng ingest (10 phút), ghi lại sẽ thành 144 dòng/ngày/cảnh báo mà không
+    #: thêm thông tin nào — số đó chỉ cần đếm trong stats của vòng ingest.
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str | None] = mapped_column(Text)
+    detail: Mapped[str | None] = mapped_column(Text)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN ('sent','failed')", name="notify_status_valid"),
+        CheckConstraint(
+            "severity IN ('critical','warning','info')", name="notify_severity_valid"
+        ),
+        # Query nóng duy nhất: "lần gửi gần nhất cho (psn, code) là khi nào" —
+        # một backward index-scan trên đúng index này.
+        Index("ix_notifications_psn_code_sent_at", "psn", "code", "sent_at"),
+    )
+
+
 class Telemetry(Base):
     """Một lần đọc đã chuẩn hoá. Bất biến — không bao giờ UPDATE trong luồng thường."""
 

@@ -68,6 +68,39 @@ class Settings(BaseSettings):
     alert_low_signal_percent: float = 10.0
     default_tank_capacity_l: float = 10425.0
 
+    # ---- dự báo / kế hoạch nạp ----
+    # Cửa sổ lịch sử dùng để suy mức dùng/ngày. 30 ngày phủ được cả biến động
+    # theo tuần (cuối tuần dùng ít) mà vẫn không kéo theo dữ liệu quá cũ từ một
+    # chế độ vận hành khác.
+    forecast_window_days: int = Field(30, ge=1, le=365)
+    forecast_reserve_percent: float = 15.0
+    # Thời gian từ lúc đặt tới lúc xe tới. Đầu vào của điểm đặt hàng lại.
+    forecast_lead_time_days: float = Field(1.0, ge=0)
+    # Mức phục vụ cho dự trữ an toàn. 95% là mặc định ngành kho vận.
+    forecast_service_level: int = 95
+    # Áp suất van an toàn của bồn. Hold time đo từ áp hiện tại tới ngưỡng này —
+    # con số này PHẢI khớp thông số bồn thật, mặc định chỉ là điểm khởi đầu.
+    lng_relief_pressure_mpa: float = 0.8
+    # Trần rót: bồn lạnh sâu phải chừa khoảng hơi cho giãn nở nhiệt.
+    lng_max_fill_percent: float = 90.0
+    truck_capacity_l: float = 20_000.0
+
+    # ---- thông báo (email) ----
+    # SMTP thuần thay vì SDK của một nhà cung cấp: không phát sinh chi phí, không
+    # thêm dependency, và dùng được với bất kỳ hộp thư nào công ty đã có.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    alert_email_to: str = ""  # nhiều địa chỉ phân tách bằng dấu phẩy
+    # Không gửi lại cùng một (PSN, mã cảnh báo) trong khoảng này. Ingest chạy mỗi
+    # 10 phút, nên không có cửa chặn thì một bồn cạn sẽ gửi 144 email/ngày và
+    # người nhận sẽ lọc thẳng vào thùng rác — mất luôn tác dụng.
+    alert_resend_hours: int = Field(12, ge=1)
+    notify_enabled: bool = True
+
     # ---- api ----
     api_host: str = "127.0.0.1"
     api_port: int = 8000
@@ -113,6 +146,24 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def alert_email_list(self) -> list[str]:
+        return [a.strip() for a in self.alert_email_to.split(",") if a.strip()]
+
+    @property
+    def smtp_ready(self) -> bool:
+        """Đủ cấu hình để gửi email hay chưa.
+
+        Thiếu cấu hình thì notifier **ghi log rồi bỏ qua** chứ không raise: một
+        vòng ingest không được thất bại chỉ vì hộp thư chưa được khai báo.
+        """
+        return bool(
+            self.notify_enabled
+            and self.smtp_host
+            and (self.smtp_from or self.smtp_user)
+            and self.alert_email_list
+        )
 
     @property
     def is_dev(self) -> bool:
