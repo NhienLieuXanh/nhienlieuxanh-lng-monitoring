@@ -224,6 +224,11 @@ def export_tanks(
                 f"{f.consumption.coverage * 100:.0f}",
                 _num2(f.idle.boil_off_percent_per_day, 3),
                 f.idle.method,
+                # Tuổi lần đọc đi NGAY TRƯỚC các cột dự báo, không nằm cuối bảng:
+                # người đọc phải thấy "số liệu cũ 79.9 ngày" trước khi đọc "còn 11.7
+                # ngày tới cạn", nếu không cột sau sẽ được hiểu là dự báo còn hiệu lực.
+                _num2(f.reading_age_days, 1),
+                "co" if f.stale else "khong",
                 _num2(f.runout.days_to_reserve, 1),
                 _num2(f.runout.days_to_empty, 1),
                 _ts(f.runout.empty_at, settings),
@@ -247,6 +252,8 @@ def export_tanks(
         "do_phu_du_lieu_pct",
         "bay_hoi_pct_ngay",
         "nguon_bay_hoi",
+        "tuoi_du_lieu_ngay",
+        "du_lieu_qua_cu",
         "ngay_toi_du_tru",
         "ngay_toi_can",
         "du_kien_can_luc",

@@ -1016,10 +1016,14 @@
       if (n < 1) return (n * 24).toFixed(1) + " giờ";
       return n.toFixed(1) + " ngày";
     }
+    // Tự dựng chuỗi thay vì toLocaleString: Chrome với locale vi-VN trả
+    // "00:43 26-08" (giờ trước ngày, dấu gạch) — đọc lên là sai quy ước Việt Nam
+    // và dễ bị hiểu thành ngày 26 tháng 8 hay 8 tháng 26. "26/08 00:43" thì không.
     function fmtWhen(iso) {
       if (!iso) return "--";
-      return new Date(iso).toLocaleString("vi-VN",
-        { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "--";
+      return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
     const CONF_VI = { high: "tin cậy cao", medium: "tin cậy vừa", low: "tin cậy thấp", none: "chưa đủ dữ liệu" };
     const METHOD_VI = { measured: "đo được", reference: "tham chiếu", insufficient: "chưa đủ dữ liệu" };
