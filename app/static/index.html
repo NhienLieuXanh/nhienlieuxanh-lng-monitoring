@@ -344,6 +344,9 @@
     .hint { margin: 0; color: var(--faint); font-size: 12px; }
 
     /* ============ PLANNER (Kế hoạch nạp LNG) ============ */
+    /* .workspace(display:grid) và #view-planner(display:flex) đè lên [hidden] mặc
+       định -> phải ép ẩn khi chuyển view, nếu không cả 2 view cùng hiện. */
+    #view-dashboard[hidden], #view-planner[hidden] { display: none !important; }
     #view-planner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
     .plan-params { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
