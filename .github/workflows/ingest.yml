@@ -1,0 +1,69 @@
+# Nhịp thu telemetry chính. Cron mỗi-ngày của Vercel trong vercel.json được GIỮ LẠI
+# làm lưới an toàn: nó không tốn gì, vòng ingest là idempotent nên chạy trùng vô hại,
+# và nó vẫn kéo dữ liệu nếu workflow này hỏng hoặc repo hết hạn mức Actions.
+#
+# Vercel gói Hobby chỉ cho phép cron MỖI NGÀY MỘT LẦN. Với ngưỡng ngoại tuyến 90 phút
+# thì một thiết bị hoàn toàn khoẻ vẫn hiện "Ngoại tuyến" khoảng 22 trong 24 giờ, vì
+# ngưỡng đó đo theo mẫu MỚI NHẤT ĐÃ LẤY VỀ, không phải theo sức khoẻ thiết bị. Lỗi
+# này chưa lộ vì cả hai thiết bị đang chết, nhưng sẽ bung ra đúng ngày chúng được sửa.
+#
+# Vì sao 30 phút, không phải 10 hay 15:
+#   - Cadence của vendor đo từ dữ liệu thật là 30 phút. Gọi dày hơn KHÔNG lấy thêm
+#     được một điểm nào, chỉ tăng tải lên một API "backstage" của vendor mà ta không
+#     có hợp đồng — đúng rủi ro DISCOVERY.md đã ghi.
+#   - Repo private chỉ có 2.000 phút Actions/tháng và mỗi lần chạy bị tính tối thiểu
+#     1 phút: 30 phút/lần = 1.440 phút/tháng (vừa đủ), 15 phút/lần = 2.880 (vượt).
+#     Repo hiện public nên không bị giới hạn, nhưng không thiết kế phụ thuộc điều đó.
+#
+# Vì 30 phút thì tuổi mẫu mới nhất có thể tới ~60 phút, cộng độ trễ vốn có của cron
+# GitHub (5-15 phút), nên ONLINE_STALE_MINUTES phải >= 120 để trạng thái không nhấp
+# nháy. Giá trị đó đặt trong app tại trang Cài đặt.
+
+name: ingest
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  # Bấm chạy tay: dùng để kiểm ngay sau khi luân chuyển CRON_SECRET, không phải đợi
+  # tới nhịp kế tiếp.
+  workflow_dispatch:
+
+# Một lần chạy tại một thời điểm. Vòng ingest là idempotent nên chạy trùng không làm
+# sai dữ liệu, nhưng nó nhân đôi request vào vendor một cách vô ích.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Gọi cron ingest
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: https://nhienlieuxanh-lng-monitoring.vercel.app
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::thiếu secret CRON_SECRET trên repo"
+            exit 1
+          fi
+          # Ghi body ra file rồi in ra: cần thấy nội dung ở CẢ hai nhánh. Nhánh lỗi
+          # thì "HTTP 401" một mình không nói được vì sao; nhánh thành công thì body
+          # là chỗ duy nhất thấy được số dòng đã nạp.
+          code=$(curl -sS -o body.json -w '%{http_code}' \
+                   --retry 2 --retry-delay 10 --retry-connrefused \
+                   --max-time 120 \
+                   -H "Authorization: Bearer ${CRON_SECRET}" \
+                   "${BASE_URL}/api/cron/ingest") || true
+          echo "HTTP ${code}"
+          cat body.json || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "::error::cron ingest trả ${code}"
+            exit 1
+          fi
