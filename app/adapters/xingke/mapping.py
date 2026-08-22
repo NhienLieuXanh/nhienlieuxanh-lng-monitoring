@@ -108,6 +108,31 @@ TEXT_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("tank_type_name", ("tankTypeName",)),
 )
 
+# GIA TRI vendor -> ten chuan quoc te. Khac voi phan con lai cua file: o tren dich
+# TEN FIELD, o day dich NOI DUNG.
+#
+# Vendor gui tankTypeName bang chu Trung. Chuoi do di thang qua API len man hinh
+# van hanh: production dang hien "立式" cho nguoi dung Viet Nam. Rang buoc kien truc
+# la tu vung vendor KHONG duoc di qua ranh gioi adapter, va mot chuoi CJK trong GIA
+# TRI vi pham dung rang buoc do. No khong bi bat vi test co lap chi soi ten field,
+# schema va file tinh — khong soi gia tri trong response co du lieu that.
+#
+# Dung ten chuan quoc te: vertical/horizontal la cach phan loai binh chiu ap theo
+# huong dat. Dong bo voi medium_name = "LNG" von cung da giu dang quoc te trong UI.
+VALUE_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "tank_type_name": {
+        "立式": "Vertical",    # dat dung
+        "卧式": "Horizontal",  # nam ngang
+    },
+}
+
+
+def has_cjk(s: str) -> bool:
+    """Co ky tu Han khong. Dung de bat gia tri vendor chua co trong bang dich."""
+    return any(
+        0x4E00 <= ord(ch) <= 0x9FFF or 0x3400 <= ord(ch) <= 0x4DBF for ch in s
+    )
+
 # Cau hinh tai san: vendor gui kem moi lan doc nhung no thuoc bang terminals,
 # khong phai telemetry.
 CAPACITY_FIELD = FieldSpec(
@@ -292,6 +317,25 @@ def extract_text(
         if s in ("", "--"):
             return None
         report.present[spec.target] = report.present.get(spec.target, 0) + 1
+
+        table = VALUE_TRANSLATIONS.get(spec.target)
+        if table is not None:
+            if s in table:
+                return table[s]
+            if has_cjk(s):
+                # KHONG tu dich va KHONG im lang. Gia tri di tiep nguyen ban (mat
+                # du lieu con te hon hien chu Trung), nhung no phai noi len: errors
+                # duoc persist vao ingest_runs.mapping_report va hien qua endpoint
+                # admin, nen khoang trong bang dich khong doi ai di doc log file.
+                report.errors.append((
+                    spec.target,
+                    f"gia tri vendor {s!r} chua co trong VALUE_TRANSLATIONS - "
+                    "them vao app/adapters/xingke/mapping.py, no dang ro ra API",
+                ))
+                log.warning(
+                    "xingke: %s=%r la chu Trung va chua co trong bang dich; "
+                    "gia tri nay dang ro ra API.", spec.target, s,
+                )
         return s
     return None
 

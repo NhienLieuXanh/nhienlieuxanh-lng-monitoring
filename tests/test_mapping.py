@@ -202,3 +202,74 @@ def test_sample_cadence_is_30_minutes():
     # nên một khoảng 29m59s sẽ floor thành 29 và làm test sai trong khi dữ liệu đúng.
     gaps = {round((b - a).total_seconds() / 60) for a, b in pairwise(ts)}
     assert gaps == {30}
+
+
+def test_tank_type_uses_international_name():
+    """``立式`` -> ``Vertical``. Vendor gửi chữ Trung; API không được phát ra nó."""
+    rep = MappingReport()
+    rows, _ = _rows("psn_search_real.json")
+    r = normalize_reading(
+        rows[0], psn="2604200016", source="xingke", vendor_tz=SHANGHAI, report=rep
+    )
+    assert r is not None
+    assert r.tank_type_name == "Vertical"
+
+
+def test_no_cjk_in_normalized_text_values():
+    """Không field văn bản nào mang chữ Hán sau khi qua normalizer.
+
+    Đây là test lẽ ra phải có từ đầu. ``tests/test_isolation.py`` chỉ soi artefact
+    TĨNH — AST của response model, schema OpenAPI, file HTML — nên một chuỗi Trung
+    nằm trong GIÁ TRỊ (không phải tên field) đi qua tự do và ra tới màn hình vận
+    hành. Chỉ so trên dữ liệu thật mới bắt được.
+    """
+    rep = MappingReport()
+    rows, _ = _rows("psn_search_real_12rows.json")
+    leaks: list[str] = []
+    for row in rows:
+        r = normalize_reading(
+            row, psn="2604200016", source="xingke", vendor_tz=SHANGHAI, report=rep
+        )
+        if r is None:
+            continue
+        # raw_payload bị LOẠI cố ý: nó giữ nguyên bản vendor (đó là mục đích của nó)
+        # và không bao giờ được phát ra API — test_isolation canh việc đó.
+        for name, value in r.model_dump(exclude={"raw_payload"}).items():
+            if isinstance(value, str) and M.has_cjk(value):
+                leaks.append(f"{name}={value!r}")
+    assert leaks == [], f"chữ Hán rò qua normalizer: {leaks}"
+
+
+def test_untranslated_cjk_value_is_reported_not_silent():
+    """Loại bồn lạ vẫn đi tiếp, nhưng phải nổi lên trong mapping_report.
+
+    Mất dữ liệu tệ hơn hiện chữ Trung nên giá trị không bị chặn. Nhưng im lặng thì
+    khoảng trống bảng dịch sẽ không bao giờ được ai phát hiện.
+    """
+    rep = MappingReport()
+    index = M.build_index({"tankTypeName": "球形"})  # dạng cầu, chưa có trong bảng
+    got = M.extract_text(index, M.TEXT_FIELDS[1], rep)
+    assert got == "球形", "không được âm thầm bỏ giá trị chưa dịch"
+    assert any(target == "tank_type_name" for target, _ in rep.errors)
+
+
+def test_translation_table_matches_data_migration():
+    """Bảng dịch ở adapter phải khớp migration đã sửa dữ liệu cũ.
+
+    Hai nơi lệch nhau thì dòng cũ và dòng mới mang hai giá trị khác nhau cho cùng một
+    loại bồn — và không có gì trong hệ thống báo điều đó.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = next(
+        (Path(__file__).parent.parent / "migrations" / "versions").glob(
+            "*_tank_type_intl.py"
+        )
+    )
+    spec = importlib.util.spec_from_file_location("mig_tank_type", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    assert dict(mod.TRANSLATIONS) == M.VALUE_TRANSLATIONS["tank_type_name"]
