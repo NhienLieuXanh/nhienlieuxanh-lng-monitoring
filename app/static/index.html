@@ -370,10 +370,15 @@
     .field:focus { border-color: var(--ring); }
     .hint { margin: 0; color: var(--faint); font-size: var(--fs-sm); }
 
+    /* MỘT luật ẩn cho MỌI view, kể cả view thêm về sau.
+       Thuộc tính `hidden` chỉ là `display: none` từ stylesheet của trình duyệt, nên
+       bất kỳ `#view-x { display: flex }` nào cũng đè được nó — hai view sẽ cùng hiện
+       và JS không hề báo lỗi. Trước đây mỗi view tự khai một luật riêng; thêm trang
+       Phân tích tôi khai `display: flex` mà quên luật ẩn, và nó render chồng xuống
+       dưới Bảng điều khiển. Một luật theo tiền tố id thì không ai quên được nữa. */
+    [id^="view-"][hidden] { display: none !important; }
+
     /* ============ PLANNER (Kế hoạch nạp LNG) ============ */
-    /* .workspace(display:grid) và #view-planner(display:flex) đè lên [hidden] mặc
-       định -> phải ép ẩn khi chuyển view, nếu không cả 2 view cùng hiện. */
-    #view-dashboard[hidden], #view-planner[hidden] { display: none !important; }
     #view-planner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
     /* BẮT BUỘC: con của một flex column CÓ overflow phải là `flex: 0 0 auto`.
@@ -482,7 +487,6 @@
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
     /* ===== DỰ BÁO & AN TOÀN LNG ===== */
     /* Mọi màu ở đây đều qua token nên tự đúng ở cả hai theme. */
-    #view-reports[hidden] { display: none !important; }
 
     .fc-sub { font-size: var(--fs-tiny); color: var(--faint); margin-top: 3px; }
 
@@ -604,7 +608,6 @@
     .trip .stop .q { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     .trip .stop.now .q { color: var(--crit); }
     /* ===== CÀI ĐẶT ===== */
-    #view-settings[hidden] { display: none !important; }
     #view-settings { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .set-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 16px;
                   display: flex; flex-direction: column; gap: 12px; }
