@@ -486,3 +486,91 @@ class LoginIn(BaseModel):
 
 class UserOut(BaseModel):
     username: str
+
+
+# --------------------------------------------------------------------------- #
+# Phân tích
+# --------------------------------------------------------------------------- #
+
+
+class QualityOut(BaseModel):
+    """Chuỗi này đáng tin bao nhiêu. Đi KÈM mọi con số phân tích, không tách rời.
+
+    Có nó thì "còn 5.8 ngày" đọc được thành "5.8 ngày, suy từ chuỗi phủ 23%" và người
+    vận hành tự biết nên tin bao nhiêu. Không có nó thì hai con số trông giống nhau
+    trong khi một cái dựng từ dữ liệu đầy đủ và cái kia từ một phần tư.
+    """
+
+    samples: int
+    window_days: float
+    cadence_minutes: float | None = None
+    cadence_jitter_minutes: float | None = None
+    expected_samples: int
+    coverage: float
+    gaps: int
+    longest_gap_hours: float | None = None
+    flatline_runs: int
+    longest_flatline_hours: float | None = None
+    grade: Literal["cao", "trung bình", "thấp", "không dùng được"]
+    reasons: list[str] = Field(default_factory=list)
+
+
+class BatteryOut(BaseModel):
+    current_v: float | None = None
+    volts_per_day: float | None = None
+    days_to_warn: float | None = None
+    days_to_dead: float | None = None
+    warn_v: float
+    dead_v: float
+    confidence: str
+
+
+class SignalOut(BaseModel):
+    current_percent: float | None = None
+    percent_per_day: float | None = None
+    below_floor_ratio: float
+    floor_percent: float
+
+
+class DeviceHealthOut(BaseModel):
+    """Thiết bị còn báo được bao lâu, và VÌ SAO nó sẽ chết.
+
+    ``likely_cause`` tồn tại vì một điểm số rủi ro không nói được nên mang theo pin
+    hay mang theo ăng-ten khi ra hiện trường.
+    """
+
+    psn: str
+    name: str | None = None
+    samples: int
+    battery: BatteryOut
+    signal: SignalOut
+    delivery_ratio: float
+    delivery_trend_per_day: float | None = None
+    silent_days: float | None = None
+    risk: Literal["cao", "trung bình", "thấp", "chưa đủ dữ liệu"]
+    likely_cause: str | None = None
+    days_to_failure: float | None = None
+    reasons: list[str] = Field(default_factory=list)
+
+
+class AnomalyOut(BaseModel):
+    at: datetime
+    kind: Literal["sụt bất thường", "tăng bất thường", "cảm biến kẹt"]
+    value_l: float | None = None
+    expected_l: float | None = None
+    deviation_l: float | None = None
+    z: float | None = None
+    note: str
+
+
+class AnalyticsOut(BaseModel):
+    psn: str
+    name: str | None = None
+    capacity_l: float | None = None
+    window_days: float
+    quality: QualityOut
+    health: DeviceHealthOut
+    anomalies: list[AnomalyOut] = Field(default_factory=list)
+    #: Thời điểm chuỗi đổi chế độ tiêu thụ — để dashboard vẽ mốc trên đồ thị.
+    regime_changes: list[datetime] = Field(default_factory=list)
+    generated_at: datetime

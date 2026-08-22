@@ -72,6 +72,12 @@ SIGNAL_FLOOR_PERCENT = 10.0
 # dữ liệu" — thà im lặng hơn đưa một độ dốc dựng từ 4 điểm.
 MIN_TREND_SAMPLES = 12
 
+# Im lâu hơn mức này thì coi là ĐÃ ngừng báo, không còn là dự đoán. Cố ý tính bằng
+# NGÀY chứ không theo bội số cadence: 4 lần cadence chỉ là 2 giờ, và một thiết bị
+# trượt vài lần upload trong 2 giờ chưa phải lý do để ai lái xe ra hiện trường. Ba
+# ngày thì không còn cách giải thích nào khác.
+SILENT_DEAD_DAYS = 3.0
+
 # Trần số điểm cho Theil-Sen. 400 điểm = 79.800 cặp; trên mức này lấy mẫu theo bước
 # đều (KHÔNG ngẫu nhiên: cùng đầu vào phải cho cùng kết quả).
 THEIL_SEN_MAX_POINTS = 400
@@ -240,7 +246,11 @@ def assess_quality(
     cadence = max(cadence, 1.0)
 
     span_min = (pts[-1].at - pts[0].at).total_seconds() / 60.0
-    expected = max(1, round(span_min / cadence) + 1)
+    # Mẫu số là CỬA SỔ ĐƯỢC YÊU CẦU, không phải khoảng dữ liệu quan sát được. Nếu lấy
+    # khoảng quan sát thì một thiết bị chỉ báo 5 ngày trong cửa sổ 30 ngày vẫn hiện
+    # "độ phủ 100%" — đúng con số dối mà module này ra đời để chặn. Đo trên cửa sổ thì
+    # thiết bị chết hiện ra là dữ liệu thiếu, vì đó chính là nó.
+    expected = max(1, round(window_days * 1440.0 / cadence))
     coverage = min(1.0, len(pts) / expected)
 
     gap_limit = cadence * GAP_FACTOR
@@ -248,10 +258,17 @@ def assess_quality(
     runs, longest_flat = _flatline_runs(pts)
 
     reasons = [
-        f"{len(pts)} lần đo trên {span_min / 1440.0:.1f} ngày, "
-        f"kỳ vọng {expected} ở nhịp {cadence:.0f} phút.",
+        f"{len(pts)} lần đo, kỳ vọng {expected} cho cửa sổ {window_days:.0f} ngày "
+        f"ở nhịp {cadence:.0f} phút.",
         f"Độ phủ {coverage * 100:.0f}%.",
     ]
+    # Nói riêng khoảng dữ liệu thật: độ phủ thấp vì thiết bị chết KHÁC độ phủ thấp vì
+    # thiết bị báo chập chờn suốt cửa sổ, và hai ca đó cần hai hành động khác nhau.
+    if span_min < window_days * 1440.0 * 0.9:
+        reasons.append(
+            f"Dữ liệu chỉ trải {span_min / 1440.0:.1f} ngày trong cửa sổ "
+            f"{window_days:.0f} ngày."
+        )
     if big:
         reasons.append(
             f"{len(big)} khoảng trống dài hơn {gap_limit / 60.0:.1f} giờ, "
@@ -435,6 +452,11 @@ def assess_device_health(
         span_min = (pts[-1].at - pts[0].at).total_seconds() / 60.0
         expected = max(1, round(span_min / cadence_minutes) + 1)
         delivery = min(1.0, len(pts) / expected)
+        # Mẫu số ở đây là khoảng thiết bị CÒN BÁO, cố ý khác `coverage` của
+        # assess_quality (đo trên cả cửa sổ). Hai câu hỏi khác nhau: "đường truyền có
+        # tốt không" khác "tôi có dữ liệu cho cửa sổ này không". Một thiết bị chết
+        # sạch sẽ có delivery 100% và coverage 15% — cả hai đều đúng, nên nhãn phải
+        # nói rõ mỗi con số đo cái gì.
         # Xu hướng: chia chuỗi làm hai nửa theo THỜI GIAN (không theo số điểm) và so
         # tỉ lệ. Thô nhưng đọc được, và không cần thêm giả định nào về phân bố khoảng
         # trống. Chia theo số điểm sẽ sai vì nửa sau vốn đã thưa hơn.
@@ -447,7 +469,9 @@ def assess_device_health(
             r2 = min(1.0, len(second) / exp_half)
             half_days = span_min / 2.0 / 1440.0
             deliv_trend = (r2 - r1) / half_days if half_days > 0 else None
-        reasons.append(f"Nhận được {delivery * 100:.0f}% số mẫu kỳ vọng.")
+        reasons.append(
+            f"Nhận được {delivery * 100:.0f}% số mẫu trong khoảng thiết bị còn báo."
+        )
 
     risk, cause, dtf = _rank_risk(
         battery=battery,
@@ -455,7 +479,6 @@ def assess_device_health(
         delivery=delivery,
         deliv_trend=deliv_trend,
         silent_days=silent_days,
-        cadence_minutes=cadence_minutes,
         n=len(pts),
         reasons=reasons,
     )
@@ -481,7 +504,6 @@ def _rank_risk(
     delivery: float,
     deliv_trend: float | None,
     silent_days: float | None,
-    cadence_minutes: float,
     n: int,
     reasons: list[str],
 ) -> tuple[Risk, str | None, float | None]:
@@ -489,8 +511,8 @@ def _rank_risk(
     if n < MIN_TREND_SAMPLES:
         return "chưa đủ dữ liệu", None, None
 
-    # Im lâu hơn 4 lần cadence: đây là báo cáo hiện trạng, không phải dự báo.
-    if silent_days is not None and silent_days * 1440.0 > cadence_minutes * 4:
+    # Im lâu hơn SILENT_DEAD_DAYS: đây là báo cáo hiện trạng, không phải dự báo.
+    if silent_days is not None and silent_days > SILENT_DEAD_DAYS:
         cause = "Thiết bị đã ngừng báo"
         if battery.current_v is not None and battery.current_v <= battery.warn_v:
             cause = "Thiết bị đã ngừng báo, pin ở mức thấp lúc đo cuối"

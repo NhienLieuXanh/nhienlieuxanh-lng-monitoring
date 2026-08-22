@@ -195,6 +195,41 @@ def series(
     return out
 
 
+def health_series(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int = 20_000,
+) -> list[tuple[datetime, float | None, float | None]]:
+    """Chuỗi (sampled_at, battery_v, signal_percent) tăng dần, cho tầng phân tích.
+
+    Truy vấn RIÊNG chứ không mở rộng ``series()``: dự báo mức chứa chạy trên mọi
+    request dashboard và không bao giờ cần pin/sóng, nên nhồi hai cột vào đó là bắt
+    mọi request đọc thêm để phục vụ một trang mà phần lớn thời gian không ai mở.
+
+    Cắt phần CŨ NHẤT giống ``series()`` và cùng lý do: xu hướng suy pin chỉ có nghĩa
+    khi tính trên dữ liệu gần đây.
+    """
+    rows = session.execute(
+        select(Telemetry.sampled_at, Telemetry.battery_v, Telemetry.signal_percent)
+        .where(
+            Telemetry.psn == psn,
+            Telemetry.sampled_at >= start,
+            Telemetry.sampled_at <= end,
+        )
+        .order_by(Telemetry.sampled_at.desc())
+        .limit(limit)
+    ).all()
+    out = [
+        (at, None if b is None else float(b), None if s is None else float(s))
+        for at, b, s in rows
+    ]
+    out.reverse()
+    return out
+
+
 #: Cột và THỨ TỰ cột của báo cáo xuất ra. Cố định ở một chỗ để hai lần xuất cách
 #: nhau vài tháng vẫn diff được với nhau, và để không ai vô tình thêm
 #: ``raw_payload`` vào file gửi ra ngoài.

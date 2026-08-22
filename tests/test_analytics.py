@@ -147,6 +147,20 @@ class TestQuality:
         assert q.coverage == 0.0
         assert q.cadence_minutes is None
 
+    def test_coverage_is_measured_against_the_window_not_the_data(self):
+        """Thiết bị chỉ báo 5/30 ngày phải hiện ~17%, KHÔNG phải 100%.
+
+        Lỗi thật đã bắt được khi chạy endpoint trên dữ liệu thật: mẫu số là khoảng dữ
+        liệu quan sát được nên một thiết bị chết từ lâu vẫn báo "độ phủ 100%" — đúng
+        con số dối mà module này ra đời để chặn.
+        """
+        s = _series(start_l=9000.0, per_day_l=500.0, hours=24 * 5)
+        q = A.assess_quality(s, now=s[-1].at, window_days=30.0)
+        assert q.expected_samples == 30 * 48  # 30 ngày ở nhịp 30 phút
+        assert q.coverage == pytest.approx(5.0 / 30.0, abs=0.02)
+        assert q.grade == "không dùng được"
+        assert any("chỉ trải" in r for r in q.reasons)
+
     def test_long_gap_is_counted_and_measured(self):
         a = _series(start_l=9000.0, per_day_l=500.0, hours=24)
         b = [
@@ -194,6 +208,18 @@ class TestDeviceHealth:
         assert r.risk == "chưa đủ dữ liệu"
         assert r.days_to_failure is None
         assert r.battery.confidence == "chưa đủ dữ liệu"
+
+    def test_brief_silence_is_not_declared_dead(self):
+        """Im 5 giờ chưa phải lý do để ai lái xe ra hiện trường.
+
+        Ngưỡng cũ là 4 lần cadence = 2 giờ, nên một thiết bị trượt vài lần upload đã
+        bị tuyên "đã ngừng báo, còn 0 ngày". Lỗi bắt được khi đọc output thật.
+        """
+        h = _health(hours=24 * 20, v0=3.65, mv_per_day=-0.05, signal=85.0)
+        r = A.assess_device_health(h, psn="X", now=h[-1].at + timedelta(hours=5))
+        assert r.silent_days is not None and r.silent_days < A.SILENT_DEAD_DAYS
+        assert r.days_to_failure != 0.0
+        assert r.likely_cause is None or "ngừng báo" not in r.likely_cause
 
     def test_silent_device_is_fact_not_forecast(self):
         """Đã im 84 ngày thì rủi ro là hiện trạng, và số ngày còn lại bằng 0."""
