@@ -580,8 +580,16 @@
     .an-tile dd { font-family: var(--mono); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; color: var(--fg); }
     .an-tile dd small { font-family: var(--font); font-size: var(--fs-tiny); color: var(--muted); margin-left: 3px; }
     .an-sub { font-size: var(--fs-micro); color: var(--faint); margin-top: 2px; }
-    .an-why { margin-top: 8px; font-size: var(--fs-prose); color: var(--muted); line-height: 1.65; }
-    .an-why li { margin-left: 16px; list-style: disc; }
+    /* Cùng khuôn thu gọn với .fc-why của thẻ dự báo. Sáu ô số phía trên đã trả lời
+       câu hỏi chính; 10 dòng lý do là để tra khi cần cãi lại con số, không phải để
+       đọc mỗi lần mở trang. Một loại nội dung thì một kiểu trình bày. */
+    .an-why { margin-top: 8px; }
+    .an-why > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--brand); list-style: none; }
+    .an-why > summary::-webkit-details-marker { display: none; }
+    .an-why > summary::before { content: "▸ "; }
+    .an-why[open] > summary::before { content: "▾ "; }
+    .an-why ul { margin: 6px 0 0 16px; display: flex; flex-direction: column; gap: 3px; }
+    .an-why li { font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; list-style: disc; overflow-wrap: anywhere; }
     .an-anom { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
     .an-anom-row { display: flex; gap: 8px; align-items: baseline; font-size: var(--fs-sm); }
     .an-anom-row time { font-family: var(--mono); font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; }
@@ -1555,7 +1563,11 @@
 
     // Dùng CHUNG cho thẻ chi tiết và cho trợ lý ở trang Kế hoạch — một nguồn markup
     // nên hai chỗ không thể trình bày cùng một đề xuất theo hai kiểu khác nhau.
-    function suggestionHtml(f, title) {
+    // `withWhy = false` cho thẻ chi tiết ở Bảng điều khiển: khối "Cơ sở tính toán"
+    // giống HỆT khối trên trang Kế hoạch nạp, và Kế hoạch nạp mới là nơi ra quyết
+    // định đặt hàng. Giữ con số ở cả hai chỗ (nó là thứ cần xem nhanh), nhưng phần
+    // giải thích chỉ để một lần, ở đúng chỗ dùng nó.
+    function suggestionHtml(f, title, withWhy = true) {
       const s = f.suggestion || {};
       const urg = s.urgency || "unknown";
       const reasons = (s.reasons || []).map(r => `<li>${esc(r)}</li>`).join("");
@@ -1569,7 +1581,7 @@
             <span class="tagline">${esc(title)} · ${esc(URG_VI[urg] || urg)}</span>
           </div>
           <div class="lead">${lead}</div>
-          ${reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
+          ${withWhy && reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
         </div>`;
     }
 
@@ -1596,15 +1608,13 @@
       // mức/áp "hiện tại", mà ở đây "hiện tại" là số của nhiều ngày trước — trình
       // bày chúng như dự báo còn hiệu lực là điều duy nhất không được làm.
       if (f.stale) {
-        const age = f.reading_age_days;
-        box.innerHTML = `
-          <p class="fc-stale">
-            Lần đo cuối <b>${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"}</b>.
-            Số liệu đã quá cũ nên hệ thống không đưa ra dự báo cho bồn này.
-            Cần kiểm tra nguồn điện và ăng-ten của thiết bị đo.
-          </p>
-          <p class="fc-sub">Thể tích lần đo cuối: ${esc(fmtM3(f.volume_l))} m³ / ${esc(fmtM3(f.capacity_l))} m³
-            (${f.fill_percent == null ? "--" : esc(Number(f.fill_percent).toFixed(2))}%)</p>`;
+        // MỘT dòng, không phải một đoạn. Bản trước viết 245 ký tự mà cả bốn điều nó
+        // nói đều đã có chỗ khác trên cùng màn hình: tuổi số liệu ở cột "Đo cuối",
+        // trạng thái cũ ở pill "Số liệu cũ", thể tích ở ô THỂ TÍCH và MỨC CHỨA ngay
+        // phía trên, còn lời khuyên về thiết bị thì nay là việc của trang Phân tích
+        // (nó nói được cả nguyên nhân, không chỉ "kiểm tra nguồn điện"). Badge cạnh
+        // tiêu đề thẻ đã ghi rõ số ngày, nên chỉ cần trỏ đường.
+        box.innerHTML = `<p class="fc-stale">Chưa dự báo được — xem <b>Phân tích</b>.</p>`;
         return;
       }
 
@@ -1659,7 +1669,7 @@
              (${esc(fmtM3(last.before_l))} → ${esc(fmtM3(last.after_l))} m³)</p>`
         : "";
 
-      box.innerHTML = tiles + suggestionHtml(f, "Khuyến nghị đặt hàng") + lastLine;
+      box.innerHTML = tiles + suggestionHtml(f, "Khuyến nghị đặt hàng", false) + lastLine;
     }
 
     async function refreshForecast() {
@@ -2203,6 +2213,13 @@
         ? "Đã ngừng báo"
         : h.days_to_failure != null ? fmtDays(h.days_to_failure) : "--";
 
+      // Thu gọn 10 dòng lý do. Sáu ô số phía trên đã trả lời câu hỏi chính; phần
+      // này là để tra khi cần cãi lại con số, không phải để đọc mỗi lần mở trang.
+      // Cùng khuôn <details> mà thẻ dự báo đã dùng — trang mới không được tự đặt
+      // một kiểu trình bày riêng cho cùng loại nội dung.
+      const why = [...(q.reasons || []), ...(h.reasons || [])]
+        .map(r => `<li>${esc(r)}</li>`).join("");
+
       const anoms = (a.anomalies || []).slice(-5).reverse().map(x => `
         <div class="an-anom-row">
           <time>${esc(fmtWhen(x.at))}</time>
@@ -2235,9 +2252,7 @@
                      ? `${a.regime_changes.length} lần đổi chế độ tiêu thụ`
                      : "Không đổi chế độ tiêu thụ")}
         </div>
-        <ul class="an-why">${
-          [...(q.reasons || []), ...(h.reasons || [])].map(r => `<li>${esc(r)}</li>`).join("")
-        }</ul>
+        ${why ? `<details class="an-why"><summary>Cơ sở đánh giá</summary><ul>${why}</ul></details>` : ""}
         ${anoms ? `<div class="an-anom">${anoms}</div>` : ""}
       </div>`;
     }
