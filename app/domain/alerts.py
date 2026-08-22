@@ -66,6 +66,31 @@ class TerminalSnapshot:
     signal_percent: Decimal | None = None
 
 
+def elapsed_vi(delta: timedelta) -> str:
+    """Khoảng thời gian đã trôi, CÙNG thang với ``fmtAgo()`` của dashboard.
+
+    Làm tròn XUỐNG và tự đổi đơn vị khi vượt ngưỡng. Hai lý do, cả hai là lỗi thật
+    đã quan sát được trên production:
+
+    - ``{hours:.0f}`` không bao giờ đổi sang ngày, nên một bồn mất tín hiệu 80 ngày
+      sinh ra chuỗi "không có dữ liệu trong 1935 giờ". Không ai đọc được, và chuỗi
+      này đi vào email cảnh báo lẫn nhật ký kiểm toán.
+    - ``:.0f`` làm tròn tới gần nhất (2.8 -> "3 giờ") còn dashboard làm tròn xuống
+      ("2 giờ"), nên cùng một sự việc hiện hai con số khác nhau trên cùng một màn
+      hình. Làm tròn xuống cũng không bao giờ nói QUÁ thời gian mất tín hiệu — điều
+      quan trọng với chuỗi dùng làm bằng chứng.
+
+    Ngưỡng 48 giờ khớp ``fmtAgo``: dưới hai ngày thì số giờ còn hành động được.
+    """
+    minutes = int(delta.total_seconds() // 60)
+    if minutes < 60:
+        return f"{minutes} phút"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours} giờ"
+    return f"{hours // 24} ngày"
+
+
 def evaluate(
     snap: TerminalSnapshot, th: AlertThresholds, now: datetime
 ) -> list[Alert]:
@@ -76,8 +101,7 @@ def evaluate(
         if snap.last_seen_at is None:
             detail = "chưa từng nhận được dữ liệu"
         else:
-            hours = (now - snap.last_seen_at).total_seconds() / 3600.0
-            detail = f"không có dữ liệu trong {hours:.0f} giờ"
+            detail = f"không có dữ liệu trong {elapsed_vi(now - snap.last_seen_at)}"
         out.append(Alert(snap.psn, AlertCode.OFFLINE, Severity.WARNING,
                          f"Thiết bị ngoại tuyến — {detail}"))
 

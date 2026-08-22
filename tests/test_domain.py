@@ -11,6 +11,7 @@ from app.domain.alerts import (
     AlertThresholds,
     Severity,
     TerminalSnapshot,
+    elapsed_vi,
     evaluate,
     fill_percent,
 )
@@ -137,3 +138,39 @@ class TestAlerts:
         )
         alerts = evaluate(snap, TH, NOW)
         assert [a.severity for a in alerts] == [Severity.CRITICAL]
+
+
+class TestElapsedVi:
+    """Chuỗi thời lượng trong cảnh báo. Dùng CHUNG thang với fmtAgo() ở dashboard."""
+
+    def test_escalates_to_days(self):
+        """Lỗi thật trên production: 80 ngày mất tín hiệu in ra "1935 giờ"."""
+        assert elapsed_vi(timedelta(days=80, hours=15)) == "80 ngày"
+        assert elapsed_vi(timedelta(days=30)) == "30 ngày"
+
+    def test_boundary_at_48_hours(self):
+        """Khớp fmtAgo: dưới 48 giờ còn hiện giờ, từ 48 trở lên đổi sang ngày."""
+        assert elapsed_vi(timedelta(hours=47, minutes=59)) == "47 giờ"
+        assert elapsed_vi(timedelta(hours=48)) == "2 ngày"
+
+    def test_boundary_at_60_minutes(self):
+        assert elapsed_vi(timedelta(minutes=59)) == "59 phút"
+        assert elapsed_vi(timedelta(minutes=60)) == "1 giờ"
+
+    def test_rounds_down_never_overstates(self):
+        """2.8 giờ là "2 giờ", không phải "3 giờ".
+
+        Làm tròn gần nhất khiến dashboard và cảnh báo hiện hai con số khác nhau cho
+        cùng một sự việc, và khiến chuỗi nói QUÁ thời gian mất tín hiệu — chuỗi này
+        đi vào email và nhật ký kiểm toán nên không được nói quá.
+        """
+        assert elapsed_vi(timedelta(hours=2, minutes=48)) == "2 giờ"
+        assert elapsed_vi(timedelta(seconds=59)) == "0 phút"
+
+    def test_used_by_offline_alert(self):
+        snap = TerminalSnapshot(psn="X", last_seen_at=NOW - timedelta(days=80))
+        msg = next(
+            a.message for a in evaluate(snap, TH, NOW) if a.code is AlertCode.OFFLINE
+        )
+        assert "80 ngày" in msg
+        assert "giờ" not in msg

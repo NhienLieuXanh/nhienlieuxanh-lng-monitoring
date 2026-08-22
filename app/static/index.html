@@ -531,7 +531,10 @@
     table.tanks td:nth-child(3), table.tanks td:nth-child(4) { white-space: nowrap; }
     /* Tuổi lần đo nằm ngay dưới badge trạng thái: hai thứ này trả lời cùng một câu
        hỏi ("thiết bị còn báo không, lần cuối là khi nào") nên đứng cùng một ô. */
-    .tago { display: block; margin-top: 3px; font-size: var(--fs-tiny); color: var(--faint); }
+    /* nowrap: "Đo cuối: 29 ngày" và "tới mức dự trữ" là nhãn NGẮN nhưng nhiều từ,
+       để tự ngắt thì chúng gãy thành 3 dòng làm mọi hàng cao lên — mất chỗ hiển
+       thị bồn trên một màn hình, đúng lỗi đã gặp với "79 ngày trước". */
+    .tago { display: block; margin-top: 3px; font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; }
     .runpill { display: inline-block; font-family: var(--mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
                padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
     .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
@@ -735,11 +738,16 @@
                 <tr>
                   <th>Bồn</th>
                   <th class="r">Mức chứa</th>
-                  <!-- "Tới dự trữ" thay chỗ của "Áp suất": áp suất đã hiện ở readout
-                       chi tiết và ở ô thời gian giữ áp, còn "còn bao nhiêu ngày tới
-                       mức dự trữ" thì không có ở đâu khác — và đó mới là con số
-                       khiến người vận hành phải làm gì đó. -->
-                  <th class="r">Tới dự trữ</th>
+                  <!-- Cột này thay chỗ của "Áp suất": áp suất đã hiện ở readout chi
+                       tiết và ở ô thời gian giữ áp, còn "còn bao nhiêu ngày" thì
+                       không có ở đâu khác — và đó mới là con số khiến người vận
+                       hành phải làm gì đó.
+
+                       Tiêu đề là "Còn lại", KHÔNG phải "Tới dự trữ": mốc được đếm
+                       thay đổi theo mức bồn (trên dự trữ -> đếm tới dự trữ; đã
+                       dưới -> đếm tới cạn), nên tiêu đề cố định một mốc là sai với
+                       nửa số hàng. Mốc thật của từng hàng nằm ở nhãn phụ trong ô. -->
+                  <th class="r">Còn lại</th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>
@@ -1059,7 +1067,7 @@
                 <input type="number" id="s-truck" class="field num" min="0.5" step="0.5" />
               </label>
               <label>
-                <span class="set-lbl">Ngưỡng dữ liệu lỗi thời (giờ) <span class="src" data-src="forecast_max_reading_age_hours">Mặc định</span></span>
+                <span class="set-lbl">Ngưỡng số liệu cũ (giờ) <span class="src" data-src="forecast_max_reading_age_hours">Mặc định</span></span>
                 <input type="number" id="s-age" class="field num" min="1" max="8760" step="1" />
               </label>
             </div>
@@ -1425,7 +1433,7 @@
             <td class="r">${runPill(tank.psn)}</td>
             <td>
               <span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
-              <span class="tago">${esc(fmtAgo(tank.last_seen_at))}</span>
+              <span class="tago">Đo cuối: ${esc(fmtAgo(tank.last_seen_at))}</span>
             </td>
           </tr>`;
       }).join("");
@@ -1437,29 +1445,52 @@
 
     /* ---------- DỰ BÁO: hiển thị ---------- */
 
-    // Pill "còn lại" ở danh sách bồn. Ngưỡng màu khớp ngưỡng cảnh báo phía server
+    // Cột "Còn lại" ở danh sách bồn. Ngưỡng màu khớp ngưỡng cảnh báo phía server
     // (RUNOUT critical <= 1 ngày, warning <= 3 ngày) để màu và chuông không nói khác nhau.
+    //
+    // Ô này LUÔN có nhãn phụ nói con số đếm tới đâu. Tiêu đề cột chỉ nói "Còn lại"
+    // nên không có nhãn thì "5.8 ngày" là mơ hồ: tới mức dự trữ hay tới cạn? Hai
+    // mốc lệch nhau cả tuần, và đó là khác biệt giữa "đặt hàng" và "mất bồn".
     function runPill(psn) {
       const f = fcOf(psn);
       // Số liệu cũ -> KHÔNG hiện một con số dự báo trông như đang sống. Server đã
       // chặn cảnh báo trong ca này; UI phải nói cùng một điều, nếu không người xem
       // sẽ tin vào con số mà hệ thống đã tự coi là không dùng được.
+      //
+      // KHÔNG in tuổi số liệu ở đây: cột "Trạng thái" ngay bên cạnh đã ghi
+      // "Đo cuối: N ngày". Hai ô cạnh nhau in cùng một con số đọc như hệ thống
+      // nói lặp — chính chỗ người dùng báo là khó hiểu.
       if (f && f.stale) {
         const age = f.reading_age_days;
         const why = age != null
-          ? `Dữ liệu lỗi thời ${fmtDays(age)} — hệ thống không dự báo từ dữ liệu này`
+          ? `Lần đo cuối cách đây ${fmtDays(age)} — hệ thống không dự báo từ dữ liệu này`
           : "Chưa có lần đo nào";
-        return `<span class="runpill" title="${esc(why)}">Lỗi thời</span>`;
+        return `<span class="runpill" title="${esc(why)}">Số liệu cũ</span>`;
       }
-      const d = f && f.runout ? f.runout.days_to_reserve : null;
+      const r = (f && f.runout) || {};
+      // Bồn đã ở dưới mức dự trữ thì days_to_reserve = 0 — đúng về toán nhưng vô
+      // dụng để hành động: nó chỉ nói "đã trễ rồi". Con số còn dùng được là thời
+      // gian tới CẠN. Đây là ca thật của cả hai bồn hiện tại (0.29% và 0.59%).
+      const below = r.days_to_reserve != null && r.days_to_reserve <= 0;
+      const d = below ? r.days_to_empty : r.days_to_reserve;
       if (d === null || d === undefined) {
-        const why = f ? "Chưa đo được mức tiêu thụ từ lịch sử" : "Đang tính…";
-        return `<span class="runpill" title="${esc(why)}">--</span>`;
+        const why = !f
+          ? "Đang tính…"
+          : below
+            ? "Đã dưới mức dự trữ · chưa đo được tốc độ hao để tính thời gian tới cạn"
+            : "Chưa đo được mức tiêu thụ từ lịch sử";
+        return `<span class="runpill" title="${esc(why)}">--</span>`
+          + `<span class="tago">${below ? "dưới mức dự trữ" : "chưa đủ dữ liệu"}</span>`;
       }
-      const cls = d <= 1 ? "crit" : d <= 3 ? "warn" : "ok";
-      const tip = `Còn ${fmtDays(d)} tới mức dự trữ ${fmtM3(f.reserve_l)} m³`
-        + (f.runout.days_to_empty != null ? ` · cạn hoàn toàn sau ${fmtDays(f.runout.days_to_empty)}` : "");
-      return `<span class="runpill ${cls}" title="${esc(tip)}">${esc(fmtDays(d))}</span>`;
+      // Dưới mức dự trữ thì luôn là critical, bất kể còn mấy ngày tới cạn: phần
+      // đệm để xe bồn kịp tới đã bị tiêu hết.
+      const cls = below || d <= 1 ? "crit" : d <= 3 ? "warn" : "ok";
+      const tip = below
+        ? `Đã dưới mức dự trữ ${fmtM3(f.reserve_l)} m³ — còn ${fmtDays(d)} tới cạn hoàn toàn`
+        : `Còn ${fmtDays(d)} tới mức dự trữ ${fmtM3(f.reserve_l)} m³`
+          + (r.days_to_empty != null ? ` · cạn hoàn toàn sau ${fmtDays(r.days_to_empty)}` : "");
+      return `<span class="runpill ${cls}" title="${esc(tip)}">${esc(fmtDays(d))}</span>`
+        + `<span class="tago">${below ? "tới cạn" : "tới mức dự trữ"}</span>`;
     }
 
     // Dùng CHUNG cho thẻ chi tiết và cho trợ lý ở trang Kế hoạch — một nguồn markup
@@ -1495,7 +1526,7 @@
       const c = f.consumption || {}, i = f.idle || {}, r = f.runout || {}, h = f.hold || {};
       if (f.stale) {
         win.textContent = f.reading_age_days != null
-          ? "Dữ liệu lỗi thời " + fmtDays(f.reading_age_days) : "Chưa có dữ liệu";
+          ? "Số liệu cũ " + fmtDays(f.reading_age_days) : "Chưa có dữ liệu";
         win.className = "fc-badge r";
       } else {
         win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày dữ liệu · độ phủ ${Math.round((c.coverage || 0) * 100)}%`;
@@ -1509,7 +1540,7 @@
         box.innerHTML = `
           <p class="fc-stale">
             Lần đo cuối <b>${age != null ? "cách đây " + esc(fmtDays(age)) : "chưa có"}</b>.
-            Dữ liệu đã lỗi thời nên hệ thống không đưa ra dự báo cho bồn này.
+            Số liệu đã quá cũ nên hệ thống không đưa ra dự báo cho bồn này.
             Cần kiểm tra nguồn điện và ăng-ten của thiết bị đo.
           </p>
           <p class="fc-sub">Thể tích lần đo cuối: ${esc(fmtM3(f.volume_l))} m³ / ${esc(fmtM3(f.capacity_l))} m³
@@ -1517,19 +1548,25 @@
         return;
       }
 
-      const dres = r.days_to_reserve;
-      const runCls = dres == null ? "" : dres <= 1 ? " crit" : dres <= 3 ? " warn" : "";
+      // Cùng quy tắc chọn mốc như cột "Còn lại" ở bảng bồn — nếu thẻ chi tiết đếm
+      // tới mốc khác thì cùng một bồn hiện hai con số khác nhau trên hai khung.
+      const belowRes = r.days_to_reserve != null && r.days_to_reserve <= 0;
+      const dres = belowRes ? r.days_to_empty : r.days_to_reserve;
+      const runCls = belowRes ? " crit" : dres == null ? "" : dres <= 1 ? " crit" : dres <= 3 ? " warn" : "";
       const holdCls = h.days == null ? "" : h.days <= 1 ? " crit" : h.days <= 5 ? " warn" : "";
       const bor = i.boil_off_percent_per_day;
 
       const tiles = `
         <div class="fc-grid">
           <div class="fc-tile${runCls}">
-            <dt>Thời gian tới mức dự trữ</dt>
+            <dt>${belowRes ? "Thời gian tới cạn" : "Thời gian tới mức dự trữ"}</dt>
             <dd>${esc(fmtDays(dres))}</dd>
-            <div class="fc-sub">${r.days_to_empty != null
-              ? "Cạn hoàn toàn sau " + esc(fmtDays(r.days_to_empty)) + " · " + esc(fmtWhen(r.empty_at))
-              : "Chưa đo được mức tiêu thụ"}</div>
+            <div class="fc-sub">${belowRes
+              ? "Đã dưới mức dự trữ " + esc(fmtM3(f.reserve_l)) + " m³ — cần nạp ngay"
+                + (r.empty_at != null ? " · cạn " + esc(fmtWhen(r.empty_at)) : "")
+              : r.days_to_empty != null
+                ? "Cạn hoàn toàn sau " + esc(fmtDays(r.days_to_empty)) + " · " + esc(fmtWhen(r.empty_at))
+                : "Chưa đo được mức tiêu thụ"}</div>
           </div>
           <div class="fc-tile">
             <dt>Mức tiêu thụ/ngày</dt>
@@ -2025,7 +2062,7 @@
       if (f.stale) {
         box.innerHTML = `<p class="plan-warn" style="display:block">
           Bồn này ngoại tuyến${f.reading_age_days != null ? " " + esc(fmtDays(f.reading_age_days)) : ""}.
-          Hệ thống không đưa ra khuyến nghị từ dữ liệu lỗi thời. Kế hoạch bên dưới vẫn được
+          Hệ thống không đưa ra khuyến nghị từ số liệu cũ. Kế hoạch bên dưới vẫn được
           tính theo các thông số bạn nhập.</p>`;
         return;
       }
@@ -2121,7 +2158,11 @@
             </div>
             ${t.stops.map(s => `
               <div class="stop ${esc(s.urgency)}">
-                <span>${esc(s.name || s.psn)} · còn ${esc(fmtDays(s.days_to_reserve))} tới mức dự trữ</span>
+                <!-- days_to_reserve = 0 nghĩa là ĐÃ dưới mức dự trữ. In "còn 0.0 giờ
+                     tới mức dự trữ" là vừa vô nghĩa vừa làm nhẹ mức khẩn. -->
+                <span>${esc(s.name || s.psn)} · ${s.days_to_reserve != null && s.days_to_reserve <= 0
+                  ? "đã dưới mức dự trữ"
+                  : "còn " + esc(fmtDays(s.days_to_reserve)) + " tới mức dự trữ"}</span>
                 <span class="q">${esc(fmtM3(s.order_l))} m³</span>
               </div>`).join("")}
           </div>`).join("")
