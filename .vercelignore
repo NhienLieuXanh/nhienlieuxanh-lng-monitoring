@@ -11,5 +11,3 @@ logs/
 .ruff_cache/
 __pycache__/
 DISCOVERY.md
-ONBOARDING.md
-start.cmd

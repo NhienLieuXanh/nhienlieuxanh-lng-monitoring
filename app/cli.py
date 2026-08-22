@@ -91,9 +91,11 @@ def probe() -> None:
     """Kiểm auth + mapping với vendor thật. Chỉ đọc, một PSN, một ngày."""
     settings = get_settings()
     if settings.xingke_adapter != "live":
+        # Adapter giả đã bị bỏ khỏi sản phẩm (chỉ còn trong tests/stub_adapter.py),
+        # nên giá trị khác "live" nghĩa là .env còn sót cấu hình cũ.
         typer.echo(
-            "XINGKE_ADAPTER=fake — probe cần adapter live. Set XINGKE_ADAPTER=live "
-            "trong .env kèm credential.",
+            f"XINGKE_ADAPTER={settings.xingke_adapter} không hợp lệ — chỉ còn "
+            'adapter "live". Đặt XINGKE_ADAPTER=live trong .env kèm credential.',
             err=True,
         )
         raise typer.Exit(1)
