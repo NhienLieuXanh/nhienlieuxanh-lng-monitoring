@@ -70,6 +70,8 @@ PROTECTED = (
     "/api/telemetry/{psn}/latest",
     "/api/forecast",
     "/api/forecast/{psn}",
+    "/api/analytics",
+    "/api/analytics/{psn}",
     "/api/refills/{psn}",
     "/api/delivery-plan",
     "/api/export/tanks.csv",
