@@ -484,30 +484,7 @@
     /* Mọi màu ở đây đều qua token nên tự đúng ở cả hai theme. */
     #view-reports[hidden] { display: none !important; }
 
-    .fc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    .fc-head h3 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
-    .fc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; }
-    .fc-tile { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 7px 9px; min-width: 0; }
-    .fc-tile dt { font-size: var(--fs-micro); font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
-                 color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .fc-tile dd { font-family: var(--mono); font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em;
-                 line-height: 1.15; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .fc-tile dd small { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
-    .fc-tile.crit dd { color: var(--crit); }
-    .fc-tile.warn dd { color: var(--warn); }
-    .fc-stale { font-size: var(--fs-prose); line-height: 1.6; color: var(--muted); }
-    .fc-stale b { color: var(--warn); }
     .fc-sub { font-size: var(--fs-tiny); color: var(--faint); margin-top: 3px; }
-
-    /* Nhãn nguồn số: "đo được" vs "tham chiếu" phải nhìn là phân biệt được ngay,
-       nếu không một hằng số 0.05%/ngày sẽ bị đọc như một phép đo. */
-    .fc-badge { display: inline-block; font-size: var(--fs-micro); font-weight: 600; letter-spacing: .05em;
-                text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
-                border: 1px solid var(--line); color: var(--muted);
-                flex: 0 0 auto; white-space: nowrap; }
-    .fc-badge.m { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
-    .fc-badge.r { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
-    .fc-badge.n { color: var(--faint); }
 
     .fc-sug { margin-top: 9px; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; background: var(--surface-2); }
     .fc-sug.now { border-color: var(--crit-line); background: var(--crit-bg); }
@@ -803,16 +780,6 @@
 
         <section class="inspect" aria-label="Chi tiết">
           <div id="tank-detail" class="card hero"><p class="empty">Chọn một bồn trong danh sách.</p></div>
-          <!-- Thẻ dự báo nằm NGAY DƯỚI readout hiện tại và TRÊN biểu đồ: thứ tự đọc
-               là "đang thế nào -> sắp thế nào -> lịch sử thế nào". Đặt nó dưới biểu
-               đồ thì phải cuộn mới thấy, mà đây lại là phần cần hành động. -->
-          <div class="card" id="fc-card">
-            <div class="fc-head">
-              <h3>Dự báo tiêu thụ &amp; an toàn</h3>
-              <span class="fc-badge n" id="fc-window">—</span>
-            </div>
-            <div id="fc-body"><p class="empty">Đang tính từ dữ liệu lịch sử…</p></div>
-          </div>
           <div class="card chart-panel" id="chart-panel">
             <div class="chart-head">
               <h2>Xu hướng theo lần đo</h2>
@@ -1400,7 +1367,6 @@
     const CONF_VI = { high: "Độ tin cậy cao", medium: "Độ tin cậy trung bình", low: "Độ tin cậy thấp", none: "Chưa đủ dữ liệu" };
     const METHOD_VI = { measured: "Đo được", reference: "Tham chiếu", insufficient: "Chưa đủ dữ liệu" };
     const URG_VI = { now: "Cần đặt ngay", soon: "Sắp phải đặt", ok: "Chưa cần đặt", unknown: "Chưa đủ dữ liệu" };
-    const confClass = (c) => (c === "high" ? "m" : c === "none" ? "n" : "r");
 
     function fcOf(psn) { return fcByPsn[psn] || null; }
     // Cảnh báo dự báo (RUNOUT/HOLD_TIME/BOIL_OFF_HIGH) do SERVER suy, nằm sẵn trong
@@ -1563,11 +1529,11 @@
 
     // Dùng CHUNG cho thẻ chi tiết và cho trợ lý ở trang Kế hoạch — một nguồn markup
     // nên hai chỗ không thể trình bày cùng một đề xuất theo hai kiểu khác nhau.
-    // `withWhy = false` cho thẻ chi tiết ở Bảng điều khiển: khối "Cơ sở tính toán"
-    // giống HỆT khối trên trang Kế hoạch nạp, và Kế hoạch nạp mới là nơi ra quyết
-    // định đặt hàng. Giữ con số ở cả hai chỗ (nó là thứ cần xem nhanh), nhưng phần
-    // giải thích chỉ để một lần, ở đúng chỗ dùng nó.
-    function suggestionHtml(f, title, withWhy = true) {
+    // Chỉ còn MỘT nơi gọi: trợ lý ở trang Kế hoạch nạp. Trước đây thẻ chi tiết trên
+    // Bảng điều khiển cũng gọi nó, nên có thêm cờ tắt khối "Cơ sở tính toán"; thẻ đó
+    // đã bị bỏ nên cờ cũng đi theo. Khuyến nghị đặt hàng thuộc về trang ra quyết định
+    // đặt hàng, không phải trang xem trạng thái.
+    function suggestionHtml(f, title) {
       const s = f.suggestion || {};
       const urg = s.urgency || "unknown";
       const reasons = (s.reasons || []).map(r => `<li>${esc(r)}</li>`).join("");
@@ -1581,95 +1547,8 @@
             <span class="tagline">${esc(title)} · ${esc(URG_VI[urg] || urg)}</span>
           </div>
           <div class="lead">${lead}</div>
-          ${withWhy && reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
+          ${reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
         </div>`;
-    }
-
-    function renderForecastCard(psn) {
-      const box = document.getElementById("fc-body");
-      const win = document.getElementById("fc-window");
-      if (!box) return;
-      const f = fcOf(psn);
-      if (!f) {
-        box.innerHTML = `<p class="empty">Đang tính từ dữ liệu lịch sử…</p>`;
-        win.textContent = "—"; win.className = "fc-badge n";
-        return;
-      }
-      const c = f.consumption || {}, i = f.idle || {}, r = f.runout || {}, h = f.hold || {};
-      if (f.stale) {
-        win.textContent = f.reading_age_days != null
-          ? "Số liệu cũ " + fmtDays(f.reading_age_days) : "Chưa có dữ liệu";
-        win.className = "fc-badge r";
-      } else {
-        win.textContent = `${Number(c.window_days || 0).toFixed(0)} ngày dữ liệu · độ phủ ${Math.round((c.coverage || 0) * 100)}%`;
-        win.className = "fc-badge " + confClass(c.confidence);
-      }
-      // Số liệu cũ: nói thẳng và KHÔNG vẽ 4 thẻ dự báo. Chúng đều là phép chiếu từ
-      // mức/áp "hiện tại", mà ở đây "hiện tại" là số của nhiều ngày trước — trình
-      // bày chúng như dự báo còn hiệu lực là điều duy nhất không được làm.
-      if (f.stale) {
-        // MỘT dòng, không phải một đoạn. Bản trước viết 245 ký tự mà cả bốn điều nó
-        // nói đều đã có chỗ khác trên cùng màn hình: tuổi số liệu ở cột "Đo cuối",
-        // trạng thái cũ ở pill "Số liệu cũ", thể tích ở ô THỂ TÍCH và MỨC CHỨA ngay
-        // phía trên, còn lời khuyên về thiết bị thì nay là việc của trang Phân tích
-        // (nó nói được cả nguyên nhân, không chỉ "kiểm tra nguồn điện"). Badge cạnh
-        // tiêu đề thẻ đã ghi rõ số ngày, nên chỉ cần trỏ đường.
-        box.innerHTML = `<p class="fc-stale">Chưa dự báo được — xem <b>Phân tích</b>.</p>`;
-        return;
-      }
-
-      // Cùng quy tắc chọn mốc như cột "Còn lại" ở bảng bồn — nếu thẻ chi tiết đếm
-      // tới mốc khác thì cùng một bồn hiện hai con số khác nhau trên hai khung.
-      const belowRes = r.days_to_reserve != null && r.days_to_reserve <= 0;
-      const dres = belowRes ? r.days_to_empty : r.days_to_reserve;
-      const runCls = belowRes ? " crit" : dres == null ? "" : dres <= 1 ? " crit" : dres <= 3 ? " warn" : "";
-      const holdCls = h.days == null ? "" : h.days <= 1 ? " crit" : h.days <= 5 ? " warn" : "";
-      const bor = i.boil_off_percent_per_day;
-
-      const tiles = `
-        <div class="fc-grid">
-          <div class="fc-tile${runCls}">
-            <dt>${belowRes ? "Thời gian tới cạn" : "Thời gian tới mức dự trữ"}</dt>
-            <dd>${esc(fmtDays(dres))}</dd>
-            <div class="fc-sub">${belowRes
-              ? "Đã dưới mức dự trữ " + esc(fmtM3(f.reserve_l)) + " m³ — cần nạp ngay"
-                + (r.empty_at != null ? " · cạn " + esc(fmtWhen(r.empty_at)) : "")
-              : r.days_to_empty != null
-                ? "Cạn hoàn toàn sau " + esc(fmtDays(r.days_to_empty)) + " · " + esc(fmtWhen(r.empty_at))
-                : "Chưa đo được mức tiêu thụ"}</div>
-          </div>
-          <div class="fc-tile">
-            <dt>Mức tiêu thụ/ngày</dt>
-            <dd>${esc(fmtM3(c.daily_use_l))}<small>m³</small></dd>
-            <div class="fc-sub">
-              <span class="fc-badge ${confClass(c.confidence)}">${esc(CONF_VI[c.confidence] || "--")}</span>
-              ${c.daily_use_sd_l != null ? " σ " + esc(fmtM3(c.daily_use_sd_l)) + " m³" : ""}
-            </div>
-          </div>
-          <div class="fc-tile">
-            <dt>Bay hơi tự nhiên</dt>
-            <dd>${bor == null ? "--" : esc(Number(bor).toFixed(3))}<small>%/ngày</small></dd>
-            <div class="fc-sub">
-              <span class="fc-badge ${i.method === "measured" ? "m" : i.method === "reference" ? "r" : "n"}">${esc(METHOD_VI[i.method] || "--")}</span>
-              ${i.idle_windows ? " " + i.idle_windows + " chu kỳ nghỉ" : ""}
-            </div>
-          </div>
-          <div class="fc-tile${holdCls}">
-            <dt>Thời gian giữ áp</dt>
-            <dd>${esc(fmtDays(h.days))}</dd>
-            <div class="fc-sub">${h.days == null
-              ? "Chưa đo được tốc độ tăng áp"
-              : "Tới áp suất van an toàn " + esc(Number(h.relief_mpa).toFixed(2)) + " MPa"}</div>
-          </div>
-        </div>`;
-
-      const last = (f.refills || [])[0];
-      const lastLine = last
-        ? `<p class="fc-sub" style="margin-top:8px">Lần nạp gần nhất: ${esc(fmtWhen(last.at))} · +${esc(fmtM3(last.amount_l))} m³
-             (${esc(fmtM3(last.before_l))} → ${esc(fmtM3(last.after_l))} m³)</p>`
-        : "";
-
-      box.innerHTML = tiles + suggestionHtml(f, "Khuyến nghị đặt hàng", false) + lastLine;
     }
 
     async function refreshForecast() {
@@ -1680,15 +1559,12 @@
         for (const f of forecasts) fcByPsn[f.psn] = f;
         // Dự báo về sau khi dashboard đã vẽ -> vẽ lại đúng những phần phụ thuộc nó.
         renderStats(); renderAlerts(); renderTankList();
-        if (selectedPsn) renderForecastCard(selectedPsn);
         updateMeasuredBtn(); renderPlanAssist();
       } catch (e) {
         if (e.name === "AuthError") return;
         // Dự báo lỗi KHÔNG được che dashboard: số liệu hiện tại vẫn đúng và vẫn
         // dùng được. Ghi console để debug, không đẩy banner đỏ toàn trang.
         console.warn("forecast:", e.message);
-        const box = document.getElementById("fc-body");
-        if (box) box.innerHTML = `<p class="empty">Không tính được dự báo: ${esc(e.message)}</p>`;
       }
     }
 
@@ -1752,7 +1628,6 @@
       // Vẽ NGAY từ dữ liệu list (đã có sẵn) hoặc bản chi tiết đã cache — không chờ
       // round-trip nào. Đây là điểm mấu chốt để bấm thấy phản hồi tức thì.
       renderTankDetail(detailCache[psn] || tank);
-      renderForecastCard(psn);  // đã có trong fcByPsn thì hiện ngay, chưa có thì báo "đang tính"
       renderChart();  // dùng cache, không block
 
       // Bổ sung các field chỉ có ở /{psn} (firmware/modem/SIM) ở NỀN, không chặn UI.
@@ -2220,6 +2095,20 @@
       const why = [...(q.reasons || []), ...(h.reasons || [])]
         .map(r => `<li>${esc(r)}</li>`).join("");
 
+      // Ba số về BỒN (tiêu thụ, bay hơi, giữ áp) và lần nạp gần nhất chuyển về đây
+      // khi khối "Dự báo tiêu thụ & an toàn" bị bỏ khỏi Bảng điều khiển — chúng không
+      // có ở đâu khác. Lấy từ fcByPsn mà trình duyệt đã tải cho bảng bồn, không thêm
+      // request nào.
+      const fc = fcOf(a.psn) || {};
+      const cons = fc.consumption || {};
+      const bor = fc.idle ? fc.idle.boil_off_percent_per_day : null;
+      const hold = fc.hold || {};
+      const lf = (fc.refills || [])[0];
+      const lastFill = lf
+        ? `<p class="an-sub" style="margin-top:8px">Lần nạp gần nhất: ${esc(fmtWhen(lf.at))}
+             · +${esc(fmtM3(lf.amount_l))} m³ (${esc(fmtM3(lf.before_l))} → ${esc(fmtM3(lf.after_l))} m³)</p>`
+        : "";
+
       const anoms = (a.anomalies || []).slice(-5).reverse().map(x => `
         <div class="an-anom-row">
           <time>${esc(fmtWhen(x.at))}</time>
@@ -2251,9 +2140,21 @@
                    (a.regime_changes || []).length
                      ? `${a.regime_changes.length} lần đổi chế độ tiêu thụ`
                      : "Không đổi chế độ tiêu thụ")}
+          ${anTile("Mức tiêu thụ/ngày",
+                   esc(fmtM3(cons.daily_use_l)) + "<small>m³</small>",
+                   cons.confidence ? esc(CONF_VI[cons.confidence] || "--") : "Chưa có dự báo")}
+          ${anTile("Bay hơi tự nhiên",
+                   bor == null ? "--" : esc(Number(bor).toFixed(3)) + "<small>%/ngày</small>",
+                   fc.idle ? esc(METHOD_VI[fc.idle.method] || "--") : "Chưa có dự báo")}
+          ${anTile("Thời gian giữ áp", esc(fmtDays(hold.days)),
+                   hold.days == null
+                     ? "Chưa đo được tốc độ tăng áp"
+                     : `Tới van an toàn ${esc(Number(hold.relief_mpa).toFixed(2))} MPa`,
+                   hold.days != null && hold.days <= 5 ? "crit" : "")}
         </div>
         ${why ? `<details class="an-why"><summary>Cơ sở đánh giá</summary><ul>${why}</ul></details>` : ""}
         ${anoms ? `<div class="an-anom">${anoms}</div>` : ""}
+        ${lastFill}
       </div>`;
     }
 
