@@ -209,6 +209,33 @@ class TestDeviceHealth:
         assert r.days_to_failure is None
         assert r.battery.confidence == "chưa đủ dữ liệu"
 
+    def test_low_risk_is_not_claimed_on_unusable_data(self):
+        """"Rủi ro thấp" cạnh "dữ liệu không dùng được" là tự mâu thuẫn.
+
+        Lỗi thấy được khi soi ảnh chụp trang thật. Chỉ hạ kết luận LẠC QUAN — rủi ro
+        cao/trung bình vẫn giữ vì chúng dựa trên bằng chứng.
+        """
+        h = _health(hours=24 * 20, v0=3.65, mv_per_day=-0.05, signal=85.0)
+        clean = A.assess_device_health(h, psn="X", now=h[-1].at)
+        assert clean.risk == "thấp"
+
+        gated = A.assess_device_health(
+            h, psn="X", now=h[-1].at, quality_grade="không dùng được"
+        )
+        assert gated.risk == "chưa đủ dữ liệu"
+        assert any("Không kết luận rủi ro thấp" in r for r in gated.reasons)
+
+    def test_high_risk_survives_unusable_data(self):
+        """Ngược lại: thiết bị đã im 84 ngày vẫn là rủi ro cao, không bị hạ xuống."""
+        h = _health(hours=24 * 20, v0=3.60, mv_per_day=-5.0)
+        r = A.assess_device_health(
+            h,
+            psn="X",
+            now=h[-1].at + timedelta(days=84),
+            quality_grade="không dùng được",
+        )
+        assert r.risk == "cao"
+
     def test_brief_silence_is_not_declared_dead(self):
         """Im 5 giờ chưa phải lý do để ai lái xe ra hiện trường.
 
@@ -317,6 +344,44 @@ class TestChangePoints:
         boundary = len(first) - 1
         tol = 0.10 * (len(first) + len(second))
         assert min(abs(c - boundary) for c in cuts) <= tol
+
+    def test_index_maps_back_to_the_original_series(self):
+        """Chuỗi bị thưa hoá trước khi phân đoạn, nên chỉ số phải map về mảng GỐC.
+
+        Không map thì chỗ cắt lệch đúng bằng bước thưa — với 800 điểm và trần 200 thì
+        lệch 4 lần, và dashboard sẽ vẽ mốc đổi chế độ sai chỗ mà không ai nhận ra.
+        """
+        n, brk = 800, 400
+        pts = [
+            Sample(
+                at=T0 + timedelta(minutes=30 * i),
+                volume_l=9000.0 - (0.5 * i if i < brk else 0.5 * brk + 5.0 * (i - brk)),
+                pressure_mpa=0.1,
+            )
+            for i in range(n)
+        ]
+        cuts = A.change_points(pts)
+        assert cuts, "không phát hiện điểm ngắt"
+        assert all(0 <= c < n for c in cuts)
+        # Sai số cho phép là một bước thưa (800 // 200 = 4).
+        assert min(abs(c - brk) for c in cuts) <= n // A.CP_MAX_POINTS
+
+    def test_long_series_stays_fast(self):
+        """Chống tái diễn timeout: O(n³) làm n=810 mất 59.5 giây, chạm trần serverless.
+
+        Ngưỡng để rộng rãi để không phụ thuộc tốc độ máy — mục đích là bắt lại việc
+        vô tình bỏ mất phép thưa hoá, chứ không phải đo hiệu năng.
+        """
+        import time
+
+        pts = [
+            Sample(at=T0 + timedelta(minutes=30 * i), volume_l=9000.0 - 0.5 * i)
+            for i in range(4000)
+        ]
+        t0 = time.perf_counter()
+        cuts = A.change_points(pts)
+        assert time.perf_counter() - t0 < 10.0, "phân đoạn chậm bất thường"
+        assert all(0 <= c < len(pts) for c in cuts)
 
     def test_constant_slope_is_not_cut(self):
         """Không thay đổi thì không được cắt — nếu không thuật toán băm mọi chuỗi."""

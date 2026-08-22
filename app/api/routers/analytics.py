@@ -71,6 +71,9 @@ def _build(
         now=now,
         warn_v=float(cfg.alert_low_battery_v),
         floor_percent=float(cfg.alert_low_signal_percent),
+        # Truyền điểm chất lượng vào: một kết luận "rủi ro thấp" dựng trên chuỗi
+        # không dùng được là tự mâu thuẫn ngay trên cùng một thẻ.
+        quality_grade=quality.grade,
     )
     anomalies = an.detect_anomalies(vol, capacity_l=capacity_l)
 

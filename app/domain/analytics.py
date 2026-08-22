@@ -82,6 +82,15 @@ SILENT_DEAD_DAYS = 3.0
 # đều (KHÔNG ngẫu nhiên: cùng đầu vào phải cho cùng kết quả).
 THEIL_SEN_MAX_POINTS = 400
 
+# Trần số điểm cho phân đoạn. Thấp hơn nhiều THEIL_SEN_MAX_POINTS vì phân đoạn gọi
+# Theil-Sen MỘT LẦN CHO MỖI ỨNG VIÊN cắt, nên chi phí là O(n³) chứ không O(n²). Đo
+# thật: 0.58 s ở n=240 nhưng 59.5 s ở n=810 — chạm trần 60 giây của hàm serverless.
+CP_MAX_POINTS = 200
+
+# Số ứng viên cắt tối đa mỗi lần chia. Mỗi ứng viên tốn hai lần khớp Theil-Sen nên
+# đây là hệ số nhân trực tiếp vào thời gian chạy.
+CP_MAX_CANDIDATES = 80
+
 Grade = Literal["cao", "trung bình", "thấp", "không dùng được"]
 Risk = Literal["cao", "trung bình", "thấp", "chưa đủ dữ liệu"]
 AnomalyKind = Literal["sụt bất thường", "tăng bất thường", "cảm biến kẹt"]
@@ -407,6 +416,7 @@ def assess_device_health(
     warn_v: float = BATTERY_WARN_V,
     dead_v: float = BATTERY_DEAD_V,
     floor_percent: float = SIGNAL_FLOOR_PERCENT,
+    quality_grade: Grade | None = None,
 ) -> DeviceHealth:
     """Thiết bị này còn báo được bao lâu nữa, và vì sao nó sẽ chết.
 
@@ -480,6 +490,7 @@ def assess_device_health(
         deliv_trend=deliv_trend,
         silent_days=silent_days,
         n=len(pts),
+        quality_grade=quality_grade,
         reasons=reasons,
     )
     return DeviceHealth(
@@ -505,6 +516,7 @@ def _rank_risk(
     deliv_trend: float | None,
     silent_days: float | None,
     n: int,
+    quality_grade: Grade | None,
     reasons: list[str],
 ) -> tuple[Risk, str | None, float | None]:
     """Xếp mức rủi ro. Thiết bị ĐÃ im thì không còn là dự đoán mà là sự thật."""
@@ -545,6 +557,16 @@ def _rank_risk(
     else:
         risk = "thấp"
 
+    # KHONG ket luan "thap" tren mot chuoi da bi cham la khong dung duoc. Man hinh
+    # hien "RUI RO THAP" canh "DU LIEU KHONG DUNG DUOC" la tu mau thuan, va no nghieng
+    # ve phia nguy hiem: im lang ve mot thiet bi ta khong biet gi. Chi ha ket luan
+    # LAC QUAN — rui ro cao/trung binh van giu, vi chung dua tren bang chung.
+    if risk == "thấp" and quality_grade == "không dùng được":
+        reasons.append(
+            "Không kết luận rủi ro thấp: chuỗi dữ liệu không đủ để đánh giá thiết bị."
+        )
+        return "chưa đủ dữ liệu", cause, dtf
+
     if dtf is not None:
         reasons.append(f"Ước tính còn {dtf:.0f} ngày trước khi mất tín hiệu ({cause}).")
     return risk, cause, dtf
@@ -583,7 +605,26 @@ def change_points(
     if len(pts) < 2 * MIN_TREND_SAMPLES:
         return []
     base = pts[0].at
-    xy = [(_days(base, s.at), float(s.volume_l or 0.0)) for s in pts]
+
+    # THƯA HOÁ TRƯỚC KHI PHÂN ĐOẠN. Vòng ứng viên là O(n) và mỗi ứng viên gọi
+    # Theil-Sen O(m²), nên tổng là O(n³): đo thật trên máy được 0.58 s ở n=240 nhưng
+    # 59.5 s ở n=810 — đúng số dòng thật của một bồn, và chạm trần 60 giây của hàm
+    # serverless. Cửa sổ 90 ngày sẽ timeout chắc chắn.
+    #
+    # Phân đoạn cần HÌNH DẠNG chuỗi, không cần từng điểm: 200 điểm trên cửa sổ 90
+    # ngày là độ phân giải ~11 giờ, vẫn mịn hơn min_segment_hours = 12. Giữ chỉ số
+    # gốc kèm theo để trả về đúng vị trí trong mảng ban đầu.
+    # Chia THỰC (không phải //): `len(pts) // CP_MAX_POINTS` cho ra 1 với mọi n dưới
+    # 2 lần trần, nghĩa là 337 điểm KHÔNG bị thưa gì cả và vẫn mất 11 giây. Trần chỉ
+    # là trần khi nó chặn ở mọi cỡ.
+    if len(pts) > CP_MAX_POINTS:
+        stride = len(pts) / CP_MAX_POINTS
+        idx = [int(i * stride) for i in range(CP_MAX_POINTS)]
+    else:
+        idx = list(range(len(pts)))
+    xy = [(_days(base, pts[i].at), float(pts[i].volume_l or 0.0)) for i in idx]
+    if len(xy) < 2 * MIN_TREND_SAMPLES:
+        return []
 
     def cost(seg: list[tuple[float, float]]) -> float:
         if len(seg) < 3:
@@ -601,7 +642,11 @@ def change_points(
             return
         whole = cost(xy[lo:hi])
         best, best_i = 0.0, -1
-        for i in range(lo + MIN_TREND_SAMPLES, hi - MIN_TREND_SAMPLES):
+        # Thưa cả vòng ỨNG VIÊN, không chỉ vòng điểm: mỗi ứng viên là hai lần khớp
+        # Theil-Sen, nên số ứng viên là hệ số nhân trực tiếp vào thời gian chạy. Độ
+        # phân giải vị trí cắt vốn đã thô hơn thế sau khi thưa điểm.
+        cand_step = max(1, (hi - lo) // CP_MAX_CANDIDATES)
+        for i in range(lo + MIN_TREND_SAMPLES, hi - MIN_TREND_SAMPLES, cand_step):
             if xy[i][0] - xy[lo][0] < min_days or xy[hi - 1][0] - xy[i][0] < min_days:
                 continue
             gain = whole - (cost(xy[lo:i]) + cost(xy[i:hi]))
@@ -610,7 +655,9 @@ def change_points(
         # Chỉ nhận nếu cắt giảm được trên 15% sai số. Không có sàn này thì thuật toán
         # luôn tìm ra "một chỗ cắt tốt hơn" và băm chuỗi thành vụn.
         if best_i > 0 and best > whole * 0.15:
-            cuts.append(best_i)
+            # idx[] map ve mang goc: hàm này hứa trả chỉ số theo `samples` truyền vào,
+            # nên trả chỉ số của mảng đã thưa sẽ lệch đúng bằng `step`.
+            cuts.append(idx[best_i])
             split(lo, best_i, depth - 1)
             split(best_i, hi, depth - 1)
 
