@@ -565,15 +565,28 @@ def check_admin_guards(
         rep.fail("guard admin/cron", "; ".join(problems))
         return
 
+    rep.ok("guard admin · từ chối", "token sai bị chặn 401")
     if not token:
-        rep.ok("guard admin", "từ chối token sai bằng 401 (không có token đúng để thử tiếp)")
+        rep.skip("guard admin · chấp nhận", "không có token nào để thử")
         return
+
     # Endpoint CHỈ ĐỌC. Cố ý KHÔNG gọi /api/admin/notify/run: nó gửi email thật.
     r = c.get("/api/admin/ingest/runs?limit=1", headers={"X-Admin-Token": token})
-    if r.status_code != 200:
-        rep.fail("guard admin", f"token đúng vẫn bị chặn: {r.status_code}")
-    else:
-        rep.ok("guard admin", "từ chối token sai · nhận token đúng (endpoint chỉ đọc)")
+    if r.status_code == 200:
+        rep.ok("guard admin · chấp nhận", "token đúng được nhận (qua endpoint chỉ đọc)")
+        return
+    if r.status_code == 401:
+        # KHÔNG kết luận "guard hỏng". Token mặc định lấy từ .env của MÁY NÀY, còn
+        # đích mặc định là production — hai giá trị khác nhau là chuyện thường (luân
+        # chuyển token, môi trường khác nhau). Bị từ chối thì không phân biệt được
+        # "token sai" với "guard chặn tất", nên kết quả trung thực là chưa kiểm được.
+        rep.skip(
+            "guard admin · chấp nhận",
+            "token đang có bị từ chối — rất có thể không phải token của server này; "
+            "truyền --admin-token / E2E_ADMIN_TOKEN đúng để kiểm mục này",
+        )
+        return
+    rep.fail("guard admin · chấp nhận", f"trả {r.status_code}, cần 200 hoặc 401")
 
 
 def check_no_vendor_leak(rep: Report, c: httpx.Client, psn: str) -> None:
@@ -663,6 +676,12 @@ def main() -> int:
     ap.add_argument("--user", default=os.environ.get("E2E_USERNAME"))
     ap.add_argument("--password", default=os.environ.get("E2E_PASSWORD"))
     ap.add_argument(
+        "--admin-token",
+        default=os.environ.get("E2E_ADMIN_TOKEN"),
+        help="ADMIN_TOKEN của SERVER ĐÍCH. Không truyền thì lấy từ .env của máy này, "
+        "vốn thường khác server production.",
+    )
+    ap.add_argument(
         "--allow-writes",
         action="store_true",
         help="cho phép PATCH dữ liệu (có baseline + assert phục hồi). Mặc định TẮT.",
@@ -699,7 +718,7 @@ def main() -> int:
                 check_alerts_match_data(rep, c, items, values)
             check_delivery_plan(rep, c, items)
             check_exports(rep, c, items, psn)
-            check_admin_guards(rep, c, anon, settings.admin_token)
+            check_admin_guards(rep, c, anon, args.admin_token or settings.admin_token)
             check_no_vendor_leak(rep, c, psn)
             if args.allow_writes:
                 check_writes(rep, c, psn)
