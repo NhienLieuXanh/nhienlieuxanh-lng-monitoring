@@ -121,6 +121,52 @@ def test_consumption_ignores_refill_jump() -> None:
     assert refills[0].amount_l > 7000
 
 
+def test_refill_steps_merge_into_one_event() -> None:
+    """Một chuyến xe bồn = MỘT bản ghi, dù nó sinh nhiều lần đọc tăng liên tiếp.
+
+    Lỗi thật trên production: nhật ký nạp hiện hai bản ghi cách nhau 64 giây
+    (0.009 -> 2.758 -> 3.258 m³) cho cùng một lần nạp, nên đếm sai số chuyến và chia
+    vụn lượng nạp. Ở đây mô phỏng đúng hình dạng đó: ba lần đọc tăng dần, cách nhau
+    một phút.
+    """
+    base = _series(start_l=3000.0, per_day_l=7400.0, hours=6)
+    t = base[-1].at
+    minute = timedelta(minutes=1)
+    fill = [
+        Sample(at=t + minute, volume_l=5000.0, pressure_mpa=0.1),
+        Sample(at=t + 2 * minute, volume_l=8000.0, pressure_mpa=0.1),
+        Sample(at=t + 3 * minute, volume_l=9000.0, pressure_mpa=0.1),
+    ]
+    after = _series(start_l=9000.0, per_day_l=7400.0, hours=6, t0=t + 4 * minute)
+
+    events = detect_refills(base + fill + after, capacity_l=CAP)
+    assert len(events) == 1, f"phải gộp thành một đợt, đang có {len(events)}"
+    ev = events[0]
+    # Trước = mức ngay trước bước tăng đầu; sau = mức ở đỉnh đợt.
+    assert ev.before_l == base[-1].volume_l
+    assert ev.after_l == 9000.0
+    assert abs(ev.amount_l - (9000.0 - (base[-1].volume_l or 0.0))) < 1e-6
+    assert ev.at == t + 3 * minute
+
+
+def test_two_deliveries_far_apart_stay_separate() -> None:
+    """Ngưỡng gộp không được rộng tới mức nuốt hai chuyến khác nhau trong ngày."""
+    a = _series(start_l=3000.0, per_day_l=7400.0, hours=2)
+    t1 = a[-1].at
+    first = [Sample(at=t1 + timedelta(minutes=1), volume_l=6000.0, pressure_mpa=0.1)]
+    # Rút tiếp 5 giờ — xa hơn REFILL_MERGE_HOURS — rồi nạp lần hai.
+    mid = _series(
+        start_l=6000.0, per_day_l=7400.0, hours=5, t0=t1 + timedelta(minutes=31)
+    )
+    t2 = mid[-1].at
+    second = [Sample(at=t2 + timedelta(minutes=1), volume_l=9000.0, pressure_mpa=0.1)]
+
+    events = detect_refills(a + first + mid + second, capacity_l=CAP)
+    assert len(events) == 2, f"phải là hai đợt riêng, đang có {len(events)}"
+    assert events[0].after_l == 6000.0
+    assert events[1].after_l == 9000.0
+
+
 def test_consumption_excludes_offline_gap() -> None:
     """Một tuần offline KHÔNG được kéo mức dùng/ngày xuống gần 0.
 

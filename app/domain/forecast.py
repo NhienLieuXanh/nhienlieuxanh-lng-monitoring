@@ -57,6 +57,12 @@ MAX_GAP = timedelta(hours=3)
 #: Cửa sổ "nghỉ" tối thiểu để hồi quy boil-off / áp suất.
 MIN_IDLE_WINDOW = timedelta(hours=6)
 
+#: Các bước tăng liên tiếp cách nhau dưới mức này thuộc CÙNG một đợt nạp. Một chuyến
+#: xe bồn bơm 20-60 phút và sinh nhiều lần đọc tăng; 2 giờ đủ rộng để phủ cả chuyến
+#: kể cả khi thiết bị báo dày (đã thấy hai lần đọc cách nhau 64 giây trong lúc nạp),
+#: và đủ hẹp để hai chuyến khác nhau trong ngày không bị gộp thành một.
+REFILL_MERGE_HOURS = 2.0
+
 #: z-score theo mức phục vụ (service level) cho dự trữ an toàn. Đây là bảng
 #: tra một phía của phân phối chuẩn — cùng công thức reorder point mà kho vận
 #: dùng: ROP = nhu cầu trong lead time + z·σ·√lead_time.
@@ -136,18 +142,49 @@ class RefillEvent:
 def detect_refills(
     samples: list[Sample], *, capacity_l: float | None = None
 ) -> list[RefillEvent]:
-    """Mọi bước nhảy tăng vượt ``refill_floor_l`` giữa hai lần đọc liền nhau.
+    """Các ĐỢT nạp, không phải từng bước nhảy tăng.
 
-    Không đòi hai lần đọc phải gần nhau: nếu thiết bị offline suốt lúc nạp thì
-    bước nhảy vẫn hiện ra ở cặp bao quanh khoảng trống, và thời điểm ghi nhận là
-    lần đọc SAU — muộn hơn thực tế nhưng không bỏ sót lần nạp.
+    Không đòi hai lần đọc phải gần nhau: nếu thiết bị offline suốt lúc nạp thì bước
+    nhảy vẫn hiện ra ở cặp bao quanh khoảng trống, và thời điểm ghi nhận là lần đọc
+    SAU — muộn hơn thực tế nhưng không bỏ sót lần nạp.
+
+    GỘP các bước tăng liên tiếp thành một đợt. Một chuyến xe bồn bơm 20-60 phút và
+    sinh NHIỀU lần đọc tăng liên tiếp, mỗi lần đều có thể vượt ``refill_floor_l``
+    (2% dung tích). Bản trước phát một sự kiện cho MỖI CẶP, nên trên dữ liệu thật một
+    lần nạp hiện thành hai bản ghi cách nhau 64 giây (0.009 -> 2.758 -> 3.258 m³):
+    nhật ký nạp đếm sai số chuyến và lượng nạp bị chia vụn.
+
+    Đợt kết thúc khi mức thôi tăng (bồn bắt đầu vơi thì đợt tự chấm dứt) hoặc khi
+    khoảng cách giữa hai lần đọc vượt ``REFILL_MERGE_HOURS``. Ngưỡng thời gian là cần
+    thiết: hai chuyến xe cách nhau nửa ngày KHÔNG được gộp thành một.
     """
     floor = refill_floor_l(capacity_l)
+    noise = noise_floor_l(capacity_l)
     pts = _volume_points(samples)
     out: list[RefillEvent] = []
-    for (_, v0), (t1, v1) in pairwise(pts):
-        if v1 - v0 >= floor:
-            out.append(RefillEvent(at=t1, before_l=v0, after_l=v1, amount_l=v1 - v0))
+    merge_gap = timedelta(hours=REFILL_MERGE_HOURS)
+
+    i = 0
+    while i < len(pts) - 1:
+        v0 = pts[i][1]
+        if pts[i + 1][1] - v0 < floor:
+            i += 1
+            continue
+        # Mở một đợt. Kéo dài khi lần đọc kế tiếp VẪN tăng — chỉ cần trên nhiễu, không
+        # cần lại vượt ngưỡng nạp, vì nhịp cuối của một chuyến bơm thường nhỏ — và vẫn
+        # liền mạch về thời gian.
+        j = i + 1
+        while j < len(pts) - 1:
+            t_cur, v_cur = pts[j]
+            t_next, v_next = pts[j + 1]
+            if t_next - t_cur > merge_gap or v_next - v_cur <= noise:
+                break
+            j += 1
+        t_end, v_end = pts[j]
+        out.append(
+            RefillEvent(at=t_end, before_l=v0, after_l=v_end, amount_l=v_end - v0)
+        )
+        i = j
     return out
 
 

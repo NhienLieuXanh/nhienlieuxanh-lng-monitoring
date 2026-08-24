@@ -561,6 +561,9 @@
     .an-tile dd { font-family: var(--mono); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; color: var(--fg); }
     .an-tile dd small { font-family: var(--font); font-size: var(--fs-tiny); color: var(--muted); margin-left: 3px; }
     .an-sub { font-size: var(--fs-micro); color: var(--faint); margin-top: 2px; }
+    .an-empty { margin-bottom: 8px; padding: 7px 10px; border-radius: var(--r-sm);
+                font-size: var(--fs-prose); line-height: 1.6;
+                color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
     /* Cùng khuôn thu gọn với .fc-why của thẻ dự báo. Sáu ô số phía trên đã trả lời
        câu hỏi chính; 10 dòng lý do là để tra khi cần cãi lại con số, không phải để
        đọc mỗi lần mở trang. Một loại nội dung thì một kiểu trình bày. */
@@ -939,6 +942,7 @@
               không lỗi phông chữ. Nếu máy của bạn dùng dấu chấm phẩy làm dấu phân tách,
               hãy chọn lại ở ô tương ứng.
             </p>
+            <p class="hint" id="rep-anchor"></p>
             <div class="rep-row">
               <label>Bồn
                 <select id="rep-tank" class="field"></select>
@@ -1010,10 +1014,14 @@
           <span class="meta" id="an-meta">Sức khoẻ thiết bị, chất lượng dữ liệu, bất thường</span>
           <div class="an-ctl">
             <label>Cửa sổ
+              <!-- Mặc định 90 ngày, không phải 30. Dữ liệu của đội bồn hiện tại kết
+                   ở 30 và 81 ngày trước, nên cửa sổ 30 ngày trả về rỗng sạch và trang
+                   đọc lên như chưa làm xong. Cửa sổ mặc định phải chứa được dữ liệu. -->
               <select id="an-window" class="field">
                 <option value="7">7 ngày</option>
-                <option value="30" selected>30 ngày</option>
-                <option value="90">90 ngày</option>
+                <option value="30">30 ngày</option>
+                <option value="90" selected>90 ngày</option>
+                <option value="180">180 ngày</option>
               </select>
             </label>
           </div>
@@ -2116,11 +2124,29 @@
       sel.innerHTML = tanks.map(t =>
         `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`).join("");
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
+      applyRepDates();
+    }
+
+    // Neo khoảng ngày vào LẦN ĐO CUỐI của bồn, không phải vào "hôm nay".
+    // Mặc định cũ là 30 ngày tính từ hôm nay. Với đội bồn hiện tại — dữ liệu kết ở
+    // 30 và 81 ngày trước — nó luôn trả về file rỗng, và người dùng kết luận rất hợp
+    // lý rằng chức năng xuất báo cáo chỉ là mockup. Một khoảng ngày không chứa dữ
+    // liệu nào thì không phải mặc định trung lập, nó là mặc định sai.
+    function applyRepDates() {
+      const sel = document.getElementById("rep-tank");
       const from = document.getElementById("rep-from"), to = document.getElementById("rep-to");
-      // Mặc định 30 ngày gần nhất: nằm trong trần 90 ngày của API và là khoảng
-      // người ta thực sự xuất hằng tháng.
-      if (to && !to.value) to.value = isoDate(new Date());
-      if (from && !from.value) from.value = isoDate(new Date(Date.now() - 29 * 86400000));
+      const note = document.getElementById("rep-anchor");
+      if (!sel || !from || !to) return;
+      const tank = tanks.find(t => t.psn === sel.value);
+      const last = tank && tank.last_seen_at ? new Date(tank.last_seen_at) : null;
+      const anchor = last || new Date();
+      to.value = isoDate(anchor);
+      from.value = isoDate(new Date(anchor.getTime() - 29 * 86400000));
+      if (note) {
+        note.textContent = last
+          ? `Khoảng mặc định kết ở lần đo cuối của bồn (${fmtWhen(tank.last_seen_at)}), không phải hôm nay — chọn hôm nay sẽ ra file rỗng.`
+          : "Bồn này chưa có lần đo nào.";
+      }
     }
 
     // Tải qua fetch + blob chứ KHÔNG dùng <a href> trực tiếp: nếu server trả 422
@@ -2207,6 +2233,19 @@
           <span><b>${esc(x.kind)}</b> — ${esc(x.note)}</span>
         </div>`).join("");
 
+      // 0 mẫu trong cửa sổ: nói THẲNG vì sao rỗng và nói luôn cách xem được. Một thẻ
+      // toàn dấu "--" đọc lên như tính năng chưa làm xong — người dùng đã kết luận
+      // đúng như vậy, và đó là lỗi của cách trình bày chứ không phải của họ.
+      const tk = tanks.find(x => x.psn === a.psn);
+      const ageD = tk && tk.last_seen_at
+        ? Math.floor((Date.now() - new Date(tk.last_seen_at).getTime()) / 86400000) : null;
+      const emptyWhy = (q.samples === 0)
+        ? `<p class="an-empty">Không có lần đo nào trong ${Math.round(a.window_days)} ngày.${
+            ageD != null ? ` Lần đo cuối cách đây <b>${ageD} ngày</b>${
+              ageD > a.window_days ? ` — chọn cửa sổ rộng hơn để xem lịch sử.` : "."}` : ""
+          }</p>`
+        : "";
+
       return `<div class="an-card ${RISK_CARD[h.risk] || "r-nd"}">
         <div class="an-head">
           <span class="an-name">${esc(a.name || a.psn)}</span>
@@ -2214,6 +2253,7 @@
           <span class="an-tag ${RISK_CLS[h.risk] || ""}">Rủi ro ${esc(h.risk || "--")}</span>
           <span class="an-tag ${GRADE_CLS[q.grade] || ""}">Dữ liệu ${esc(q.grade || "--")}</span>
         </div>
+        ${emptyWhy}
         <div class="an-grid">
           ${anTile("Còn báo được", esc(headline),
                    h.likely_cause ? esc(h.likely_cause) : "Chưa đoán được thời điểm",
@@ -2275,6 +2315,16 @@
       }
     }
 
+    // Cửa sổ nhật ký nạp. DÙNG CHUNG cho bảng trên màn hình và file tải về: hai chỗ
+    // lệch khoảng thì người dùng xuất file ra và thấy số dòng khác hẳn cái vừa xem.
+    function refillWindowDays(psn) {
+      const id = psn || (document.getElementById("rep-tank") || {}).value;
+      const tk = tanks.find(t => t.psn === id);
+      const age = tk && tk.last_seen_at
+        ? Math.floor((Date.now() - new Date(tk.last_seen_at).getTime()) / 86400000) : 0;
+      return Math.min(365, 90 + Math.max(0, age));
+    }
+
     async function loadRefills() {
       const body = document.getElementById("refill-body");
       if (!body) return;
@@ -2284,14 +2334,23 @@
         return;
       }
       try {
-        const rows = await api(`/api/refills/${encodeURIComponent(psn)}?window_days=90`);
+        // API tính cửa sổ từ THỜI ĐIỂM HIỆN TẠI nên không dịch được điểm neo; cách
+        // duy nhất để chạm tới dữ liệu cũ là nới rộng. 90 ngày cộng tuổi lần đo cuối,
+        // chặn ở 365 (trần của API). Bồn báo bình thường thì vẫn đúng 90 ngày.
+        const tk = tanks.find(t => t.psn === psn);
+        const ageDays = tk && tk.last_seen_at
+          ? Math.floor((Date.now() - new Date(tk.last_seen_at).getTime()) / 86400000) : 0;
+        const win = refillWindowDays(psn);
+        const rows = await api(`/api/refills/${encodeURIComponent(psn)}?window_days=${win}`);
         body.innerHTML = rows.length
           ? rows.map(e => `<tr>
               <td>${esc(fmtWhen(e.at))}</td>
               <td class="num">${esc(fmtM3(e.before_l))}</td>
               <td class="num">${esc(fmtM3(e.after_l))}</td>
               <td class="num">+${esc(fmtM3(e.amount_l))}</td></tr>`).join("")
-          : `<tr><td colspan="4" class="empty">Không có lần nạp nào trong 90 ngày gần nhất.</td></tr>`;
+          : `<tr><td colspan="4" class="empty">Không có lần nạp nào trong ${win} ngày gần nhất${
+              ageDays > 90 ? ` (đã nới từ 90 ngày vì lần đo cuối cách đây ${ageDays} ngày)` : ""
+            }.</td></tr>`;
       } catch (e) {
         if (e.name === "AuthError") return;
         body.innerHTML = `<tr><td colspan="4" class="empty">${esc(e.message)}</td></tr>`;
@@ -2660,13 +2719,14 @@
       document.getElementById("p-use-measured").addEventListener("click", useMeasuredDaily);
 
       // Báo cáo
-      document.getElementById("rep-tank").addEventListener("change", loadRefills);
+      document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); });
       document.getElementById("an-window").addEventListener("change", loadAnalytics);
       document.getElementById("btn-trips").addEventListener("click", loadTrips);
       document.getElementById("dl-tanks").addEventListener("click", () =>
         dlCsv(`/api/export/tanks.csv?delimiter=${repDelim()}`, "tong_hop_bon.csv"));
       document.getElementById("dl-refills").addEventListener("click", () =>
-        dlCsv(`/api/export/refills.csv?window_days=90&delimiter=${repDelim()}`, "nhat_ky_nap.csv"));
+        dlCsv(`/api/export/refills.csv?window_days=${refillWindowDays()}&delimiter=${repDelim()}`,
+              "nhat_ky_nap.csv"));
       document.getElementById("dl-telemetry").addEventListener("click", () => {
         const psn = document.getElementById("rep-tank").value;
         if (!psn) { showError("Chưa chọn bồn để xuất dữ liệu đo."); return; }
