@@ -451,7 +451,27 @@
     .plan-table td { padding: 7px 11px; border-bottom: 1px solid var(--line-soft); }
     .plan-table tr.is-fill { background: var(--sel); }
     .plan-table td.low { color: var(--crit); font-weight: 700; }
-    .plan-table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--brand); }
+    /* Vung bam 44x44 nhung o hien thi van 18px. KHONG dung transform: scale() de
+       thu nho: vung nhan click co theo transform, tuc la van 16px nhu truoc — dung
+       cach do la sua ve nhin ma khong sua duoc thu can sua.
+       Doi lai: dong bang cao 44px thay vi 30px. Da bo padding doc cua o de dong
+       khong thanh 58px. */
+    .plan-table input[type="checkbox"] {
+      appearance: none; -webkit-appearance: none;
+      width: 44px; height: 44px; margin: 0; padding: 0; border: 0;
+      background: transparent; cursor: pointer; display: grid; place-content: center;
+    }
+    .plan-table input[type="checkbox"]::before {
+      content: ""; width: 18px; height: 18px; border-radius: 4px;
+      border: 1.5px solid var(--line); background: var(--surface-2);
+    }
+    .plan-table input[type="checkbox"]:hover::before { border-color: var(--brand); }
+    .plan-table input[type="checkbox"]:checked::before {
+      border-color: var(--brand-solid);
+      background: var(--brand-solid) center / 12px 12px no-repeat
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+    }
+    .plan-table td.c { padding-top: 0; padding-bottom: 0; }
     .tag-fill { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--brand); background: var(--sel); padding: 2px 9px; border-radius: 999px; }
     .plan-table td.trigger { color: var(--warn); font-weight: 700; background: var(--warn-bg); }
     .plan-params .p-wide { grid-column: 1 / -1; }
