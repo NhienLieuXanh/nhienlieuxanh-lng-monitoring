@@ -41,7 +41,7 @@
       --line-soft: #1a2740;
       --fg: #e8edf5;
       --muted: #93a1b8;
-      --faint: #64748b;
+      --faint: #838fa3;
       --brand: #4f8ff7;
       --brand-strong: #3b82f6;
       /* Nen DAC cho nut/chip co chu trang. --brand va --brand-strong o theme toi
@@ -93,14 +93,14 @@
       --line-soft: #e7ebf1;
       --fg: #0f1a2c;
       --muted: #516074;
-      --faint: #7b8798;
+      --faint: #616d7b;
       --brand: #0d4fb5;
       --brand-strong: #0d4fb5;
       --brand-solid: #0d4fb5;
       --on-crit: #ffffff;
       --nlx: #15803d;
-      --ok: #15803d;   --ok-bg: #e3f5e9;   --ok-line: #b7e4c3;
-      --warn: #b45309; --warn-bg: #fbeecf; --warn-line: #ead3a0;
+      --ok: #146c34;   --ok-bg: #e3f5e9;   --ok-line: #b7e4c3;
+      --warn: #92400e; --warn-bg: #fbeecf; --warn-line: #ead3a0;
       --crit: #c02718; --crit-bg: #fdeae7; --crit-line: #f2c4bd;
       --sel: #e0edfd;
       --ring: #0d4fb5;
@@ -126,7 +126,7 @@
        quanh; selector theo class (.nav-item, .btn-dl…) vẫn thắng nhờ độ đặc hiệu. */
     input, select, textarea, button { font: inherit; }
     .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
-    .skip { position: absolute; left: -999px; top: 0; background: var(--brand-solid); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
+    .skip { position: absolute; left: -999px; top: 0; background: var(--brand-solid); color: #fff; min-height: 44px; display: flex; align-items: center; padding: 0 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
     .skip:focus { left: 0; top: 0; }
 
     /* ============ BUTTONS ============ */
@@ -146,7 +146,9 @@
     .btn-primary:hover { filter: brightness(1.1); background: var(--brand-solid); }
     .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
     .btn-quiet:hover { background: var(--surface-3); color: var(--fg); }
-    .icon-btn { min-height: 34px; width: 34px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
+    /* 44x44 la nguong vung bam toi thieu. Giu icon 17px ben trong, chi mo rong vung
+   bam: nut 34x34 tren tablet o kho la thu nguoi ta bam truot. */
+    .icon-btn { min-height: 44px; width: 44px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
     .icon-btn svg { width: 17px; height: 17px; }
     svg { flex: 0 0 auto; }
 
@@ -196,7 +198,7 @@
     .nav-group { color: var(--faint); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 12px 10px 4px; white-space: nowrap; }
     .nav-item {
       display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
-      min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+      min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
       background: transparent; color: var(--muted); font-weight: 500; font-size: var(--fs-md); white-space: nowrap;
     }
     .nav-item svg { width: 18px; height: 18px; stroke-width: 1.9; }
@@ -217,7 +219,7 @@
     }
     .side-foot { border-top: 1px solid var(--line-soft); padding: 8px; flex: 0 0 auto; }
     .rail-toggle {
-      width: 100%; justify-content: flex-start; gap: 11px; min-height: 38px; padding: 0 10px;
+      width: 100%; justify-content: flex-start; gap: 11px; min-height: 44px; padding: 0 10px;
       border: 0; background: transparent; color: var(--muted); border-radius: var(--r-sm); white-space: nowrap;
     }
     .rail-toggle svg { width: 18px; height: 18px; transition: transform .18s ease; }
