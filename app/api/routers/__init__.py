@@ -8,6 +8,7 @@ from app.api.routers import (
     export,
     forecast,
     ops,
+    report,
     settings,
     telemetry,
     terminals,
@@ -21,6 +22,7 @@ api_router.include_router(telemetry.router)
 api_router.include_router(forecast.router)
 api_router.include_router(analytics.router)
 api_router.include_router(export.router)
+api_router.include_router(report.router)
 api_router.include_router(settings.router)
 
 __all__ = ["api_router"]

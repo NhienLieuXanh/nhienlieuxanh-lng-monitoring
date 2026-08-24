@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from app.domain import forecast as fc
 from app.domain.alerts import AlertThresholds, TerminalSnapshot, evaluate
 from app.domain.alerts import fill_percent as _fill_percent
+from app.domain.smtp_errors import explain as explain_smtp
 from app.repositories import notifications as notif_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
@@ -196,7 +197,10 @@ def notify(session: Session, settings: ConfigLike, now: datetime) -> NotifyStats
     try:
         send_email(cfg, subject, body)
     except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"
+        # Cùng câu dịch với màn hình Cài đặt: chuỗi này được ghi vào
+        # notifications.detail và người vận hành đọc nó ở trang nhật ký thông báo,
+        # nên nó phải nói việc cần làm chứ không chỉ nói máy chủ đã từ chối.
+        error = explain_smtp(exc)
         log.error("notify: gửi email thất bại: %s", error)
 
     status = "failed" if error else "sent"

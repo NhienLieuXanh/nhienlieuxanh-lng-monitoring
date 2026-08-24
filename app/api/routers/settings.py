@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import SessionDep, SettingsDep, UserDep
 from app.api.schemas import ActionOut, SettingsIn, SettingsOut
+from app.domain.smtp_errors import explain as explain_smtp
 from app.repositories import app_settings as store
 from app.services import notifier
 from app.services.appconfig import EffectiveConfig, load_config
@@ -132,11 +133,12 @@ def test_email(session: SessionDep, settings: SettingsDep, user: UserDep) -> Act
     try:
         notifier.send_email(cfg, subject, body)
     except Exception as exc:
-        # Trả nguyên loại lỗi + thông điệp SMTP: đây là màn hình cấu hình, người
-        # dùng CẦN biết "sai mật khẩu" khác "sai cổng". Không có tên vendor
-        # telemetry nào trong chuỗi này nên không vi phạm nguyên tắc chống rò.
+        # Dịch thành việc-cần-làm rồi mới kèm chi tiết kỹ thuật. Trả nguyên văn
+        # lỗi smtplib là đúng về kỹ thuật nhưng vô dụng với người vận hành kho:
+        # "535 5.7.139 SmtpClientAuthentication is disabled for the Tenant" và
+        # "sai mật khẩu" đọc y như nhau, trong khi việc phải làm thì khác hẳn.
         log.warning("settings: gửi email thử thất bại: %s", exc)
-        return ActionOut(ok=False, message=f"{type(exc).__name__}: {exc}")
+        return ActionOut(ok=False, message=explain_smtp(exc))
     return ActionOut(
         ok=True,
         message=f"Đã gửi thư kiểm tra tới {', '.join(cfg.alert_email_list)}",

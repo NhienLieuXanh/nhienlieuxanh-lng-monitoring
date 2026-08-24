@@ -17,6 +17,16 @@
         if (localStorage.getItem("nlx-rail") === "1") document.documentElement.classList.add("rail-collapsed");
       } catch (_) { document.documentElement.setAttribute("data-theme", "light"); }
     })();
+
+    // Ảnh logo chữ không tải được (chưa đặt file, hoặc sai tên) -> hiện khối chữ
+    // dự phòng. Định nghĩa ở <head> chứ không ở cuối <body>: onerror của một ảnh
+    // 404 có thể nổ trước khi script cuối trang được phân tích, và lúc đó hàm chưa
+    // tồn tại nên khung ảnh vỡ đứng lại trên màn hình đăng nhập.
+    function brandFallback(img) {
+      img.hidden = true;
+      var f = img.parentElement && img.parentElement.querySelector(".brand-txt");
+      if (f) f.hidden = false;
+    }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -154,6 +164,16 @@
     .side-brand img { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
     .side-brand .txt { min-width: 0; white-space: nowrap; }
     .side-brand .name { font-weight: 700; font-size: var(--fs-lg); letter-spacing: -.01em; line-height: 1.1; }
+    /* Logo chữ dùng ẢNH — dựng lại bằng chữ là vẽ sai logo. Khối chữ dự phòng chỉ
+       hiện khi ảnh lỗi, và [hidden] ở đây PHẢI có !important: .brand-mark là flex
+       nên display của flex item thắng thuộc tính hidden của HTML. Đúng cái bẫy đã
+       từng làm hai trang hiện chồng lên nhau. */
+    .brand-mark { display: flex; align-items: center; min-width: 0; }
+    .brand-mark [hidden] { display: none !important; }
+    .brand-img { display: block; width: auto; max-width: 100%; }
+    .side-brand .brand-img { height: 24px; }
+    .login-brand .brand-mark { justify-content: center; }
+    .login-brand .brand-img { height: 42px; }
     .side-brand .name .gas { color: var(--brand); } .side-brand .name .nlx { color: var(--nlx); }
     .side-brand .sub { color: var(--muted); font-size: var(--fs-tiny); }
     .nav { flex: 1; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
@@ -661,6 +681,18 @@
       gap: 3px;
     }
     .smtp-guide li b { color: var(--fg); }
+    /* Cảnh báo trong hướng dẫn: dùng cho việc người vận hành KHÔNG tự làm được
+       và phải nhờ người khác — nó cần khác màu với các bước tự làm, nếu không
+       người ta thử đi thử lại một việc bất khả thi. */
+    .smtp-guide .gnote {
+      display: block;
+      margin-top: 8px;
+      padding: 7px 9px;
+      border-left: 3px solid var(--warn);
+      background: var(--warn-bg);
+      color: var(--fg);
+      border-radius: var(--r-sm);
+    }
     .smtp-guide li code {
       font-family: var(--mono);
       font-size: var(--fs-tiny);
@@ -703,8 +735,15 @@
   <div id="login-gate" class="login-gate" role="dialog" aria-modal="true" aria-labelledby="login-title">
     <div class="login-card">
       <div class="login-brand">
-        <img src="logo-gx.png" width="60" height="60" alt="GAS Nhiên Liệu Xanh" />
-        <h1 id="login-title"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></h1>
+        <img src="logo-gx.png" width="60" height="60" alt="" />
+        <!-- Logo chữ là ẢNH, không dựng lại bằng chữ: dựng lại bằng chữ là vẽ sai
+             logo — sai phông, sai màu, sai khoảng chữ. Khối .brand-txt chỉ hiện khi
+             ảnh không tải được, để trang vẫn có định danh thay vì một khung ảnh vỡ. -->
+        <h1 id="login-title" class="brand-mark">
+          <img class="brand-img" src="logo-nlx.png" alt="GAS Nhiên Liệu Xanh"
+               onerror="brandFallback(this)" />
+          <span class="brand-txt" hidden><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></span>
+        </h1>
         <p>Giám sát bồn LNG nội bộ. Đăng nhập bằng tài khoản giám sát thiết bị của công ty.</p>
       </div>
       <form class="login-form" id="login-form" autocomplete="on">
@@ -731,7 +770,11 @@
       <div class="side-brand">
         <img src="logo-gx.png" width="30" height="30" alt="" />
         <div class="txt">
-          <div class="name"><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></div>
+          <div class="name brand-mark">
+            <img class="brand-img" src="logo-nlx.png" alt="GAS Nhiên Liệu Xanh"
+                 onerror="brandFallback(this)" />
+            <span class="brand-txt" hidden><span class="gas">GAS</span> <span class="nlx">Nhiên Liệu Xanh</span></span>
+          </div>
           <div class="sub">Giám sát LNG</div>
         </div>
       </div>
@@ -932,15 +975,45 @@
       <section id="view-reports" class="reports" hidden aria-label="Báo cáo và nhật ký">
         <div class="pane-head">
           <h1>Báo cáo</h1>
-          <span class="meta">Xuất dữ liệu định dạng CSV, mở trực tiếp bằng Excel</span>
+          <span class="meta">Báo cáo trình ký in ra PDF, và dữ liệu thô dạng CSV cho Excel</span>
         </div>
         <div class="rep-scroll">
+          <!-- Báo cáo hoàn chỉnh đứng TRƯỚC các nút CSV: đây là thứ người ta mang đi
+               họp và trình ký, còn CSV là dữ liệu thô để tự tính lại. Đặt CSV lên
+               trước thì người dùng tải file thô rồi tự dựng báo cáo bằng tay. -->
           <div class="rep-card">
-            <h3>Xuất báo cáo</h3>
+            <h3>Báo cáo giám sát bồn LNG (bản trình ký)</h3>
             <p class="hint">
-              File dùng mã hoá UTF-8 và mốc thời gian theo giờ Việt Nam, mở bằng Excel
-              không lỗi phông chữ. Nếu máy của bạn dùng dấu chấm phẩy làm dấu phân tách,
-              hãy chọn lại ở ô tương ứng.
+              Một tài liệu hoàn chỉnh: tóm tắt điều hành, hiện trạng từng bồn, tiêu thụ và
+              dự báo, chất lượng dữ liệu và sức khoẻ thiết bị, nhật ký nạp, cảnh báo đang mở,
+              ghi chú phương pháp và ô chữ ký. Mở ra tab mới, bấm <b>In / Lưu thành PDF</b>
+              trong tab đó để có tệp gửi đi.
+            </p>
+            <div class="rep-row">
+              <label>Phạm vi
+                <select id="rp-scope" class="field"></select>
+              </label>
+              <label>Kỳ báo cáo
+                <select id="rp-win" class="field">
+                  <option value="7">7 ngày</option>
+                  <option value="30" selected>30 ngày</option>
+                  <option value="90">90 ngày</option>
+                  <option value="180">180 ngày</option>
+                </select>
+              </label>
+            </div>
+            <div class="rep-row" style="margin-top:10px">
+              <button type="button" class="btn-primary-sm" id="rp-open">Mở báo cáo để in</button>
+            </div>
+            <p class="hint" id="rp-note" style="margin:8px 0 0"></p>
+          </div>
+
+          <div class="rep-card">
+            <h3>Xuất dữ liệu thô (CSV)</h3>
+            <p class="hint">
+              Dành cho việc tự tính lại bằng Excel. File dùng mã hoá UTF-8 và mốc thời gian
+              theo giờ Việt Nam, mở bằng Excel không lỗi phông chữ. Nếu máy của bạn dùng dấu
+              chấm phẩy làm dấu phân tách, hãy chọn lại ở ô tương ứng.
             </p>
             <p class="hint" id="rep-anchor"></p>
             <div class="rep-row">
@@ -1086,7 +1159,8 @@
                 <span class="set-lbl">1. Nhà cung cấp thư</span>
                 <select id="s-provider" class="field">
                   <option value="gmail">Gmail</option>
-                  <option value="outlook">Outlook · Microsoft 365</option>
+                  <option value="outlook">Outlook.com · Hotmail (thư cá nhân)</option>
+                  <option value="m365">Microsoft 365 (thư công ty)</option>
                   <option value="custom">Khác (máy chủ riêng của công ty)</option>
                 </select>
               </label>
@@ -1101,6 +1175,33 @@
                 <li>Đặt tên ứng dụng (ví dụ: <code>LNG</code>) rồi bấm <b>Tạo</b>.</li>
                 <li>Sao chép mã <b>16 chữ cái</b> và dán vào ô Mật khẩu ứng dụng bên dưới.</li>
               </ol>
+            </div>
+
+            <!-- Outlook.com/Hotmail cá nhân: máy chủ smtp-mail.outlook.com, KHÁC
+                 với Microsoft 365 công ty. Gộp hai thứ này vào một mục là sai với
+                 một trong hai bên, nên tách hẳn thành hai lựa chọn. -->
+            <div id="s-guide-outlook" class="smtp-guide" hidden>
+              <b>Cách lấy Mật khẩu ứng dụng cho thư Outlook.com / Hotmail:</b>
+              <ol>
+                <li>Bật <b>Xác minh hai bước</b> cho tài khoản Microsoft (nếu chưa bật).</li>
+                <li>Mở <b>account.microsoft.com/security</b> rồi vào <b>Tuỳ chọn bảo mật nâng cao</b>.</li>
+                <li>Chọn <b>Tạo mật khẩu ứng dụng mới</b>.</li>
+                <li>Sao chép mật khẩu vừa tạo và dán vào ô Mật khẩu ứng dụng bên dưới.</li>
+              </ol>
+            </div>
+
+            <div id="s-guide-m365" class="smtp-guide" hidden>
+              <b>Thư công ty trên Microsoft 365:</b>
+              <ol>
+                <li>Nhập địa chỉ thư công ty và mật khẩu của chính hộp thư đó ở Bước 2.</li>
+                <li>Bấm <b>Lưu và gửi thư kiểm tra</b> để biết tổ chức có cho gửi hay không.</li>
+              </ol>
+              <span class="gnote">
+                Microsoft <b>khoá gửi thư qua SMTP theo mặc định</b>. Nếu thư kiểm tra
+                báo lỗi khoá, đây không phải do bạn nhập sai: nhờ người quản trị
+                Microsoft 365 bật <b>Authenticated SMTP</b> cho hộp thư này, hoặc dùng
+                một hộp thư Gmail riêng cho cảnh báo.
+              </span>
             </div>
 
             <!-- Bước 2: Chỉ nhập địa chỉ thư và mật khẩu ứng dụng -->
@@ -2125,6 +2226,7 @@
         `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`).join("");
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
       applyRepDates();
+      renderRpScope();
     }
 
     // Neo khoảng ngày vào LẦN ĐO CUỐI của bồn, không phải vào "hôm nay".
@@ -2177,6 +2279,69 @@
     }
 
     function repDelim() { return document.getElementById("rep-delim").value; }
+
+    function renderRpScope() {
+      const sel = document.getElementById("rp-scope");
+      if (!sel) return;
+      const keep = sel.value;
+      sel.innerHTML = `<option value="">Toàn bộ bồn (${tanks.length})</option>` + tanks.map(t =>
+        `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`).join("");
+      // Giữ lựa chọn cũ. "" là giá trị HỢP LỆ (toàn bộ bồn) nên không thể dùng
+      // `if (keep)` để quyết định gán lại — làm vậy thì mỗi lần làm mới dữ liệu,
+      // người đang xem một bồn cụ thể bị đẩy về "toàn bộ".
+      if (keep === "" || tanks.some(t => t.psn === keep)) sel.value = keep;
+      applyRpNote();
+    }
+
+    // Nói trước kỳ báo cáo sẽ kết ở đâu. Server neo kỳ vào lần đo cuối, nên nếu
+    // không nói ra thì người dùng bấm xong mới thấy ngày lạ và tưởng hệ thống sai.
+    function applyRpNote() {
+      const note = document.getElementById("rp-note");
+      if (!note) return;
+      const sel = document.getElementById("rp-scope");
+      const scope = sel ? sel.value : "";
+      const pool = scope ? tanks.filter(t => t.psn === scope) : tanks;
+      const stamps = pool.map(t => t.last_seen_at).filter(Boolean).map(s => new Date(s).getTime());
+      if (!stamps.length) {
+        note.textContent = "Chưa có lần đo nào trong phạm vi này — báo cáo sẽ trống.";
+        return;
+      }
+      const end = new Date(Math.max.apply(null, stamps));
+      const ageDays = (Date.now() - end.getTime()) / 86400000;
+      note.textContent = ageDays > 1
+        ? `Kỳ báo cáo kết ở lần đo cuối (${fmtWhen(end.toISOString())}), không phải hôm nay — số liệu đã cũ ${ageDays.toFixed(1)} ngày.`
+        : `Kỳ báo cáo kết ở lần đo cuối (${fmtWhen(end.toISOString())}).`;
+    }
+
+    // Mở báo cáo bản in ở tab mới. Mở tab TRƯỚC khi await là bắt buộc: window.open
+    // gọi sau một await không còn được coi là do người dùng bấm và bị trình duyệt
+    // chặn như cửa sổ tự bật. Nạp nội dung bằng fetch thay vì trỏ thẳng href để
+    // phiên hết hạn ra màn hình đăng nhập, không ra một trang JSON 401.
+    async function openReport() {
+      const scope = (document.getElementById("rp-scope") || {}).value || "";
+      const win = (document.getElementById("rp-win") || {}).value || "30";
+      const q = new URLSearchParams({ window_days: win });
+      if (scope) q.set("psn", scope);
+      const w = window.open("", "_blank");
+      try {
+        const r = await fetch(API + "/api/export/report.html?" + q.toString(), { credentials: "same-origin" });
+        if (r.status === 401) { if (w) w.close(); showLogin(); return; }
+        if (!r.ok) {
+          if (w) w.close();
+          let d = "";
+          try { d = apiErrText(await r.json()); } catch (_) {}
+          showError(`Không tạo được báo cáo (${r.status})${d ? " — " + d : ""}`);
+          return;
+        }
+        const html = await r.text();
+        if (!w) { showError("Trình duyệt đã chặn tab mới. Cho phép cửa sổ bật lên cho trang này rồi thử lại."); return; }
+        w.document.open(); w.document.write(html); w.document.close();
+        clearError();
+      } catch (e) {
+        if (w) w.close();
+        showError(e.message);
+      }
+    }
 
     /* ---------- PHÂN TÍCH ---------- */
 
@@ -2434,42 +2599,47 @@
     }
 
     // Tự động điền host/port/TLS và chuyển đổi giao diện theo nhà cung cấp thư được chọn
+    // Máy chủ gửi thư của từng nhà cung cấp. Outlook.com cá nhân và Microsoft 365
+    // công ty là HAI máy chủ khác nhau — gộp chúng vào một mục "Outlook" thì đúng
+    // với bên này và sai với bên kia, nên tách hẳn.
+    const SMTP_PROVIDERS = {
+      gmail:   { host: "smtp.gmail.com",        port: "587", tls: "true", ph: "vidu@gmail.com",   guide: "s-guide-gmail" },
+      outlook: { host: "smtp-mail.outlook.com", port: "587", tls: "true", ph: "vidu@outlook.com", guide: "s-guide-outlook" },
+      m365:    { host: "smtp.office365.com",    port: "587", tls: "true", ph: "vidu@congty.com",  guide: "s-guide-m365" },
+    };
+    const SMTP_GUIDES = ["s-guide-gmail", "s-guide-outlook", "s-guide-m365"];
+
     function applySmtpProvider(provider, autoFill = true) {
       const hostEl = document.getElementById("s-host");
       const portEl = document.getElementById("s-port");
       const tlsEl = document.getElementById("s-tls");
       const userEl = document.getElementById("s-user");
       const fromEl = document.getElementById("s-from");
-      const guideEl = document.getElementById("s-guide-gmail");
       const advEl = document.getElementById("s-advanced");
       const providerEl = document.getElementById("s-provider");
 
       if (providerEl && provider) providerEl.value = provider;
       const prov = providerEl ? providerEl.value : (provider || "gmail");
+      const spec = SMTP_PROVIDERS[prov] || null;
 
-      if (prov === "gmail") {
+      // Ẩn hết rồi bật đúng một cái. Ẩn theo danh sách chứ không theo từng nhánh:
+      // thêm nhà cung cấp thứ tư mà quên một nhánh sẽ để hai hướng dẫn hiện cùng lúc.
+      SMTP_GUIDES.forEach(id => {
+        const g = document.getElementById(id);
+        if (g) g.hidden = !(spec && spec.guide === id);
+      });
+
+      if (spec) {
         if (autoFill || !hostEl || !hostEl.value) {
-          if (hostEl) hostEl.value = "smtp.gmail.com";
-          if (portEl) portEl.value = "587";
-          if (tlsEl) tlsEl.value = "true";
+          if (hostEl) hostEl.value = spec.host;
+          if (portEl) portEl.value = spec.port;
+          if (tlsEl) tlsEl.value = spec.tls;
           if (fromEl && userEl && userEl.value) fromEl.value = userEl.value.trim();
         }
-        if (userEl) userEl.placeholder = "vidu@gmail.com";
-        if (guideEl) guideEl.hidden = false;
-        if (advEl) advEl.hidden = true;
-      } else if (prov === "outlook") {
-        if (autoFill || !hostEl || !hostEl.value) {
-          if (hostEl) hostEl.value = "smtp.office365.com";
-          if (portEl) portEl.value = "587";
-          if (tlsEl) tlsEl.value = "true";
-          if (fromEl && userEl && userEl.value) fromEl.value = userEl.value.trim();
-        }
-        if (userEl) userEl.placeholder = "vidu@congty.com";
-        if (guideEl) guideEl.hidden = true;
+        if (userEl) userEl.placeholder = spec.ph;
         if (advEl) advEl.hidden = true;
       } else {
-        // Nhà cung cấp "Khác": ẩn hướng dẫn Gmail và mở khối thiết lập nâng cao
-        if (guideEl) guideEl.hidden = true;
+        // Nhà cung cấp "Khác": mở khối thiết lập nâng cao cho máy chủ riêng.
         if (advEl) {
           advEl.hidden = false;
           if (autoFill) advEl.open = true;
@@ -2478,15 +2648,25 @@
       }
     }
 
-    // Với Gmail và Outlook, tài khoản đăng nhập (user) và địa chỉ gửi (from) luôn giống nhau
+    // Suy nhà cung cấp từ host đã lưu. Nhận cả các host cũ của Microsoft để một
+    // cấu hình lưu từ trước không bị hạ về "Khác" rồi lộ nguyên khối kỹ thuật.
+    function smtpProviderFromHost(host) {
+      const h = (host || "").trim().toLowerCase();
+      if (h === "" || h === "smtp.gmail.com") return "gmail";
+      if (h === "smtp-mail.outlook.com" || h === "smtp.live.com" || h === "smtp.outlook.com") return "outlook";
+      if (h === "smtp.office365.com") return "m365";
+      return "custom";
+    }
+
+    // Với ba nhà cung cấp có sẵn, tài khoản đăng nhập (user) và địa chỉ gửi (from)
+    // buộc phải giống nhau — Microsoft 365 trả lỗi 5.7.60 nếu chúng khác nhau.
     function syncSmtpUserToFrom() {
       const providerEl = document.getElementById("s-provider");
       const prov = providerEl ? providerEl.value : "gmail";
-      if (prov === "gmail" || prov === "outlook") {
-        const userEl = document.getElementById("s-user");
-        const fromEl = document.getElementById("s-from");
-        if (userEl && fromEl) fromEl.value = userEl.value.trim();
-      }
+      if (!SMTP_PROVIDERS[prov]) return;
+      const userEl = document.getElementById("s-user");
+      const fromEl = document.getElementById("s-from");
+      if (userEl && fromEl) fromEl.value = userEl.value.trim();
     }
 
     async function loadSettings() {
@@ -2521,16 +2701,9 @@
           ? `Cập nhật lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " · " + d.updated_by : ""}`
           : "Thay đổi có hiệu lực ngay cho toàn hệ thống";
 
-        // Tự suy nhà cung cấp từ host đã lưu để hiển thị đúng giao diện Bước 1:
-        // smtp.gmail.com -> Gmail; smtp.office365.com -> Outlook; còn lại -> Khác.
-        const hostVal = (document.getElementById("s-host") ? document.getElementById("s-host").value : "").trim().toLowerCase();
-        let prov = "custom";
-        if (hostVal === "smtp.gmail.com" || hostVal === "") {
-          prov = "gmail";
-        } else if (hostVal === "smtp.office365.com" || hostVal === "smtp-mail.outlook.com" || hostVal === "smtp.live.com") {
-          prov = "outlook";
-        }
-        applySmtpProvider(prov, false);
+        // Tự suy nhà cung cấp từ host đã lưu để hiển thị đúng giao diện Bước 1.
+        const hostEl = document.getElementById("s-host");
+        applySmtpProvider(smtpProviderFromHost(hostEl ? hostEl.value : ""), false);
 
         settingsLoaded = true;
       } catch (e) {
@@ -2720,6 +2893,8 @@
 
       // Báo cáo
       document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); });
+      document.getElementById("rp-scope").addEventListener("change", applyRpNote);
+      document.getElementById("rp-open").addEventListener("click", openReport);
       document.getElementById("an-window").addEventListener("change", loadAnalytics);
       document.getElementById("btn-trips").addEventListener("click", loadTrips);
       document.getElementById("dl-tanks").addEventListener("click", () =>

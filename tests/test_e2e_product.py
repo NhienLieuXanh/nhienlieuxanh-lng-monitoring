@@ -63,6 +63,7 @@ SESSION_GET = frozenset({
     "/api/analytics/{psn}",
     "/api/refills/{psn}",
     "/api/delivery-plan",
+    "/api/export/report.html",
     "/api/export/tanks.csv",
     "/api/export/refills.csv",
     "/api/export/telemetry.csv",
