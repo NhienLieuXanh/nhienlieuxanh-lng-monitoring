@@ -431,7 +431,12 @@
     .plan-params { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
     @media (max-width: 900px) { .plan-params { grid-template-columns: repeat(2, 1fr); } }
     .plan-params label { display: grid; gap: 5px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
-    .plan-params .field { min-height: 44px; }
+    /* .field trong label dang grid bi KEO GIAN theo o cao nhat cua hang: mot o co
+       them nut phu ("Ap dung so do thuc te") lam MOI o nhap cung hang cao len 70px
+       thay vi 44px. Loi nay co truoc, va viec nang min-height 34->44 chi lam no ro
+       hon. align-self: start giu o nhap o dung chieu cao that cua no. */
+    .plan-params label { align-content: start; }
+    .plan-params .field { min-height: 44px; align-self: start; }
     .p-out { display: flex; align-items: center; font-family: var(--mono); font-weight: 700; color: var(--brand); background: var(--surface-2); }
     .plan-summary { display: flex; gap: 12px; flex-wrap: wrap; }
     .ps-tile { flex: 1; min-width: 150px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; }
