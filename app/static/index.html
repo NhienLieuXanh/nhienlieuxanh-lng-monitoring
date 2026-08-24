@@ -614,6 +614,8 @@
     .set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
     .set-grid label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); min-width: 0; }
     .set-grid label.wide { grid-column: 1 / -1; }
+    .set-step { margin-top: 10px; }
+    .set-grid label.set-prov { grid-column: 1 / -1; max-width: 380px; }
     .set-grid .field { width: 100%; }
     /* Nhãn cho biết giá trị đang lấy từ đâu — câu hỏi đầu tiên của bất kỳ ai mở
        một trang cấu hình có hai nguồn (app và biến môi trường). */
@@ -636,6 +638,59 @@
                       background: var(--brand); color: #fff; cursor: pointer; font-weight: 600; }
     .btn-primary-sm:hover { background: var(--brand-strong); }
     .btn-primary-sm[disabled] { opacity: .5; cursor: not-allowed; }
+
+    /* Hướng dẫn mật khẩu ứng dụng: hiển thị các bước thao tác rõ ràng */
+    .smtp-guide {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--r-sm);
+      font-size: var(--fs-prose);
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .smtp-guide ol {
+      margin: 6px 0 0 18px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .smtp-guide li b { color: var(--fg); }
+    .smtp-guide li code {
+      font-family: var(--mono);
+      font-size: var(--fs-tiny);
+      color: var(--brand);
+      background: var(--surface-3);
+      padding: 1px 5px;
+      border-radius: var(--r-sm);
+    }
+    /* Khung thiết lập nâng cao thu gọn dành cho máy chủ thư tuỳ chỉnh */
+    .set-adv {
+      margin-top: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--r-sm);
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+    .set-adv > summary {
+      cursor: pointer;
+      padding: 8px 12px;
+      font-size: var(--fs-sm);
+      font-weight: 600;
+      color: var(--muted);
+      list-style: none;
+      user-select: none;
+    }
+    .set-adv > summary::-webkit-details-marker { display: none; }
+    .set-adv > summary::before { content: "▸ "; color: var(--brand); }
+    .set-adv[open] > summary::before { content: "▾ "; }
+    .set-adv > summary:hover { color: var(--fg); background: var(--surface-3); }
+    .set-adv-body {
+      padding: 10px 12px 12px;
+      border-top: 1px solid var(--line-soft);
+    }
   </style>
 </head>
 <body class="is-locked">
@@ -1008,44 +1063,78 @@
             </div>
           </div>
 
-          <!-- Máy chủ gửi thư là một nhóm RIÊNG: "ai nhận" và "máy nào gửi" là hai
-               việc khác nhau, gộp một thẻ làm người đọc không biết nút Lưu đang lưu
-               phần nào. -->
+          <!-- Thẻ cấu hình máy chủ thư điện tử: tối giản cho nhân viên vận hành,
+               tự động hoá các thông số kỹ thuật (host, port, bảo mật, địa chỉ gửi) -->
           <div class="rep-card">
             <h3>Máy chủ thư điện tử</h3>
             <p class="hint">
-              Hệ thống dùng máy chủ này để phát cảnh báo. Nhà cung cấp thư điện tử yêu cầu
-              một mật khẩu ứng dụng riêng, cần được tạo từ tài khoản của bạn. Với Gmail:
-              bật xác thực hai bước, tạo mật khẩu ứng dụng 16 ký tự, sau đó nhập vào ô bên
-              dưới. Máy chủ <b>smtp.gmail.com</b>, cổng <b>587</b>.
+              Hệ thống dùng tài khoản này để tự động gửi thư cảnh báo khi bồn LNG có sự cố hoặc sắp cạn.
             </p>
             <p class="set-note" id="set-smtp-state"></p>
-            <div class="set-grid">
-              <label>
-                <span class="set-lbl">Địa chỉ máy chủ <span class="src" data-src="smtp_host">Mặc định</span></span>
-                <input type="text" id="s-host" class="field" placeholder="smtp.gmail.com" maxlength="255" />
+
+            <!-- Bước 1: Chọn nhà cung cấp dịch vụ thư -->
+            <div class="set-grid set-step">
+              <label class="set-prov">
+                <span class="set-lbl">1. Nhà cung cấp thư</span>
+                <select id="s-provider" class="field">
+                  <option value="gmail">Gmail</option>
+                  <option value="outlook">Outlook · Microsoft 365</option>
+                  <option value="custom">Khác (máy chủ riêng của công ty)</option>
+                </select>
               </label>
+            </div>
+
+            <!-- Hướng dẫn lấy mật khẩu ứng dụng Gmail: chỉ hiện khi đang chọn Gmail -->
+            <div id="s-guide-gmail" class="smtp-guide">
+              <b>Cách lấy Mật khẩu ứng dụng Gmail (16 chữ cái):</b>
+              <ol>
+                <li>Bật <b>Xác minh 2 bước</b> cho tài khoản Google (nếu chưa bật).</li>
+                <li>Mở liên kết quản lý tài khoản: <b>myaccount.google.com/apppasswords</b></li>
+                <li>Đặt tên ứng dụng (ví dụ: <code>LNG</code>) rồi bấm <b>Tạo</b>.</li>
+                <li>Sao chép mã <b>16 chữ cái</b> và dán vào ô Mật khẩu ứng dụng bên dưới.</li>
+              </ol>
+            </div>
+
+            <!-- Bước 2: Chỉ nhập địa chỉ thư và mật khẩu ứng dụng -->
+            <div class="set-grid set-step">
               <label>
-                <span class="set-lbl">Cổng kết nối <span class="src" data-src="smtp_port">Mặc định</span></span>
-                <input type="number" id="s-port" class="field num" min="1" max="65535" step="1" />
-              </label>
-              <label>
-                <span class="set-lbl">Tài khoản đăng nhập <span class="src" data-src="smtp_user">Mặc định</span></span>
-                <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" />
+                <span class="set-lbl">2. Địa chỉ thư gửi cảnh báo <span class="src" data-src="smtp_user">Mặc định</span></span>
+                <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" placeholder="vidu@gmail.com" />
               </label>
               <label>
                 <span class="set-lbl">Mật khẩu ứng dụng <span class="src" id="s-pass-state">Chưa thiết lập</span></span>
                 <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="Bỏ trống để giữ nguyên" />
               </label>
-              <label>
-                <span class="set-lbl">Địa chỉ gửi <span class="src" data-src="smtp_from">Mặc định</span></span>
-                <input type="text" id="s-from" class="field" maxlength="255" />
-              </label>
-              <label>
-                <span class="set-lbl">Bảo mật kết nối <span class="src" data-src="smtp_starttls">Mặc định</span></span>
-                <select id="s-tls" class="field"><option value="true">STARTTLS · cổng 587</option><option value="false">SSL/TLS · cổng 465</option></select>
-              </label>
             </div>
+
+            <!-- Thiết lập nâng cao: bọc trong details, chỉ hiện khi chọn "Khác" -->
+            <details id="s-advanced" class="set-adv" hidden>
+              <summary>Thiết lập nâng cao (máy chủ, cổng, bảo mật, địa chỉ gửi)</summary>
+              <div class="set-adv-body">
+                <div class="set-grid">
+                  <label>
+                    <span class="set-lbl">Địa chỉ máy chủ <span class="src" data-src="smtp_host">Mặc định</span></span>
+                    <input type="text" id="s-host" class="field" placeholder="smtp.gmail.com" maxlength="255" />
+                  </label>
+                  <label>
+                    <span class="set-lbl">Cổng kết nối <span class="src" data-src="smtp_port">Mặc định</span></span>
+                    <input type="number" id="s-port" class="field num" min="1" max="65535" step="1" />
+                  </label>
+                  <label>
+                    <span class="set-lbl">Địa chỉ gửi (From) <span class="src" data-src="smtp_from">Mặc định</span></span>
+                    <input type="text" id="s-from" class="field" maxlength="255" placeholder="canhbao@congty.com" />
+                  </label>
+                  <label>
+                    <span class="set-lbl">Bảo mật kết nối <span class="src" data-src="smtp_starttls">Mặc định</span></span>
+                    <select id="s-tls" class="field">
+                      <option value="true">STARTTLS · cổng 587</option>
+                      <option value="false">SSL/TLS · cổng 465</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </details>
+
             <div class="set-actions">
               <button type="button" class="btn-primary-sm" id="s-save-test">Lưu và gửi thư kiểm tra</button>
               <button type="button" class="btn-dl" id="s-save">Lưu</button>
@@ -2285,6 +2374,62 @@
       if ("hidden" in el) el.hidden = !text;
     }
 
+    // Tự động điền host/port/TLS và chuyển đổi giao diện theo nhà cung cấp thư được chọn
+    function applySmtpProvider(provider, autoFill = true) {
+      const hostEl = document.getElementById("s-host");
+      const portEl = document.getElementById("s-port");
+      const tlsEl = document.getElementById("s-tls");
+      const userEl = document.getElementById("s-user");
+      const fromEl = document.getElementById("s-from");
+      const guideEl = document.getElementById("s-guide-gmail");
+      const advEl = document.getElementById("s-advanced");
+      const providerEl = document.getElementById("s-provider");
+
+      if (providerEl && provider) providerEl.value = provider;
+      const prov = providerEl ? providerEl.value : (provider || "gmail");
+
+      if (prov === "gmail") {
+        if (autoFill || !hostEl || !hostEl.value) {
+          if (hostEl) hostEl.value = "smtp.gmail.com";
+          if (portEl) portEl.value = "587";
+          if (tlsEl) tlsEl.value = "true";
+          if (fromEl && userEl && userEl.value) fromEl.value = userEl.value.trim();
+        }
+        if (userEl) userEl.placeholder = "vidu@gmail.com";
+        if (guideEl) guideEl.hidden = false;
+        if (advEl) advEl.hidden = true;
+      } else if (prov === "outlook") {
+        if (autoFill || !hostEl || !hostEl.value) {
+          if (hostEl) hostEl.value = "smtp.office365.com";
+          if (portEl) portEl.value = "587";
+          if (tlsEl) tlsEl.value = "true";
+          if (fromEl && userEl && userEl.value) fromEl.value = userEl.value.trim();
+        }
+        if (userEl) userEl.placeholder = "vidu@congty.com";
+        if (guideEl) guideEl.hidden = true;
+        if (advEl) advEl.hidden = true;
+      } else {
+        // Nhà cung cấp "Khác": ẩn hướng dẫn Gmail và mở khối thiết lập nâng cao
+        if (guideEl) guideEl.hidden = true;
+        if (advEl) {
+          advEl.hidden = false;
+          if (autoFill) advEl.open = true;
+        }
+        if (userEl) userEl.placeholder = "vidu@congty.com";
+      }
+    }
+
+    // Với Gmail và Outlook, tài khoản đăng nhập (user) và địa chỉ gửi (from) luôn giống nhau
+    function syncSmtpUserToFrom() {
+      const providerEl = document.getElementById("s-provider");
+      const prov = providerEl ? providerEl.value : "gmail";
+      if (prov === "gmail" || prov === "outlook") {
+        const userEl = document.getElementById("s-user");
+        const fromEl = document.getElementById("s-from");
+        if (userEl && fromEl) fromEl.value = userEl.value.trim();
+      }
+    }
+
     async function loadSettings() {
       try {
         const d = await api("/api/settings");
@@ -2316,6 +2461,18 @@
         meta.textContent = d.updated_at
           ? `Cập nhật lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " · " + d.updated_by : ""}`
           : "Thay đổi có hiệu lực ngay cho toàn hệ thống";
+
+        // Tự suy nhà cung cấp từ host đã lưu để hiển thị đúng giao diện Bước 1:
+        // smtp.gmail.com -> Gmail; smtp.office365.com -> Outlook; còn lại -> Khác.
+        const hostVal = (document.getElementById("s-host") ? document.getElementById("s-host").value : "").trim().toLowerCase();
+        let prov = "custom";
+        if (hostVal === "smtp.gmail.com" || hostVal === "") {
+          prov = "gmail";
+        } else if (hostVal === "smtp.office365.com" || hostVal === "smtp-mail.outlook.com" || hostVal === "smtp.live.com") {
+          prov = "outlook";
+        }
+        applySmtpProvider(prov, false);
+
         settingsLoaded = true;
       } catch (e) {
         if (e.name === "AuthError") return;
@@ -2494,6 +2651,8 @@
       // Cài đặt
       document.getElementById("s-save-recipients").addEventListener("click", onSaveRecipients);
       document.getElementById("s-save").addEventListener("click", () => onSaveEmail(false));
+      document.getElementById("s-provider").addEventListener("change", (e) => applySmtpProvider(e.target.value, true));
+      document.getElementById("s-user").addEventListener("input", syncSmtpUserToFrom);
       document.getElementById("s-save-test").addEventListener("click", () => onSaveEmail(true));
       document.getElementById("s-save2").addEventListener("click", onSaveParams);
       document.getElementById("plan-form").addEventListener("input", computePlan);
