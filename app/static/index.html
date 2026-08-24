@@ -93,7 +93,7 @@
       --line-soft: #e7ebf1;
       --fg: #0f1a2c;
       --muted: #516074;
-      --faint: #616d7b;
+      --faint: #5a6673;
       --brand: #0d4fb5;
       --brand-strong: #0d4fb5;
       --brand-solid: #0d4fb5;
@@ -133,7 +133,9 @@
     button, .btn {
       appearance: none; font: inherit; cursor: pointer; color: var(--fg);
       border: 1px solid var(--line); background: var(--surface-3);
-      min-height: 32px; padding: 0 12px; border-radius: var(--r-sm);
+      /* 44px la nguong vung bam toi thieu, ap cho MOI nut. Phan tu nao co ly do
+         rieng de nho hon (nut hien mat khau nam trong o nhap) tu ghi de ben duoi. */
+      min-height: 44px; padding: 0 12px; border-radius: var(--r-sm);
       display: inline-flex; align-items: center; gap: 7px;
       transition: background .13s ease, border-color .13s ease, transform .06s ease, color .13s ease;
     }
@@ -371,10 +373,10 @@
     .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .chart-head h2 { margin: 0; font-size: var(--fs-body); font-weight: 700; }
     .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
-    .seg button { min-height: 28px; padding: 0 11px; border: 0; border-right: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 0; font-size: var(--fs-sm); }
+    .seg button { min-height: 44px; padding: 0 11px; border: 0; border-right: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 0; font-size: var(--fs-sm); }
     .seg button:last-child { border-right: 0; }
     .seg button:hover { background: var(--surface-3); }
-    .seg button[aria-pressed="true"] { background: var(--brand-strong); color: #fff; }
+    .seg button[aria-pressed="true"] { background: var(--brand-solid); color: #fff; }
     .chart-box { position: relative; height: 232px; min-width: 0; }
     .chart-box canvas { max-width: 100%; }
     .chart-note { font-size: var(--fs-sm); color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); padding: 5px 9px; border-radius: var(--r-sm); margin-bottom: 8px; }
@@ -404,7 +406,7 @@
     .rename { display: grid; gap: 7px; }
     .rename label { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
     .rename-row { display: flex; gap: 8px; }
-    .field { flex: 1; min-height: 34px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); padding: 0 11px; font: inherit; border-radius: var(--r-sm); }
+    .field { flex: 1; min-height: 44px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); padding: 0 11px; font: inherit; border-radius: var(--r-sm); }
     .field:focus { border-color: var(--ring); }
     .hint { margin: 0; color: var(--faint); font-size: var(--fs-sm); }
 
@@ -429,7 +431,7 @@
     .plan-params { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
     @media (max-width: 900px) { .plan-params { grid-template-columns: repeat(2, 1fr); } }
     .plan-params label { display: grid; gap: 5px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
-    .plan-params .field { min-height: 34px; }
+    .plan-params .field { min-height: 44px; }
     .p-out { display: flex; align-items: center; font-family: var(--mono); font-weight: 700; color: var(--brand); background: var(--surface-2); }
     .plan-summary { display: flex; gap: 12px; flex-wrap: wrap; }
     .ps-tile { flex: 1; min-width: 150px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; }
@@ -474,8 +476,8 @@
     .login-form { display: grid; gap: 13px; }
     .login-form label { display: grid; gap: 5px; font-size: var(--fs-body); color: var(--muted); font-weight: 600; }
     .pass-wrap { position: relative; display: flex; align-items: center; }
-    .pass-wrap .field { width: 100%; padding-right: 54px; min-height: 42px; }
-    .login-form .field { min-height: 42px; }
+    .pass-wrap .field { width: 100%; padding-right: 54px; min-height: 44px; }
+    .login-form .field { min-height: 44px; }
     .pass-toggle { position: absolute; right: 3px; top: 3px; bottom: 3px; width: 46px; border: 0; background: transparent; color: var(--muted); font-size: var(--fs-sm); min-height: 0; }
     .login-form .btn-primary { width: 100%; min-height: 42px; margin-top: 6px; justify-content: center; }
     .login-error { display: none; margin: 0; padding: 9px 11px; background: var(--crit-bg); border: 1px solid var(--crit-line); color: var(--crit); font-size: var(--fs-body); border-radius: var(--r-sm); }
