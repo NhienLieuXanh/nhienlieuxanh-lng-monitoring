@@ -44,6 +44,14 @@
       --faint: #64748b;
       --brand: #4f8ff7;
       --brand-strong: #3b82f6;
+      /* Nen DAC cho nut/chip co chu trang. --brand va --brand-strong o theme toi
+         qua sang: chu trang tren chung chi dat 3,18 va 3,95 — duoi nguong 4,5.
+         Tach token rieng thay vi lam toi --brand, vi --brand con dung lam mau CHU
+         tren nen toi, ma o do lam toi lai la lam giam tuong phan. */
+      --brand-solid: #2563eb;
+      /* Chu tren huy hieu do. Theme toi dung --crit sang (#f87171) nen chu trang
+         chi dat 2,77; chu toi tren do dat 6,6 va giu duoc do noi bat cua huy hieu. */
+      --on-crit: #0b1120;
       --nlx: #34d399;
       --ok: #34d399;      --ok-bg: rgba(52,211,153,.13);   --ok-line: rgba(52,211,153,.30);
       --warn: #fbbf24;    --warn-bg: rgba(251,191,36,.13);  --warn-line: rgba(251,191,36,.30);
@@ -88,6 +96,8 @@
       --faint: #7b8798;
       --brand: #0d4fb5;
       --brand-strong: #0d4fb5;
+      --brand-solid: #0d4fb5;
+      --on-crit: #ffffff;
       --nlx: #15803d;
       --ok: #15803d;   --ok-bg: #e3f5e9;   --ok-line: #b7e4c3;
       --warn: #b45309; --warn-bg: #fbeecf; --warn-line: #ead3a0;
@@ -116,7 +126,7 @@
        quanh; selector theo class (.nav-item, .btn-dl…) vẫn thắng nhờ độ đặc hiệu. */
     input, select, textarea, button { font: inherit; }
     .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
-    .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
+    .skip { position: absolute; left: -999px; top: 0; background: var(--brand-solid); color: #fff; padding: 8px 16px; z-index: 200; border-radius: 0 0 var(--r-sm) 0; }
     .skip:focus { left: 0; top: 0; }
 
     /* ============ BUTTONS ============ */
@@ -132,8 +142,8 @@
     button:focus-visible, .btn:focus-visible, .field:focus-visible,
     tr.tank:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     button:disabled { opacity: .45; cursor: not-allowed; }
-    .btn-primary { background: var(--brand-strong); border-color: var(--brand-strong); color: #fff; }
-    .btn-primary:hover { filter: brightness(1.08); background: var(--brand-strong); }
+    .btn-primary { background: var(--brand-solid); border-color: var(--brand-solid); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.1); background: var(--brand-solid); }
     .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
     .btn-quiet:hover { background: var(--surface-3); color: var(--fg); }
     .icon-btn { min-height: 34px; width: 34px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
@@ -198,7 +208,7 @@
     .nav-item.soon:hover { background: transparent; color: var(--muted); }
     .nav-item .badge {
       margin-left: auto; min-width: 20px; height: 19px; padding: 0 6px; border-radius: 999px;
-      background: var(--crit); color: #fff; font-size: var(--fs-tiny); font-weight: 700;
+      background: var(--crit); color: var(--on-crit); font-size: var(--fs-tiny); font-weight: 700;
       display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono);
     }
     .nav-item .tag {
@@ -254,7 +264,7 @@
     .alert-chip { position: relative; }
     .alert-chip .badge {
       position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
-      border-radius: 999px; background: var(--crit); color: #fff; font-size: var(--fs-micro); font-weight: 700;
+      border-radius: 999px; background: var(--crit); color: var(--on-crit); font-size: var(--fs-micro); font-weight: 700;
       display: none; align-items: center; justify-content: center; font-family: var(--mono);
     }
     .alert-chip.has .badge { display: inline-flex; }
@@ -299,7 +309,7 @@
       padding: 11px 14px; border-bottom: 1px solid var(--line-soft); flex: 0 0 auto;
     }
     .pane-head h1, .pane-head h2 { margin: 0; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
-    .pane-head .meta { color: var(--faint); font-size: var(--fs-sm); }
+    .pane-head .meta { color: var(--muted); font-size: var(--fs-sm); }
     .fleet-scroll { overflow: auto; flex: 1; min-height: 0; }
     table.tanks { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
     table.tanks th {
@@ -610,7 +620,7 @@
     .rep-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 12px; }
     .rep-scroll > *, .set-scroll > * { flex: 0 0 auto; min-width: 0; }
     .rep-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-width: 0; }
-    .rep-card > h3 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin-bottom: 4px; }
+    .rep-card > h2 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin-bottom: 4px; }
     .rep-card > .hint { font-size: var(--fs-prose); color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
     .rep-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
     .rep-row label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); }
@@ -623,7 +633,7 @@
     .mini-wrap { overflow-x: auto; margin-top: 4px; }
     table.mini { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
     table.mini th { text-align: left; font-weight: 600; font-size: var(--fs-micro); text-transform: uppercase;
-                    letter-spacing: .05em; color: var(--faint); padding: 6px 8px;
+                    letter-spacing: .05em; color: var(--muted); padding: 6px 8px;
                     border-bottom: 1px solid var(--line); white-space: nowrap; }
     table.mini td { padding: 5px 8px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
     table.mini td.num, table.mini th.r { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -663,9 +673,9 @@
     .set-msg.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
     .set-msg.bad { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
     .set-msg.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
-    .btn-primary-sm { font-size: var(--fs-body); padding: 6px 14px; border-radius: var(--r-sm); border: 1px solid var(--brand);
-                      background: var(--brand); color: #fff; cursor: pointer; font-weight: 600; }
-    .btn-primary-sm:hover { background: var(--brand-strong); }
+    .btn-primary-sm { font-size: var(--fs-body); padding: 6px 14px; border-radius: var(--r-sm); border: 1px solid var(--brand-solid);
+                      background: var(--brand-solid); color: #fff; cursor: pointer; font-weight: 600; }
+    .btn-primary-sm:hover { filter: brightness(1.1); }
     .btn-primary-sm[disabled] { opacity: .5; cursor: not-allowed; }
 
     /* Hướng dẫn mật khẩu ứng dụng: hiển thị các bước thao tác rõ ràng */
@@ -868,8 +878,8 @@
             <table class="tanks">
               <thead>
                 <tr>
-                  <th>Bồn</th>
-                  <th class="r">Mức chứa</th>
+                  <th scope="col">Bồn</th>
+                  <th scope="col" class="r">Mức chứa</th>
                   <!-- Cột này thay chỗ của "Áp suất": áp suất đã hiện ở readout chi
                        tiết và ở ô thời gian giữ áp, còn "còn bao nhiêu ngày" thì
                        không có ở đâu khác — và đó mới là con số khiến người vận
@@ -879,8 +889,8 @@
                        thay đổi theo mức bồn (trên dự trữ -> đếm tới dự trữ; đã
                        dưới -> đếm tới cạn), nên tiêu đề cố định một mốc là sai với
                        nửa số hàng. Mốc thật của từng hàng nằm ở nhãn phụ trong ô. -->
-                  <th class="r">Còn lại</th>
-                  <th>Trạng thái</th>
+                  <th scope="col" class="r">Còn lại</th>
+                  <th scope="col">Trạng thái</th>
                 </tr>
               </thead>
               <tbody id="tank-list"></tbody>
@@ -965,8 +975,8 @@
             <table class="plan-table">
               <thead>
                 <tr>
-                  <th>Ngày</th><th>Thứ</th><th class="r">Thể tích đầu ngày (m³)</th>
-                  <th class="c">Ngày nghỉ</th><th class="c">Nạp chỉ định</th><th>Hoạt động</th><th>Thời điểm nạp</th><th class="r">Lượng đặt (m³)</th>
+                  <th scope="col">Ngày</th><th scope="col">Thứ</th><th scope="col" class="r">Thể tích đầu ngày (m³)</th>
+                  <th scope="col" class="c">Ngày nghỉ</th><th scope="col" class="c">Nạp chỉ định</th><th scope="col">Hoạt động</th><th scope="col">Thời điểm nạp</th><th scope="col" class="r">Lượng đặt (m³)</th>
                 </tr>
               </thead>
               <tbody id="plan-body"></tbody>
@@ -988,7 +998,7 @@
                họp và trình ký, còn CSV là dữ liệu thô để tự tính lại. Đặt CSV lên
                trước thì người dùng tải file thô rồi tự dựng báo cáo bằng tay. -->
           <div class="rep-card">
-            <h3>Báo cáo giám sát bồn LNG (bản trình ký)</h3>
+            <h2>Báo cáo giám sát bồn LNG (bản trình ký)</h2>
             <p class="hint">
               Một tài liệu hoàn chỉnh: tóm tắt điều hành, hiện trạng từng bồn, tiêu thụ và
               dự báo, chất lượng dữ liệu và sức khoẻ thiết bị, nhật ký nạp, cảnh báo đang mở,
@@ -1015,7 +1025,7 @@
           </div>
 
           <div class="rep-card">
-            <h3>Xuất dữ liệu thô (CSV)</h3>
+            <h2>Xuất dữ liệu thô (CSV)</h2>
             <p class="hint">
               Dành cho việc tự tính lại bằng Excel. File dùng mã hoá UTF-8 và mốc thời gian
               theo giờ Việt Nam, mở bằng Excel không lỗi phông chữ. Nếu máy của bạn dùng dấu
@@ -1053,20 +1063,20 @@
           </div>
 
           <div class="rep-card">
-            <h3>Nhật ký nạp (90 ngày)</h3>
+            <h2>Nhật ký nạp (90 ngày)</h2>
             <p class="hint">
               Hệ thống tự nhận diện các lần nạp từ dữ liệu đo, không cần nhập tay.
             </p>
             <div class="mini-wrap">
               <table class="mini">
-                <thead><tr><th>Thời điểm</th><th class="r">Trước khi nạp (m³)</th><th class="r">Sau khi nạp (m³)</th><th class="r">Lượng nạp (m³)</th></tr></thead>
+                <thead><tr><th scope="col">Thời điểm</th><th scope="col" class="r">Trước khi nạp (m³)</th><th scope="col" class="r">Sau khi nạp (m³)</th><th scope="col" class="r">Lượng nạp (m³)</th></tr></thead>
                 <tbody id="refill-body"><tr><td colspan="4" class="empty">Chọn bồn để xem nhật ký.</td></tr></tbody>
               </table>
             </div>
           </div>
 
           <div class="rep-card">
-            <h3>Lịch giao hàng</h3>
+            <h2>Lịch giao hàng</h2>
             <p class="hint">
               Hệ thống gom các bồn cần nạp thành từng chuyến theo sức chứa xe, ưu tiên bồn
               cấp thiết nhất ở chuyến đầu. Chưa tối ưu tuyến đường do hệ thống chưa có toạ độ kho.
@@ -1124,7 +1134,7 @@
           </p>
 
           <div class="rep-card">
-            <h3>Người nhận cảnh báo</h3>
+            <h2>Người nhận cảnh báo</h2>
             <p class="hint">
               Hệ thống gửi cảnh báo tới các địa chỉ này khi bồn sắp cạn, thời gian giữ áp
               còn ngắn, mức chứa xuống thấp, hoặc thiết bị ngoại tuyến.
@@ -1153,7 +1163,7 @@
           <!-- Thẻ cấu hình máy chủ thư điện tử: tối giản cho nhân viên vận hành,
                tự động hoá các thông số kỹ thuật (host, port, bảo mật, địa chỉ gửi) -->
           <div class="rep-card">
-            <h3>Máy chủ thư điện tử</h3>
+            <h2>Máy chủ thư điện tử</h2>
             <p class="hint">
               Hệ thống dùng tài khoản này để tự động gửi thư cảnh báo khi bồn LNG có sự cố hoặc sắp cạn.
             </p>
@@ -1258,7 +1268,7 @@
           </div>
 
           <div class="rep-card">
-            <h3>Thông số bồn</h3>
+            <h2>Thông số bồn</h2>
             <p class="hint">
               <b>Áp suất van an toàn</b> là cơ sở tính thời gian giữ áp. Giá trị này phải khớp
               thông số kỹ thuật của bồn thực tế.
@@ -1280,7 +1290,7 @@
           </div>
 
           <div class="rep-card">
-            <h3>Chính sách đặt hàng</h3>
+            <h2>Chính sách đặt hàng</h2>
             <p class="hint">
               Hệ thống dùng các thông số này để xác định điểm đặt hàng lại và lượng đặt
               khuyến nghị cho từng bồn.
@@ -1316,7 +1326,7 @@
           </div>
 
           <div class="rep-card">
-            <h3>Ngưỡng cảnh báo</h3>
+            <h2>Ngưỡng cảnh báo</h2>
             <p class="hint">
               Vượt các ngưỡng này, hệ thống phát cảnh báo trên bảng điều khiển và gửi tới
               địa chỉ nhận đã khai báo.

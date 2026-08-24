@@ -144,8 +144,14 @@ def _table(headers: list[tuple[str, str]], rows: list[str], *, empty: str) -> st
     """Bảng có thead lặp lại mỗi trang in. Bảng rỗng ra một câu, không ra bảng rỗng."""
     if not rows:
         return f'<p class="empty">{_e(empty)}</p>'
+    # scope="col" là bắt buộc, không phải trang trí: không có nó thì trình đọc màn
+    # hình đọc từng ô số mà không nói ô đó thuộc cột nào, và một bảng 11 cột trở
+    # thành một dãy số vô nghĩa.
     head = "".join(
-        f'<th class="{c}">{_e(t)}</th>' if c else f"<th>{_e(t)}</th>" for t, c in headers
+        f'<th scope="col" class="{c}">{_e(t)}</th>'
+        if c
+        else f'<th scope="col">{_e(t)}</th>'
+        for t, c in headers
     )
     return (
         '<div class="tw"><table><thead><tr>'
