@@ -214,6 +214,17 @@ class TestTrungThuc:
         assert "—" in row
         assert ">0,000<" not in row
 
+    def test_khong_in_ty_le_vo_nghia_khi_chua_suy_duoc_nhip_do(self, wired) -> None:
+        """Bồn chưa đủ hai lần đo phải ra "0 / —", không ra "0 / 0".
+
+        Domain đặt expected_samples = 0 để nói "chưa suy được nhịp đo". In thẳng
+        con số đó lên giấy biến nó thành một tỉ lệ mà người đọc phải tự đoán nghĩa.
+        """
+        html = _render()
+        health = html.split("sức khoẻ thiết bị")[1].split("Nhật ký nạp")[0]
+        assert "/ 0<" not in health
+        assert "/ —" in health
+
     def test_nhan_du_lieu_cu(self, wired) -> None:
         html = _render()
         assert "CŨ" in html

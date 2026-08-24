@@ -500,7 +500,15 @@ def export_report(
             _row([
                 _cell(_e(t.psn), "psn"),
                 _cell(_grade_pill(q.grade), "c"),
-                _cell(f"{q.samples} / {q.expected_samples}", "n"),
+                # expected_samples = 0 nghĩa là CHƯA SUY ĐƯỢC nhịp đo (dưới hai lần
+                # đo thì không có khoảng nào để suy), không phải "kỳ vọng bằng 0".
+                # In thẳng số 0 ra giấy thành "1 / 0" — một tỉ lệ vô nghĩa mà người
+                # đọc buộc phải tự đoán nghĩa.
+                _cell(
+                    f"{q.samples} / "
+                    + (str(q.expected_samples) if q.expected_samples else "—"),
+                    "n",
+                ),
                 _cell(_pct(q.coverage * 100, 0), "n"),
                 _cell(_n(q.longest_gap_hours, 1), "n"),
                 _cell(_n(h.battery.current_v, 2), "n"),
