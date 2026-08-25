@@ -139,7 +139,16 @@
       display: inline-flex; align-items: center; gap: 7px;
       transition: background .13s ease, border-color .13s ease, transform .06s ease, color .13s ease;
     }
-    button:hover, .btn:hover { border-color: var(--faint); background: var(--surface); }
+    /* :where() để luật hover CHUNG này có specificity (0,1,0) thay vì (0,1,1).
+       Vì sao quan trọng: `button:hover` là (0,1,1), cao hơn MỌI biến thể khai bằng
+       một class như `.btn-primary-sm` (0,1,0). Nên nó đè `background` của biến thể
+       mà KHÔNG đè `color` — nút "Lưu" xanh chữ trắng hoá nền trắng chữ trắng, đo
+       được tương phản 1.00, tức chữ biến mất hoàn toàn. `.mp-pin` và `.pass-toggle`
+       (nền trong suốt) cũng bị: hover làm hiện ra một hộp nền lạ.
+       Với :where(), luật chung tụt xuống ngang biến thể và biến thể thắng nhờ đứng
+       sau — nên biến thể thêm về sau tự động đúng, không phải nhớ khai lại nền.
+       Cùng lớp bẫy specificity với `.side-brand img` từng đè `.brand-img`. */
+    :where(button, .btn):hover { border-color: var(--faint); background: var(--surface); }
     button:active, .btn:active { transform: translateY(1px); }
     button:focus-visible, .btn:focus-visible, .field:focus-visible,
     tr.tank:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
@@ -773,7 +782,10 @@
     .set-msg.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
     .btn-primary-sm { font-size: var(--fs-body); padding: 6px 14px; border-radius: var(--r-sm); border: 1px solid var(--brand-solid);
                       background: var(--brand-solid); color: #fff; cursor: pointer; font-weight: 600; }
-    .btn-primary-sm:hover { filter: brightness(1.1); }
+    /* Khai lại nền và viền tường minh, dù :where() ở luật hover chung đã đủ: đây là
+       nút hành động chính của trang Cài đặt, và đúng nút này đã từng trắng bóc.
+       (0,2,0) thì không phụ thuộc thứ tự khai trong file nữa. */
+    .btn-primary-sm:hover { filter: brightness(1.1); background: var(--brand-solid); border-color: var(--brand-solid); }
     .btn-primary-sm[disabled] { opacity: .5; cursor: not-allowed; }
 
     /* Hướng dẫn mật khẩu ứng dụng: hiển thị các bước thao tác rõ ràng */
