@@ -58,6 +58,12 @@ class TerminalOut(BaseModel):
     medium_name: str | None = None
     tank_type_name: str | None = None
 
+    # Toạ độ bồn cho trang Bản đồ. Người vận hành nhập, không phải GPS vendor —
+    # module trả 0,0 khi mất định vị, xem db/models.py. NULL cả hai nghĩa là chưa
+    # khai; DB cấm trạng thái nửa vời nên JS không phải xử lý ca đó.
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+
     # Số vendor gửi.
     volume_l: Decimal | None = None
     volume_percent: Decimal | None = None
@@ -88,6 +94,13 @@ class TerminalUpdateIn(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=128)
     capacity_l: Decimal | None = Field(None, gt=0)
 
+    # Toạ độ dùng ngữ nghĩa KHÁC name/capacity_l: ở đây ``null`` tường minh có
+    # nghĩa là XOÁ toạ độ, không phải "không gửi". Cần vậy vì ghim sai vị trí thì
+    # phải bỏ ghim được, mà `null` = "bỏ qua" thì không có đường nào bỏ. Phân biệt
+    # "gửi null" với "không gửi" bằng ``model_fields_set``.
+    latitude: Decimal | None = Field(None, ge=Decimal("-90"), le=Decimal("90"))
+    longitude: Decimal | None = Field(None, ge=Decimal("-180"), le=Decimal("180"))
+
     @field_validator("name")
     @classmethod
     def _strip_name(cls, v: str | None) -> str | None:
@@ -98,10 +111,31 @@ class TerminalUpdateIn(BaseModel):
             raise ValueError("name không được để trống")
         return s
 
+    @property
+    def location_sent(self) -> bool:
+        """True nếu client CÓ gửi toạ độ (kể cả gửi null để xoá)."""
+        return bool(self.model_fields_set & {"latitude", "longitude"})
+
     @model_validator(mode="after")
-    def _at_least_one(self) -> TerminalUpdateIn:
-        if self.name is None and self.capacity_l is None:
-            raise ValueError("cần ít nhất một field: name hoặc capacity_l")
+    def _check(self) -> TerminalUpdateIn:
+        sent = self.model_fields_set
+        has_lat, has_lon = "latitude" in sent, "longitude" in sent
+        if has_lat != has_lon:
+            # Gửi một nửa thì không có cách nào đoán đúng: DB cấm trạng thái nửa
+            # vời, nên từ chối ở đây thay vì để 500 từ CHECK constraint.
+            raise ValueError("toạ độ phải gửi cả latitude và longitude")
+        if has_lat:
+            if (self.latitude is None) != (self.longitude is None):
+                raise ValueError(
+                    "latitude và longitude phải cùng có giá trị, hoặc cùng null để xoá"
+                )
+            if self.latitude == 0 and self.longitude == 0:
+                # 0,0 là giá trị module gửi khi MẤT định vị, không phải một vị trí.
+                # Nhận nó thì bản đồ đặt bồn ở giữa vịnh Guinea.
+                raise ValueError("0,0 không phải vị trí — đó là giá trị khi mất định vị")
+
+        if self.name is None and self.capacity_l is None and not self.location_sent:
+            raise ValueError("cần ít nhất một field: name, capacity_l, hoặc toạ độ")
         return self
 
 

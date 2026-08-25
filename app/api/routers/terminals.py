@@ -86,9 +86,17 @@ def update_terminal(
     settings: SettingsDep,
     _: UserDep,
 ) -> TerminalDetailOut:
-    """Sửa tên / dung tích do người vận hành sở hữu. Cần phiên đăng nhập."""
+    """Sửa tên / dung tích / toạ độ do người vận hành sở hữu. Cần phiên đăng nhập."""
     term = term_repo.update_operator(
-        session, psn, name=body.name, capacity_l=body.capacity_l
+        session,
+        psn,
+        name=body.name,
+        capacity_l=body.capacity_l,
+        # `location_sent` phân biệt "không gửi toạ độ" với "gửi null để xoá ghim".
+        # Không có nó thì một ghim đặt sai không bao giờ bỏ được.
+        location_sent=body.location_sent,
+        latitude=body.latitude,
+        longitude=body.longitude,
     )
     if term is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Terminal not found")

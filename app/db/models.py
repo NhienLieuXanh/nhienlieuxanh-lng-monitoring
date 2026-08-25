@@ -84,6 +84,23 @@ class Terminal(Base):
     # mỗi ngày. Ở đây nó cũng sửa tay được khi vendor sai.
     capacity_l: Mapped[Decimal | None] = mapped_column(Numeric(18, 3))
 
+    # Toạ độ bồn, do NGƯỜI VẬN HÀNH nhập — xem update_operator().
+    #
+    # KHÔNG lấy từ vendor, dù `psn/search` có gửi `gpsLatitude`/`gpsLongitude`:
+    # cả hai thiết bị pilot đều trả `0.000000 / 0.000000` kèm `gpsAddress = "--"`,
+    # tức là module không có định vị. Vẽ thẳng số đó lên bản đồ thì bồn LNG hiện ở
+    # Null Island giữa vịnh Guinea, ngoài khơi châu Phi. Toạ độ thật duy nhất từng
+    # thấy (10.971047, 106.750161) chỉ nằm trong DISCOVERY.md, không có trong
+    # fixture nào, nên không tái lập được.
+    #
+    # Bồn LNG là tài sản cố định đặt tại kho khách hàng: toạ độ thuộc *cấu hình tài
+    # sản*, cùng loại với capacity_l, không phải telemetry.
+    #
+    # Numeric(9,6): 3 chữ số phần nguyên đủ cho kinh độ ±180, 6 chữ số thập phân
+    # ~0,11 m — dư sức cho một bồn đứng yên.
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+
     # `status` là CACHE, không phải sự thật. API suy lại từ last_seen_at lúc đọc
     # (xem domain/status.py) vì cột lưu có lỗi staleness không tránh được: thiết bị
     # ngừng báo thì không ingest nào chạm row đó, nên nó đứng mãi ở giá trị cũ.
@@ -110,6 +127,26 @@ class Terminal(Base):
         CheckConstraint("status IN ('online','offline')", name="status_valid"),
         CheckConstraint(
             "capacity_l IS NULL OR capacity_l > 0", name="capacity_positive"
+        ),
+        CheckConstraint(
+            "latitude IS NULL OR (latitude >= -90 AND latitude <= 90)",
+            name="latitude_range",
+        ),
+        CheckConstraint(
+            "longitude IS NULL OR (longitude >= -180 AND longitude <= 180)",
+            name="longitude_range",
+        ),
+        # Một nửa toạ độ là trạng thái vô nghĩa: không vẽ được điểm nào, mà cũng
+        # không phải "chưa khai". Bắt cặp ở tầng DB nên không đường ghi nào tạo ra
+        # được nó — cùng tinh thần với composite FK của telemetry: để Postgres
+        # chứng minh, đừng dựa vào kỷ luật ở tầng app.
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="latlon_paired"),
+        # 0,0 là Null Island giữa vịnh Guinea — chính là giá trị vendor gửi khi
+        # module KHÔNG có định vị. Chặn ở đây để một lần gõ nhầm, hay một lần import
+        # GPS vendor sau này, không đặt bồn LNG ra giữa Đại Tây Dương.
+        CheckConstraint(
+            "latitude IS NULL OR latitude <> 0 OR longitude <> 0",
+            name="latlon_not_null_island",
         ),
         # Target cho composite FK của telemetry. Redundant với PK về mặt logic
         # nhưng Postgres đòi một UNIQUE khớp đúng cặp cột được tham chiếu.

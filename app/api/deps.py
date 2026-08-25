@@ -159,6 +159,8 @@ def to_terminal_out(
         "status": derive_status(term.last_seen_at, now, stale_after).value,
         "last_seen_at": term.last_seen_at,
         "capacity_l": term.capacity_l,
+        "latitude": term.latitude,
+        "longitude": term.longitude,
         "medium_name": term.medium_name or (latest.medium_name if latest else None),
         "tank_type_name": term.tank_type_name
         or (latest.tank_type_name if latest else None),

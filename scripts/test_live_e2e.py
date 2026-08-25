@@ -171,7 +171,7 @@ def check_ui(rep: Report, anon: httpx.Client) -> None:
     # tên có chứa chính chuỗi cũ, nên tìm thô sẽ luôn báo "còn nhãn cũ". Dùng mốc
     # thẻ (">nhãn<") và chuỗi trong template JS để chỉ bắt phần thật sự hiện ra.
     body = re.sub(r"<!--.*?-->", "", page, flags=re.S)
-    want = (">Còn lại<", "Đo cuối:", ">Số liệu cũ<")
+    want = (">Còn lại<", "Đo cuối:", ">Số liệu cũ<", ">Bản đồ<")
     obsolete = (">Tới dự trữ<", ">Lỗi thời<", "Dữ liệu lỗi thời")
     absent = [s for s in want if s not in body]
     lingering = [s for s in obsolete if s in body]
@@ -182,6 +182,79 @@ def check_ui(rep: Report, anon: httpx.Client) -> None:
         )
         return
     rep.ok("giao diện", f"{len(page) // 1024} KB · nhãn đã chuẩn hoá")
+
+
+# Vùng biển hở nằm trong yêu sách đường lưỡi bò, cách bờ và cách mọi đảo.
+_BIEN_DONG = ((14.0, 114.0), (18.0, 116.0), (10.0, 113.0), (8.0, 110.0), (16.0, 112.5))
+
+
+def _phu_boi(fc: dict[str, Any], lat: float, lon: float) -> list[str]:
+    """Ray casting: những vùng nào phủ điểm (lat, lon)."""
+
+    def trong(ring: list[list[float]]) -> bool:
+        c = False
+        n = len(ring)
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            if (y1 > lat) != (y2 > lat) and lon < x1 + (lat - y1) * (x2 - x1) / (y2 - y1):
+                c = not c
+        return c
+
+    out = []
+    for f in fc["features"]:
+        for poly in f["geometry"]["coordinates"]:
+            if trong(poly[0]) and not any(trong(r) for r in poly[1:]):
+                out.append(f["properties"]["n"])
+                break
+    return out
+
+
+def check_map(rep: Report, anon: httpx.Client) -> None:
+    """Nền bản đồ ĐANG CHẠY không có đường lưỡi bò.
+
+    tests/test_world_map.py đã canh file trong repo. Phép kiểm này canh thứ khác:
+    bản thật sự được deploy. Một lần deploy thiếu file, hay ``includeFiles`` của
+    Vercel không gói ``app/static/**``, sẽ ra một trang Bản đồ trắng mà không endpoint
+    nào báo lỗi — đúng lớp bug "chỉ lộ ra khi chạy thật" mà script này tồn tại để bắt.
+    """
+    r = anon.get("/ui/world-vi.geojson")
+    if r.status_code != 200:
+        rep.fail("bản đồ · nền", f"/ui/world-vi.geojson trả {r.status_code}")
+        return
+    try:
+        fc = r.json()
+    except ValueError as exc:
+        rep.fail("bản đồ · nền", f"không phải JSON: {exc}")
+        return
+    if fc.get("type") != "FeatureCollection" or not fc.get("features"):
+        rep.fail("bản đồ · nền", "không phải FeatureCollection có dữ liệu")
+        return
+
+    # Điểm đối chứng TRƯỚC: nếu thuật toán không chạy thì phép thử biển vô nghĩa.
+    if _phu_boi(fc, 21.028, 105.854) != ["Việt Nam"]:
+        rep.fail("bản đồ · nền", "điểm đối chứng Hà Nội không ra Việt Nam")
+        return
+    ve_tren_bien = [
+        f"{la}N/{lo}E thuộc {who}"
+        for la, lo in _BIEN_DONG
+        if (who := _phu_boi(fc, la, lo))
+    ]
+    if ve_tren_bien:
+        rep.fail("bản đồ · nền", f"có yêu sách vẽ trên biển hở: {ve_tren_bien}")
+        return
+
+    kinds = {f["geometry"]["type"] for f in fc["features"]}
+    if kinds != {"MultiPolygon"}:
+        # Một yêu sách vẽ dạng ĐƯỜNG sẽ lọt qua phép thử điểm-trong-đa-giác.
+        rep.fail("bản đồ · nền", f"có hình học lạ ngoài MultiPolygon: {kinds}")
+        return
+
+    rep.ok(
+        "bản đồ · nền",
+        f"{len(fc['features'])} vùng · {len(r.content) // 1024} KB · "
+        f"{len(_BIEN_DONG)} điểm trên Biển Đông đều trống",
+    )
 
 
 def check_guards(rep: Report, anon: httpx.Client, psn: str) -> None:
@@ -702,6 +775,7 @@ def main() -> int:
     anon = httpx.Client(base_url=base, timeout=30.0)
     health = check_health(rep, anon)
     check_ui(rep, anon)
+    check_map(rep, anon)
     check_login_rejects_bad_password(rep, anon)
 
     c = authenticate(rep, base, args.user, args.password, settings.session_secret)

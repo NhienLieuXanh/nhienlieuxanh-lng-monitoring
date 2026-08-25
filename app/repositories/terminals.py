@@ -151,11 +151,19 @@ def update_operator(
     *,
     name: str | None = None,
     capacity_l: Decimal | None = None,
+    location_sent: bool = False,
+    latitude: Decimal | None = None,
+    longitude: Decimal | None = None,
 ) -> Terminal | None:
     """Sửa field do người vận hành sở hữu. Trả None nếu PSN không tồn tại.
 
     Ingest chỉ COALESCE vào chỗ NULL — một lần sửa ở đây là bền, không bị vòng
     ingest kế tiếp ghi đè.
+
+    ``location_sent`` là cờ tri-state cho toạ độ, không phải thừa: ``None`` ở
+    latitude/longitude vừa có thể nghĩa là "không sửa" vừa có thể nghĩa là "xoá
+    ghim". Một cờ tường minh tách hai ý đó ra; nếu dùng ``latitude is not None``
+    như name/capacity_l thì không có đường nào bỏ một ghim đặt sai.
     """
     term = get_by_psn(session, psn)
     if term is None:
@@ -164,6 +172,11 @@ def update_operator(
         term.name = name
     if capacity_l is not None:
         term.capacity_l = capacity_l
+    if location_sent:
+        # Gán CẢ HAI, luôn luôn. CHECK ck_terminals_latlon_paired cấm trạng thái
+        # nửa vời, nên gán lẻ một cột là cách chắc chắn nhất để ăn IntegrityError.
+        term.latitude = latitude
+        term.longitude = longitude
     session.flush()
     return term
 

@@ -51,6 +51,16 @@ cuối. Panel chi tiết: mức chứa / thể tích / áp suất / nhiệt đ�
   (z × độ lệch chuẩn × √thời gian giao hàng), kèm danh sách `reasons` để mỗi con số
   truy được về đầu vào.
 
+**Bản đồ.** Vị trí bồn trên nền bản đồ thế giới **nhúng sẵn trong app**
+(`app/static/world-vi.geojson`, dựng bằng `scripts/build_world_map.py` từ Natural Earth
+1:110m — public domain). Không gọi tile của nhà cung cấp nào: nền bản đồ này **không có
+đường lưỡi bò**, và `tests/test_world_map.py` canh giữ điều đó bằng 10 điểm thăm dò cộng
+một lưới 268 ô quét vùng biển hở — với tile raster thì không viết được test nào như vậy.
+Tên nước bằng tiếng Việt (`NAME_VI` có sẵn trong dữ liệu); Hoàng Sa và Trường Sa được
+đánh dấu thuộc Việt Nam, khai trong `VN_ISLANDS` ở `index.html` vì ở tỉ lệ 1:110 triệu
+Natural Earth bỏ hẳn hai quần đảo. Toạ độ bồn **do người vận hành nhập** — xem
+"Toạ độ GPS của vendor luôn là 0,0" bên dưới.
+
 **Kế hoạch nạp.** Lập lịch theo tháng cho một bồn thật (tự lấy dung tích + thể tích
 hiện tại), có nút áp dụng mức tiêu thụ đo được, cột ngày nghỉ / nạp chỉ định, và giờ
 nạp tới từng giây.
@@ -194,6 +204,22 @@ scope nhưng endpoint bỏ qua. Và `?psn=` bị **bỏ qua im lặng** (phải 
 Vì vậy `XINGKE_ALLOWED_PSNS` là **bắt buộc** và được thi hành ở ranh giới adapter.
 Không bao giờ "thu thập hết rồi filter sau".
 
+### Toạ độ GPS của vendor luôn là 0,0
+
+`psn/search` **có** gửi `gpsLatitude` / `gpsLongitude`, nên rất dễ tưởng là dùng được.
+Nhưng cả hai thiết bị pilot đều trả `0.000000 / 0.000000` kèm `gpsAddress = "--"` —
+module không có định vị. Vẽ thẳng số đó lên bản đồ thì bồn LNG hiện ở **Null Island giữa
+vịnh Guinea**, ngoài khơi châu Phi. Toạ độ thật duy nhất từng thấy
+(`10.971047, 106.750161`) chỉ có trong `DISCOVERY.md`, **không có trong fixture nào**,
+nên không tái lập được.
+
+Vì vậy toạ độ là **cấu hình tài sản do người nhập**, cùng loại với `capacity_l`, chứ
+không phải telemetry — bồn LNG là tài sản cố định đặt tại kho khách hàng, không di
+chuyển. Ba lưới an toàn ở tầng DB (`ck_terminals_*`): cấm đúng cặp `0,0`, cấm nửa toạ
+độ, và chặn `latitude` ngoài ±90 — luật cuối bắt lỗi **đảo thứ tự lat/lon**, vì với Việt
+Nam thì kinh độ 106,75 đặt vào ô vĩ độ sẽ vượt ngưỡng ngay thay vì âm thầm đưa bồn sang
+Siberia.
+
 ### Không dự báo từ dữ liệu đã lỗi thời
 
 Lần đo cũ hơn `FORECAST_MAX_READING_AGE_HOURS` (24 giờ) thì dự báo bị đánh dấu `stale`
@@ -232,6 +258,14 @@ step). Hai quy ước đã được thi hành và đừng phá:
   trữ · lần đo cuối · trực tuyến / ngoại tuyến · dữ liệu lỗi thời · bay hơi tự nhiên ·
   thời gian giữ áp · áp suất van an toàn · thời gian giao hàng · điểm đặt hàng lại ·
   dự trữ an toàn · mức phục vụ · sức chứa xe · ngưỡng.
+
+Trang Bản đồ có một quy ước riêng: **nền là SVG, ghim là HTML đè lên**. Mọi thứ nằm
+trong SVG đều bị `viewBox` co giãn theo, nên một ghim `r=3` ở mức thế giới sẽ phình bằng
+cả tỉnh khi zoom vào — và vùng bấm phình y hệt. Tách hai tầng thì ghim luôn đúng 44px
+thật. Cũng vì vậy `.mp-land` phải có `vector-effect: non-scaling-stroke`, nếu không
+đường bờ biển thành một dải bệt ở mức Việt Nam. Khung ngắm khai bằng **hộp** kinh/vĩ độ
+chứ không bằng một span kinh độ: khung rộng gấp 1,83 lần chiều cao nên span cố định 24°
+kinh chỉ cho 13,1° vĩ, cắt mất cả mũi Nam Bộ và Trường Sa.
 
 Container cuộn theo cột dọc (`.inspect`, `.plan-scroll`, `.rep-scroll`, `.set-scroll`)
 phải có `> * { flex: 0 0 auto }`: không có dòng đó thì con bị **bóp** thay vì để

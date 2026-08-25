@@ -644,6 +644,75 @@
     .an-anom-row time { font-family: var(--mono); font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; }
     .an-anom-row span { color: var(--muted); min-width: 0; }
 
+    /* ===== BẢN ĐỒ =====
+       Nền bản đồ là SVG, một path mỗi nước, phóng/thu bằng `viewBox` nên hình không
+       phải vẽ lại khi zoom. Còn ghim bồn và nhãn địa danh là HTML tuyệt đối ĐÈ LÊN
+       SVG, không phải <circle>/<text> bên trong SVG: mọi thứ trong SVG bị viewBox co
+       giãn theo, nên một ghim r=3 ở mức thế giới sẽ phình bằng cả tỉnh khi zoom vào,
+       và vùng bấm phình y hệt. Tách hai tầng thì ghim luôn đúng 44px thật. */
+    #view-map { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .mp-ctl { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+    .mp-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; padding: 12px 14px 14px; }
+    /* position: relative để tầng ghim định vị theo khung này. overflow: hidden để
+       ghim của bồn ngoài tầm nhìn không đẩy khung phình ra. */
+    .mp-canvas { position: relative; min-width: 0; min-height: 240px; overflow: hidden;
+                 background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); }
+    .mp-canvas:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+    .mp-canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    /* vector-effect giữ nét viền 1px ở mọi mức zoom. Không có nó, viền dày theo
+       viewBox và ở mức Việt Nam đường bờ biển thành một dải bệt. */
+    .mp-land { fill: var(--surface-3); stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .mp-land.vn { fill: var(--ok-bg); stroke: var(--nlx); stroke-width: 1.4; }
+    .mp-marks { position: absolute; inset: 0; pointer-events: none; }
+    .mp-pin { position: absolute; transform: translate(-50%, -50%); width: 44px; height: 44px; min-height: 44px;
+              padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; }
+    .mp-pin .dot { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+                   border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); box-shadow: var(--shadow-sm); }
+    .mp-pin.off .dot { background: var(--warn); }
+    .mp-pin.crit .dot { background: var(--crit); }
+    .mp-pin.sel .dot { width: 16px; height: 16px; margin: -8px 0 0 -8px; box-shadow: 0 0 0 4px var(--sel); }
+    /* --dy do JS tính để nhãn hai bồn gần nhau không đè lên nhau. */
+    .mp-pin .lbl { position: absolute; left: 50%; top: 50%; margin: calc(-9px + var(--dy, 0px)) 0 0 11px; white-space: nowrap;
+                   font-size: var(--fs-tiny); font-weight: 700; color: var(--fg); background: var(--surface);
+                   border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px 6px;
+                   max-width: var(--lw, 240px); overflow: hidden; text-overflow: ellipsis; }
+    /* Ghim sát cạnh phải: lật nhãn sang bên trái để khung không cắt mất phần cuối. */
+    .mp-pin .lbl.lft { left: auto; right: 50%; margin: calc(-9px + var(--dy, 0px)) 11px 0 0; }
+    /* Nhãn địa danh KHÔNG bấm được: nó là chú thích bản đồ, không phải nút. */
+    .mp-place { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; text-align: center;
+                font-size: var(--fs-tiny); color: var(--muted); pointer-events: none; }
+    .mp-place b { display: block; color: var(--nlx); font-size: var(--fs-sm); }
+    .mp-place .isl { display: block; letter-spacing: 2px; color: var(--nlx); line-height: 1; }
+    .mp-place.sea { color: var(--brand); font-style: italic; letter-spacing: .06em; }
+    .mp-legend { position: absolute; left: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 3px;
+                 background: var(--surface); border: 1px solid var(--line);
+                 border-radius: var(--r-sm); padding: 6px 8px; font-size: var(--fs-micro); color: var(--muted); }
+    .mp-legend span { display: flex; align-items: center; gap: 5px; }
+    .mp-legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+    .mp-legend i.off { background: var(--warn); }
+    .mp-legend i.crit { background: var(--crit); }
+    .mp-credit { position: absolute; right: 8px; bottom: 8px; font-size: var(--fs-micro); color: var(--faint); }
+    .mp-side { min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .mp-side > * { flex: 0 0 auto; min-width: 0; }
+    .mp-row { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 11px; min-width: 0; }
+    .mp-row.sel { border-color: var(--brand); background: var(--sel); }
+    .mp-row-top { display: flex; align-items: baseline; gap: 7px; }
+    .mp-row-name { font-size: var(--fs-body); font-weight: 700; color: var(--fg); min-width: 0; overflow-wrap: anywhere; }
+    .mp-row-psn { font-family: var(--mono); font-size: var(--fs-micro); color: var(--faint); margin-left: auto; }
+    .mp-row-pos { font-family: var(--mono); font-size: var(--fs-tiny); color: var(--muted); margin-top: 3px; }
+    .mp-row-pos.none { font-family: var(--font); color: var(--warn); }
+    .mp-row-act { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+    .mp-edit { margin-top: 8px; display: grid; gap: 6px; }
+    .mp-edit label { display: grid; gap: 3px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
+    .mp-edit .field { min-height: 44px; }
+    .mp-edit .row { display: flex; gap: 6px; }
+    @media (max-width: 980px) {
+      /* Xếp dọc: cột phải 300px trên màn hẹp làm khung bản đồ còn vài chục px. */
+      .mp-body { grid-template-columns: minmax(0, 1fr); }
+      .mp-canvas { min-height: 300px; }
+      .mp-side { overflow: visible; }
+    }
+
     /* ===== BÁO CÁO ===== */
     #view-reports { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .rep-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -827,6 +896,10 @@
         <button type="button" class="nav-item active" id="nav-dashboard" data-view="dashboard" title="Bảng điều khiển">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
           <span class="lbl">Bảng điều khiển</span>
+        </button>
+        <button type="button" class="nav-item" id="nav-map" data-view="map" title="Vị trí bồn trên bản đồ">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+          <span class="lbl">Bản đồ</span>
         </button>
         <button type="button" class="nav-item" id="nav-planner" data-view="planner" title="Kế hoạch nạp LNG">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7S5 10 5 14.5a7 7 0 0 0 14 0C19 10 12 2.7 12 2.7z"/></svg>
@@ -1126,6 +1199,48 @@
            Mỗi thẻ mở đầu bằng chất lượng dữ liệu có chủ ý: mọi con số bên dưới chỉ
            đúng bằng mức đúng của chuỗi sinh ra nó, nên độ phủ phải đọc được TRƯỚC
            chứ không nằm ở cuối như một chú thích. -->
+      <!-- BẢN ĐỒ: vị trí bồn trên nền bản đồ thế giới NHÚNG SẴN trong app.
+           Không dùng tile của nhà cung cấp nào — lý do và bằng chứng ở
+           scripts/build_world_map.py và tests/test_world_map.py: nền bản đồ này
+           không có đường lưỡi bò, và điều đó được test tự động canh giữ. -->
+      <section id="view-map" class="map" hidden aria-label="Bản đồ vị trí bồn">
+        <div class="pane-head">
+          <h1>Bản đồ</h1>
+          <span class="meta" id="mp-meta">Vị trí bồn LNG</span>
+          <div class="mp-ctl">
+            <button type="button" class="btn" id="mp-fit">Vừa khít bồn</button>
+            <button type="button" class="btn" id="mp-vn">Việt Nam</button>
+            <button type="button" class="btn" id="mp-world">Thế giới</button>
+            <button type="button" class="icon-btn" id="mp-in" aria-label="Phóng to" title="Phóng to">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="mp-out" aria-label="Thu nhỏ" title="Thu nhỏ">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="mp-body">
+          <!-- tabindex + phím mũi tên: di chuyển bản đồ KHÔNG cần kéo chuột. Cố ý
+               không làm kéo-thả: một vùng kéo được nằm giữa trang sẽ ăn cả cú vuốt
+               dọc để cuộn trang trên điện thoại. Bấm vào bản đồ là đặt lại tâm. -->
+          <!-- role="group", KHÔNG phải role="application": application bắt trình đọc
+               màn hình nhả hết phím cho trang, làm mất luôn cách điều hướng quen
+               thuộc. Các ghim là <button> thật nên Tab tới được bình thường. -->
+          <div class="mp-canvas" id="mp-canvas" tabindex="0" role="group"
+               aria-label="Bản đồ thế giới. Bấm để đặt lại tâm, phím mũi tên để di chuyển.">
+            <svg id="mp-svg" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="mp-marks" id="mp-marks"></div>
+            <div class="mp-legend">
+              <span><i></i> Đang báo</span>
+              <span><i class="off"></i> Mất liên lạc</span>
+              <span><i class="crit"></i> Có cảnh báo nặng</span>
+            </div>
+            <div class="mp-credit">Nền bản đồ: Natural Earth (public domain)</div>
+          </div>
+          <aside class="mp-side" id="mp-side"></aside>
+        </div>
+      </section>
+
       <section id="view-analytics" class="analytics" hidden aria-label="Phân tích">
         <div class="pane-head">
           <h1>Phân tích</h1>
@@ -2078,6 +2193,13 @@
         lu.hidden = false;
         renderHealth(); renderStats(); renderAlerts(); renderPsnOptions(); renderPlanTankOptions();
         renderTankList();
+        // Bản đồ chỉ vẽ lại khi ĐANG mở. Vòng làm mới 60 giây có thể chạy trong lúc
+        // người dùng đang gõ toạ độ, nên không vẽ lại phần danh sách nếu ô nhập đang
+        // mở — nếu không thì innerHTML xoá mất số họ vừa đánh dở.
+        if (!document.getElementById("view-map").hidden) {
+          if (mpEdit === null) mpRenderSide();
+          mpApply();
+        }
         await selectTank(selectedPsn ?? (sortedTanks()[0] && sortedTanks()[0].psn));
         // KHÔNG await: dashboard đã vẽ xong và dùng được; dự báo tự vẽ chồng lên khi
         // tới. Await ở đây sẽ làm mỗi lần làm mới đứng chờ vài nghìn điểm dữ liệu.
@@ -2853,8 +2975,355 @@
 
     /* ---------- ĐIỀU HƯỚNG VIEW ---------- */
 
+    // ================= BẢN ĐỒ =================
+    // Phép chiếu equirectangular (plate carrée): x = kinh độ, y = -vĩ độ. Chọn nó vì
+    // mục đích của trang là "bồn nằm ở đâu", không phải đo đường hay đo diện tích —
+    // và nó là phép chiếu duy nhất ở đây không cần một dòng toán nào.
+    let worldGeo = null;                  // GeoJSON, tải một lần rồi giữ
+    let mpDrawn = false;                  // đã dựng path nền chưa
+    let mpInited = false;                 // đã đặt khung ngắm lần đầu chưa
+    let mpSel = null;                     // PSN đang chọn
+    let mpEdit = null;                    // PSN đang mở ô nhập toạ độ
+    let mpView = { lon: 108.5, lat: 15.5, span: 24 };
+
+    // Preset khai bằng HỘP [tây, đông, nam, bắc], KHÔNG phải bằng một span kinh độ.
+    // Lỗi đã mắc: khai "Việt Nam" là span 24 độ kinh. Khung rộng gấp 1,83 lần chiều
+    // cao nên span vĩ độ suy ra chỉ 13,1 độ — đo được vùng thấy là 8,95..22,05, tức
+    // CẮT MẤT cả mũi Nam Bộ (8,6 N) và Trường Sa (8,2 N). Hộp thì không phụ thuộc
+    // hình dạng khung: span tính lại từ tỉ lệ thật mỗi lần vẽ.
+    const MP_PRESETS = {
+      // Trọn Việt Nam kèm Hoàng Sa và Trường Sa.
+      vn: [101.0, 118.5, 6.2, 23.9],
+      // Cả vĩ độ, KHÔNG cắt Nam Cực. Cắt nó làm hộp hoá ra rất dẹt (355×133), và
+      // vì bề rộng quyết định span thì phần cao dôi ra thành dải trống — đo được
+      // vùng thấy là vĩ độ −95..114 cho một hộp chỉ cần 133 độ. Lấy trọn ±85 thì
+      // span vẫn do bề rộng quyết định nhưng chiều cao gần khít.
+      world: [-180, 180, -85, 85],
+    };
+    const MP_MIN_SPAN = 0.5, MP_MAX_SPAN = 400;
+
+    // Hoàng Sa và Trường Sa khai TẠI ĐÂY, không lấy từ dữ liệu nền: ở tỉ lệ
+    // 1:110 triệu Natural Earth bỏ hẳn hai quần đảo vì quá nhỏ. Toạ độ dưới đây là
+    // vị trí CHỈ DẤU của vài đảo tiêu biểu để người xem định hướng, không phải số
+    // liệu trắc địa — bản đồ này để biết bồn nằm ở đâu, không dùng cho hàng hải.
+    const VN_ISLANDS = [
+      {
+        name: "Hoàng Sa", note: "(Việt Nam)", lon: 111.4, lat: 15.6,
+        dots: [[112.33, 16.83], [111.60, 16.84], [111.51, 17.10], [112.74, 16.53]],
+      },
+      {
+        name: "Trường Sa", note: "(Việt Nam)", lon: 112.6, lat: 8.2,
+        dots: [[111.92, 8.64], [114.33, 11.43], [114.37, 10.18], [114.33, 9.88], [112.89, 9.55]],
+      },
+    ];
+    const MP_SEA = { name: "Biển Đông", lon: 116.8, lat: 13.2 };
+    // Dưới mức này thì nhãn địa danh chồng lên nhau thành một vũng chữ — ẩn đi.
+    const MP_LABEL_SPAN = 70;
+
+    async function openMap() {
+      try {
+        await mpLoadGeo();
+      } catch (e) {
+        document.getElementById("mp-meta").textContent =
+          "Không tải được nền bản đồ: " + e.message;
+        return;
+      }
+      mpDrawBase();
+      mpRenderSide();
+      // Lần đầu mở: khung ngắm phải do DỮ LIỆU quyết định, không phải một hằng số.
+      // mpFit() tự lùi về preset Việt Nam khi chưa bồn nào có toạ độ.
+      if (!mpInited) { mpInited = true; mpFit(); } else mpApply();
+    }
+
+    async function mpLoadGeo() {
+      if (worldGeo) return;
+      // Đường tương đối: trang được serve từ /ui/ nên không hard-code host, và
+      // không gọi ra bất kỳ CDN nào — chạy được sau firewall công ty.
+      const r = await fetch("world-vi.geojson", { credentials: "same-origin" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      worldGeo = await r.json();
+    }
+
+    // Dựng path MỘT LẦN. Zoom chỉ đổi viewBox nên hình không phải tính lại — đó là
+    // lý do dùng SVG cho nền thay vì canvas vẽ tay mỗi khung.
+    function mpDrawBase() {
+      if (mpDrawn || !worldGeo) return;
+      const parts = [];
+      for (const f of worldGeo.features) {
+        let d = "";
+        for (const poly of f.geometry.coordinates) {
+          for (const ring of poly) {
+            d += "M" + ring.map(p => `${p[0]} ${-p[1]}`).join("L") + "Z";
+          }
+        }
+        if (!d) continue;
+        const vn = f.properties.i === "VNM" ? " vn" : "";
+        parts.push(`<path class="mp-land${vn}" d="${d}"><title>${esc(f.properties.n)}</title></path>`);
+      }
+      document.getElementById("mp-svg").innerHTML = parts.join("");
+      mpDrawn = true;
+    }
+
+    // Tính viewBox từ tỉ lệ THẬT của khung: nếu không, `preserveAspectRatio="none"`
+    // sẽ bóp méo hình nước. Tính lại mỗi lần vẽ nên đổi kích thước cửa sổ vẫn đúng.
+    function mpBox() {
+      const r = document.getElementById("mp-canvas").getBoundingClientRect();
+      const pw = r.width || 1, ph = r.height || 1;
+      const w = mpView.span;
+      const h = w * ph / pw;
+      return { x0: mpView.lon - w / 2, y0: -mpView.lat - h / 2, w, h, pw, ph };
+    }
+    function mpToPx(lon, lat, b) {
+      return { x: (lon - b.x0) / b.w * b.pw, y: (-lat - b.y0) / b.h * b.ph };
+    }
+    function mpToLonLat(px, py, b) {
+      return { lon: b.x0 + px / b.pw * b.w, lat: -(b.y0 + py / b.ph * b.h) };
+    }
+
+    function mpApply() {
+      const b = mpBox();
+      document.getElementById("mp-svg")
+        .setAttribute("viewBox", `${b.x0} ${b.y0} ${b.w} ${b.h}`);
+      mpRenderMarks(b);
+    }
+
+    function mpSetView(lon, lat, span) {
+      mpView = {
+        lon: Math.max(-180, Math.min(180, lon)),
+        lat: Math.max(-85, Math.min(85, lat)),
+        span: Math.max(MP_MIN_SPAN, Math.min(MP_MAX_SPAN, span)),
+      };
+      mpApply();
+    }
+    function mpZoom(f) { mpSetView(mpView.lon, mpView.lat, mpView.span * f); }
+
+    // Đưa một hộp kinh/vĩ độ vào vừa khung. `span` là bề rộng theo kinh độ, nên để
+    // hộp vừa cả chiều CAO thì span phải >= chiều cao hộp × (rộng khung / cao khung).
+    // Lấy max của hai chiều: hộp luôn nằm trọn trong khung, không bị cắt cạnh nào.
+    function mpFitBox(lo1, lo2, la1, la2, pad) {
+      const r = document.getElementById("mp-canvas").getBoundingClientRect();
+      const pw = r.width || 1, ph = r.height || 1;
+      const p = pad || 1.08;
+      const w = Math.max(0.2, (lo2 - lo1) * p);
+      const h = Math.max(0.2, (la2 - la1) * p);
+      mpSetView((lo1 + lo2) / 2, (la1 + la2) / 2, Math.max(w, h * pw / ph));
+    }
+    // Thế giới không cần đệm: hộp đã là trọn hành tinh, đệm thêm chỉ tạo viền trống.
+    function mpPreset(k) {
+      const b = MP_PRESETS[k];
+      mpFitBox(b[0], b[1], b[2], b[3], k === "world" ? 1 : 1.08);
+    }
+
+    function mpPlaced() {
+      return tanks.filter(t => t.latitude !== null && t.latitude !== undefined);
+    }
+
+    function mpFit() {
+      const ts = mpPlaced();
+      if (!ts.length) {
+        document.getElementById("mp-meta").textContent =
+          "Chưa bồn nào có toạ độ — ghim vị trí ở danh sách bên phải.";
+        mpPreset("vn");
+        return;
+      }
+      const las = ts.map(t => Number(t.latitude)), los = ts.map(t => Number(t.longitude));
+      // Nới hộp ra tối thiểu 4 độ mỗi chiều: hai bồn cách nhau 0,4 độ cho một hộp
+      // gần như một điểm, zoom vào đó thì thấy đúng hai cái ghim trên nền trắng và
+      // mất hết ngữ cảnh "nó nằm ở đâu" — chính là câu hỏi trang này để trả lời.
+      const pad = 2;
+      mpFitBox(
+        Math.min(...los) - pad, Math.max(...los) + pad,
+        Math.min(...las) - pad, Math.max(...las) + pad,
+      );
+    }
+
+    function mpCritSet() {
+      return new Set(alerts.filter(a => a.severity === "critical").map(a => a.psn));
+    }
+
+    function mpRenderMarks(b) {
+      b = b || mpBox();
+      const bits = [];
+
+      if (mpView.span <= MP_LABEL_SPAN) {
+        for (const isl of VN_ISLANDS) {
+          const dots = isl.dots
+            .map(([lo, la]) => mpToPx(lo, la, b))
+            .map(p => `<span class="mp-place" style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px"><span class="isl">•</span></span>`);
+          bits.push(...dots);
+          const c = mpToPx(isl.lon, isl.lat, b);
+          bits.push(
+            `<span class="mp-place" style="left:${c.x.toFixed(1)}px;top:${c.y.toFixed(1)}px">` +
+            `<b>${esc(isl.name)}</b>${esc(isl.note)}</span>`
+          );
+        }
+        const s = mpToPx(MP_SEA.lon, MP_SEA.lat, b);
+        bits.push(`<span class="mp-place sea" style="left:${s.x.toFixed(1)}px;top:${s.y.toFixed(1)}px">${esc(MP_SEA.name)}</span>`);
+      }
+
+      const crit = mpCritSet();
+      // Chống nhãn đè nhau. Hai bồn cách nhau 0,4 độ là hai nhãn nằm chồng, đọc ra
+      // một dòng chữ vô nghĩa — đã thấy trên ảnh chụp với đúng hai bồn. Đẩy dần nhãn
+      // xuống cho tới khi không chồng nữa. Bề rộng nhãn ước lượng theo số ký tự: chỉ
+      // cần đủ để tránh nhau, không cần đo chính xác (đo thật thì phải render trước
+      // rồi đọc lại layout — một vòng reflow cho mỗi ghim).
+      const placedLbl = [];
+      for (const t of mpPlaced()) {
+        const p = mpToPx(Number(t.longitude), Number(t.latitude), b);
+        // Bỏ ghim ngoài khung: DOM không phình vì bồn đang ở nửa kia địa cầu.
+        if (p.x < -60 || p.y < -60 || p.x > b.pw + 60 || p.y > b.ph + 60) continue;
+        const cls = crit.has(t.psn) ? "crit" : (t.status === "offline" ? "off" : "");
+        const pct = pctOf(t);
+        const name = t.name || t.psn;
+        const lbl = pct === null ? name : `${name} · ${fmtPct(pct)}%`;
+
+        // Nhãn mặc định bên phải ghim. Trên màn hẹp, một tên bồn dài không vừa BÊN
+        // NÀO: đo được nhãn 178px trên khung 347px, lật sang trái thì cắt mất đầu
+        // thay vì cắt mất đuôi. Nên vừa chọn bên còn nhiều chỗ hơn, VỪA đặt trần bề
+        // rộng để CSS cắt bằng dấu ba chấm — tên đầy đủ vẫn có ở tooltip và ở danh
+        // sách bên phải, nên không mất thông tin nào.
+        const lwMax = Math.max(80, Math.min(260, b.pw * 0.45));
+        const wEst = Math.min(lbl.length * 6.6 + 14, lwMax);
+        const roomR = b.pw - (p.x + 11) - 4, roomL = p.x - 11 - 4;
+        const lft = roomR < wEst && roomL > roomR;
+        const cap = Math.max(60, Math.min(wEst, lft ? roomL : roomR));
+        const x0 = lft ? p.x - 11 - cap : p.x + 11, x1 = x0 + cap;
+        let dy = 0;
+        while (
+          dy <= 120 &&
+          placedLbl.some(q => Math.abs(q.y - (p.y + dy)) < 17 && x0 < q.x1 && q.x0 < x1)
+        ) dy += 17;
+        placedLbl.push({ x0, x1, y: p.y + dy });
+
+        bits.push(
+          `<button type="button" class="mp-pin ${cls}${t.psn === mpSel ? " sel" : ""}" ` +
+          `style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;--dy:${dy}px;--lw:${Math.round(cap)}px" data-psn="${esc(t.psn)}" ` +
+          `title="${esc(name)} — ${esc(t.latitude)}, ${esc(t.longitude)}">` +
+          `<span class="dot"></span><span class="lbl${lft ? " lft" : ""}">${esc(lbl)}</span></button>`
+        );
+      }
+      document.getElementById("mp-marks").innerHTML = bits.join("");
+
+      const n = mpPlaced().length, tot = tanks.length;
+      document.getElementById("mp-meta").textContent =
+        tot === 0 ? "Chưa có bồn nào trong hệ thống."
+                  : `${n}/${tot} bồn đã ghim vị trí`;
+    }
+
+    function mpRenderSide() {
+      const side = document.getElementById("mp-side");
+      if (!tanks.length) {
+        side.innerHTML = `<p class="hint">Chưa có bồn nào trong hệ thống.</p>`;
+        return;
+      }
+      side.innerHTML = tanks.map(t => {
+        const has = t.latitude !== null && t.latitude !== undefined;
+        const pos = has
+          ? `<div class="mp-row-pos">${esc(t.latitude)}, ${esc(t.longitude)}</div>`
+          : `<div class="mp-row-pos none">Chưa ghim vị trí</div>`;
+        const editing = mpEdit === t.psn;
+        const form = editing ? `
+          <div class="mp-edit">
+            <label>Vĩ độ (latitude)
+              <input class="field" id="mp-lat-${esc(t.psn)}" inputmode="decimal"
+                     value="${has ? esc(t.latitude) : ""}" placeholder="10.971047" />
+            </label>
+            <label>Kinh độ (longitude)
+              <input class="field" id="mp-lon-${esc(t.psn)}" inputmode="decimal"
+                     value="${has ? esc(t.longitude) : ""}" placeholder="106.750161" />
+            </label>
+            <p class="hint">Dán được cả cặp "10.971047, 106.750161" vào ô vĩ độ.</p>
+            <div class="row">
+              <button type="button" class="btn btn-primary" data-mp-save="${esc(t.psn)}">Lưu</button>
+              ${has ? `<button type="button" class="btn" data-mp-clear="${esc(t.psn)}">Xoá ghim</button>` : ""}
+              <button type="button" class="btn" data-mp-cancel="1">Đóng</button>
+            </div>
+            <p class="set-msg" id="mp-msg-${esc(t.psn)}" hidden></p>
+          </div>` : "";
+        return `<div class="mp-row${t.psn === mpSel ? " sel" : ""}">
+          <div class="mp-row-top">
+            <span class="mp-row-name">${esc(t.name || t.psn)}</span>
+            <span class="mp-row-psn">${esc(t.psn)}</span>
+          </div>
+          ${pos}
+          <div class="mp-row-act">
+            ${has ? `<button type="button" class="btn" data-mp-go="${esc(t.psn)}">Xem trên bản đồ</button>` : ""}
+            <button type="button" class="btn" data-mp-edit="${esc(t.psn)}">${has ? "Sửa toạ độ" : "Ghim vị trí"}</button>
+          </div>
+          ${form}
+        </div>`;
+      }).join("");
+    }
+
+    // Cặp toạ độ dán từ Google Maps là "10.971047, 106.750161". Chỉ tách khi CẢ HAI
+    // phần đều có dấu chấm thập phân — nếu không thì "10,97" (cách viết số của người
+    // Việt) sẽ bị hiểu thành hai số 10 và 97, đặt bồn ra giữa Thái Bình Dương.
+    const MP_PAIR = /^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/;
+
+    function mpReadPair(psn) {
+      const rawLat = (document.getElementById(`mp-lat-${psn}`).value || "").trim();
+      const rawLon = (document.getElementById(`mp-lon-${psn}`).value || "").trim();
+      const m = rawLat.match(MP_PAIR);
+      if (m) return { lat: m[1], lon: m[2] };
+      // Dấu phẩy còn lại là dấu thập phân kiểu Việt Nam: 10,971047 -> 10.971047
+      return { lat: rawLat.replace(",", "."), lon: rawLon.replace(",", ".") };
+    }
+
+    async function mpSaveLocation(psn) {
+      const id = `mp-msg-${psn}`;
+      const { lat, lon } = mpReadPair(psn);
+      if (!lat || !lon) { setMsg(id, "Cần nhập cả vĩ độ và kinh độ.", "bad"); return; }
+      if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) {
+        setMsg(id, "Toạ độ không phải số. Ví dụ: 10.971047 và 106.750161", "bad");
+        return;
+      }
+      await mpPatch(psn, { latitude: lat, longitude: lon }, id, "Đã ghim vị trí.");
+    }
+
+    async function mpClearLocation(psn) {
+      // null CẢ HAI là cách API hiểu "xoá ghim". Gửi một bên là 422.
+      await mpPatch(psn, { latitude: null, longitude: null }, `mp-msg-${psn}`, "Đã xoá ghim.");
+    }
+
+    async function mpPatch(psn, body, msgId, okText) {
+      setMsg(msgId, "Đang lưu…", "");
+      try {
+        const t = await api(`/api/terminals/${encodeURIComponent(psn)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        // Cập nhật đúng bồn trong state thay vì tải lại cả trang: server đã trả về
+        // bản ghi sau khi lưu, nên không cần thêm một vòng request nào.
+        const i = tanks.findIndex(x => x.psn === psn);
+        if (i >= 0) { tanks[i].latitude = t.latitude; tanks[i].longitude = t.longitude; }
+        mpEdit = null;
+        mpRenderSide();
+        if (t.latitude !== null && t.latitude !== undefined) {
+          mpSel = psn;
+          mpSetView(Number(t.longitude), Number(t.latitude), Math.min(mpView.span, 8));
+        } else {
+          mpApply();
+        }
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg(msgId, e.message, "bad");
+      }
+    }
+
+    function mpSelect(psn) {
+      mpSel = psn;
+      const t = tanks.find(x => x.psn === psn);
+      mpRenderSide();
+      if (t && t.latitude !== null && t.latitude !== undefined) {
+        mpSetView(Number(t.longitude), Number(t.latitude), Math.min(mpView.span, 8));
+      } else {
+        mpApply();
+      }
+    }
+
     const VIEWS = {
       dashboard: { el: "view-dashboard", nav: "nav-dashboard", title: "Giám sát bồn LNG" },
+      map: { el: "view-map", nav: "nav-map", title: "Bản đồ vị trí bồn" },
       planner: { el: "view-planner", nav: "nav-planner", title: "Kế hoạch nạp LNG" },
       reports: { el: "view-reports", nav: "nav-reports", title: "Báo cáo & nhật ký" },
       analytics: { el: "view-analytics", nav: "nav-analytics", title: "Phân tích" },
@@ -2870,6 +3339,7 @@
         if (nav) nav.classList.toggle("active", key === name);
       }
       document.querySelector(".page-title").textContent = VIEWS[name].title;
+      if (name === "map") openMap();
       if (name === "planner") { renderPlanTankOptions(); updateMeasuredBtn(); renderPlanAssist(); computePlan(); }
       if (name === "reports") { renderRepTankOptions(); loadRefills(); }
       // Tải MỖI LẦN mở: khác trang Cài đặt (nơi người dùng có thể đang gõ nửa dở),
@@ -2923,6 +3393,45 @@
       // nó không gây lỗi console nào, chỉ là bấm vào không có gì xảy ra.
       document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
         btn.addEventListener("click", () => showView(btn.dataset.view));
+      });
+
+      // Bản đồ
+      document.getElementById("mp-world").addEventListener("click", () => mpPreset("world"));
+      document.getElementById("mp-vn").addEventListener("click", () => mpPreset("vn"));
+      document.getElementById("mp-fit").addEventListener("click", mpFit);
+      document.getElementById("mp-in").addEventListener("click", () => mpZoom(0.6));
+      document.getElementById("mp-out").addEventListener("click", () => mpZoom(1 / 0.6));
+      // MỘT handler cho cả khung: ghim có pointer-events:auto nên click trên ghim vẫn
+      // nổi bọt lên đây. Bắt ghim trước, còn lại là đặt lại tâm.
+      document.getElementById("mp-canvas").addEventListener("click", (e) => {
+        const pin = e.target.closest(".mp-pin");
+        if (pin) { mpSelect(pin.dataset.psn); return; }
+        const r = e.currentTarget.getBoundingClientRect();
+        const p = mpToLonLat(e.clientX - r.left, e.clientY - r.top, mpBox());
+        mpSetView(p.lon, p.lat, mpView.span);
+      });
+      document.getElementById("mp-canvas").addEventListener("keydown", (e) => {
+        const d = mpView.span / 6;
+        const mv = { ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, d], ArrowDown: [0, -d] };
+        if (mv[e.key]) {
+          e.preventDefault();
+          mpSetView(mpView.lon + mv[e.key][0], mpView.lat + mv[e.key][1], mpView.span);
+        } else if (e.key === "+" || e.key === "=") { e.preventDefault(); mpZoom(0.6); }
+        else if (e.key === "-") { e.preventDefault(); mpZoom(1 / 0.6); }
+      });
+      document.getElementById("mp-side").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.mpGo) mpSelect(b.dataset.mpGo);
+        else if (b.dataset.mpEdit) { mpEdit = b.dataset.mpEdit; mpSel = b.dataset.mpEdit; mpRenderSide(); }
+        else if (b.dataset.mpCancel) { mpEdit = null; mpRenderSide(); }
+        else if (b.dataset.mpSave) mpSaveLocation(b.dataset.mpSave);
+        else if (b.dataset.mpClear) mpClearLocation(b.dataset.mpClear);
+      });
+      // Đổi kích thước cửa sổ là đổi tỉ lệ khung, nên viewBox phải tính lại: với
+      // preserveAspectRatio="none" mà không tính lại thì hình các nước bị bóp méo.
+      window.addEventListener("resize", () => {
+        if (!document.getElementById("view-map").hidden) mpApply();
       });
 
       // Cài đặt
