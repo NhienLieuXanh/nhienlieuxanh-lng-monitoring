@@ -19,11 +19,14 @@ bao giờ bỏ được.
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.dialects import postgresql
 
 from app.api.schemas import TerminalUpdateIn
+from app.repositories import terminals as term_repo
 
 
 class TestNhanToaDoHopLe:
@@ -91,6 +94,61 @@ class TestXoaGhim:
         got = TerminalUpdateIn(name="Bồn A - Kho Long An")
         assert got.location_sent is False
         assert got.latitude is None
+
+
+class _FakeResult:
+    def __init__(self, row: tuple) -> None:
+        self._row = row
+
+    def one(self) -> tuple:
+        return self._row
+
+
+class _CapturingSession:
+    """Session giả: ghi lại statement, KHÔNG mở kết nối nào."""
+
+    def __init__(self) -> None:
+        self.stmts: list = []
+
+    def execute(self, stmt, *a, **kw):  # type: ignore[no-untyped-def]
+        self.stmts.append(stmt)
+        return _FakeResult((uuid4(), True))
+
+
+class TestUpsertKhongGhiDeGhimTay:
+    """Ingest chỉ được ĐIỀN VÀO CHỖ TRỐNG, không được ghi đè.
+
+    Đây là luật quan trọng nhất của đường tự động, và cũng là luật duy nhất cần DB
+    thật mới quan sát được hành vi (xem tests/test_ingestion.py). Test này kiểm nó ở
+    tầng SQL nên chạy được ở mọi nơi: biên dịch đúng câu lệnh mà upsert() phát ra
+    rồi assert mệnh đề COALESCE có mặt.
+
+    Vì sao đáng kiểm: nếu ghi đè vô điều kiện thì (a) mất vị trí chính xác người
+    vận hành tự đo, và (b) một ngày module mất định vị sẽ XOÁ toạ độ đang đúng —
+    GPS của vendor là dữ liệu thỉnh thoảng có.
+    """
+
+    def _sql(self) -> str:
+        s = _CapturingSession()
+        term_repo.upsert(
+            s,  # type: ignore[arg-type]  # chỉ cần .execute(); không nối DB nào
+            "2604200016",
+            default_latitude=Decimal("10.971047"),
+            default_longitude=Decimal("106.750161"),
+        )
+        assert s.stmts, "upsert() không phát ra statement nào"
+        return str(s.stmts[0].compile(dialect=postgresql.dialect())).lower()
+
+    def test_toa_do_duoc_coalesce(self) -> None:
+        sql = self._sql()
+        assert "coalesce(terminals.latitude, excluded.latitude)" in sql
+        assert "coalesce(terminals.longitude, excluded.longitude)" in sql
+
+    def test_khong_gan_thang_gia_tri_vendor(self) -> None:
+        """`SET latitude = excluded.latitude` trần là đúng thứ phải không có."""
+        sql = self._sql()
+        assert "latitude = excluded.latitude" not in sql
+        assert "longitude = excluded.longitude" not in sql
 
 
 class TestGiuNguyenHanhViCu:

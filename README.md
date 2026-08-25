@@ -58,8 +58,9 @@ cuối. Panel chi tiết: mức chứa / thể tích / áp suất / nhiệt đ�
 một lưới 268 ô quét vùng biển hở — với tile raster thì không viết được test nào như vậy.
 Tên nước bằng tiếng Việt (`NAME_VI` có sẵn trong dữ liệu); Hoàng Sa và Trường Sa được
 đánh dấu thuộc Việt Nam, khai trong `VN_ISLANDS` ở `index.html` vì ở tỉ lệ 1:110 triệu
-Natural Earth bỏ hẳn hai quần đảo. Toạ độ bồn **do người vận hành nhập** — xem
-"Toạ độ GPS của vendor luôn là 0,0" bên dưới.
+Natural Earth bỏ hẳn hai quần đảo. Toạ độ bồn **tự lấy từ GPS của module** mỗi vòng
+ingest, và ghim tay được để sửa hoặc để khai khi module không định vị — xem "GPS của
+vendor là dữ liệu THỈNH THOẢNG CÓ" bên dưới.
 
 **Kế hoạch nạp.** Lập lịch theo tháng cho một bồn thật (tự lấy dung tích + thể tích
 hiện tại), có nút áp dụng mức tiêu thụ đo được, cột ngày nghỉ / nạp chỉ định, và giờ
@@ -204,21 +205,31 @@ scope nhưng endpoint bỏ qua. Và `?psn=` bị **bỏ qua im lặng** (phải 
 Vì vậy `XINGKE_ALLOWED_PSNS` là **bắt buộc** và được thi hành ở ranh giới adapter.
 Không bao giờ "thu thập hết rồi filter sau".
 
-### Toạ độ GPS của vendor luôn là 0,0
+### GPS của vendor là dữ liệu THỈNH THOẢNG CÓ, và 0,0 nghĩa là mất định vị
 
-`psn/search` **có** gửi `gpsLatitude` / `gpsLongitude`, nên rất dễ tưởng là dùng được.
-Nhưng cả hai thiết bị pilot đều trả `0.000000 / 0.000000` kèm `gpsAddress = "--"` —
-module không có định vị. Vẽ thẳng số đó lên bản đồ thì bồn LNG hiện ở **Null Island giữa
-vịnh Guinea**, ngoài khơi châu Phi. Toạ độ thật duy nhất từng thấy
-(`10.971047, 106.750161`) chỉ có trong `DISCOVERY.md`, **không có trong fixture nào**,
-nên không tái lập được.
+`psn/search` gửi `gpsLatitude` / `gpsLongitude`, và nó **dùng được** — nhưng không phải
+lúc nào cũng có. Xác minh bằng cách gọi thẳng vendor: PSN `2604200016` ngày `2026-07-23`
+trả `10.971047 / 106.750161`, còn ngày `2026-06-02` trả `0.000000 / 0.000000` cho **cả
+17 dòng**. `gpsAddress` thì luôn là placeholder `"--"`.
 
-Vì vậy toạ độ là **cấu hình tài sản do người nhập**, cùng loại với `capacity_l`, chứ
-không phải telemetry — bồn LNG là tài sản cố định đặt tại kho khách hàng, không di
-chuyển. Ba lưới an toàn ở tầng DB (`ck_terminals_*`): cấm đúng cặp `0,0`, cấm nửa toạ
-độ, và chặn `latitude` ngoài ±90 — luật cuối bắt lỗi **đảo thứ tự lat/lon**, vì với Việt
-Nam thì kinh độ 106,75 đặt vào ô vĩ độ sẽ vượt ngưỡng ngay thay vì âm thầm đưa bồn sang
-Siberia.
+Hai cái bẫy, cả hai đều làm mất dữ liệu nếu làm sai:
+
+- **Nhận 0,0** là đặt bồn LNG ở **Null Island giữa vịnh Guinea**, ngoài khơi châu Phi.
+  0,0 là tín hiệu mất định vị, không phải một vị trí. Loại ở `mapping.extract_gps` —
+  nhưng chỉ loại **cặp** 0,0, vì `lon = 0` riêng lẻ (kinh tuyến Greenwich) là thật.
+- **Kết luận "vendor không có GPS" từ một ngày.** Đúng lỗi đã mắc: fixture được chụp vào
+  ngày module mất định vị nên toàn 0,0, và kết luận sai đó đã suýt biến một tính năng tự
+  động thành việc nhập tay. Một ngày không phải bằng chứng.
+
+Vì vậy có **hai nguồn**, ưu tiên rõ ràng: GPS module tự điền mỗi vòng ingest, còn người
+vận hành ghim tay để sửa cho chính xác hơn hoặc để khai khi module không định vị được.
+Ingest chỉ `COALESCE` vào chỗ `NULL` nên **ghim tay luôn thắng** — không có luật đó thì
+một ngày mất định vị sẽ xoá mất toạ độ đang đúng.
+
+Bốn lưới an toàn ở tầng DB (`ck_terminals_*`): cấm đúng cặp `0,0`, cấm nửa toạ độ, và
+chặn `latitude`/`longitude` ngoài khoảng — luật cuối bắt lỗi **đảo thứ tự lat/lon**, vì
+với Việt Nam thì kinh độ 106,75 đặt vào ô vĩ độ sẽ vượt ±90 ngay thay vì âm thầm đưa bồn
+sang Siberia.
 
 ### Không dự báo từ dữ liệu đã lỗi thời
 

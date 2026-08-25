@@ -166,11 +166,27 @@ class IngestionService:
                 (r.capacity_l for r in reversed(result.readings) if r.capacity_l),
                 None,
             )
+            # Toạ độ cũng vậy, nhưng nó là dữ liệu THỈNH THOẢNG CÓ: cùng một thiết
+            # bị có ngày trả toạ độ thật, có ngày trả 0,0 — xác minh trên dữ liệu
+            # thật (2604200016 ngày 2026-07-23 có toạ độ, ngày 2026-06-02 thì cả 17
+            # dòng đều 0,0). Adapter đã loại 0,0, nên ở đây chỉ lấy cặp gần nhất
+            # còn sót. Không có cặp nào thì để None và upsert() không ghi gì —
+            # KHÔNG BAO GIỜ xoá toạ độ đang có chỉ vì hôm nay module mất định vị.
+            lat, lon = next(
+                (
+                    (r.latitude, r.longitude)
+                    for r in reversed(result.readings)
+                    if r.latitude is not None and r.longitude is not None
+                ),
+                (None, None),
+            )
             tid, created = term_repo.upsert(
                 session,
                 psn,
                 default_capacity_l=capacity
                 or Decimal(str(self._s.default_tank_capacity_l)),
+                default_latitude=lat,
+                default_longitude=lon,
             )
             if created:
                 stats.terminals_created += 1

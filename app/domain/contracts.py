@@ -89,6 +89,16 @@ class NormalizedTelemetry(BaseModel):
     # vào bảng telemetry.
     capacity_l: Decimal | None = None
 
+    # Toạ độ bồn. Cùng lý do như capacity_l: vendor gửi kèm mỗi lần đọc nhưng nó
+    # là cấu hình tài sản, nên đi vào bảng terminals chứ không vào telemetry.
+    #
+    # LUÔN đi theo cặp, hoặc cùng None. Adapter đã loại cặp 0,0 (giá trị module
+    # gửi khi mất định vị) và giá trị ngoài khoảng — xem mapping.extract_gps.
+    # Đây là dữ liệu "thỉnh thoảng có": cùng một thiết bị có ngày trả toạ độ thật,
+    # có ngày trả 0,0.
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+
     raw_payload: dict[str, Any]
 
     @field_validator("sampled_at")

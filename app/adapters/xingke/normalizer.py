@@ -57,6 +57,7 @@ def normalize_reading(
         values[spec.target] = M.extract_text(index, spec, report)
 
     capacity_l = M.extract_number(index, M.CAPACITY_FIELD, report)
+    latitude, longitude = M.extract_gps(index, report)
 
     # Nhãn nguồn của volume_percent. Vendor CÓ gửi volumePercentage trên endpoint
     # này, nhưng endpoint khác có thể không — và trộn giá trị vendor gửi với giá
@@ -73,6 +74,8 @@ def normalize_reading(
         vendor_ts_raw=str(raw_ts) if raw_ts is not None else None,
         volume_percent_source=percent_source,
         capacity_l=capacity_l,
+        latitude=latitude,
+        longitude=longitude,
         raw_payload=dict(row) if store_raw else {},
         **values,
     )

@@ -90,7 +90,8 @@ Params: `currentPage` · `pageSize` · `psn` · `queryTime` (**một ngày `YYYY
 | `hardwareVersion` `softwareVersion` | `None` | terminals | **chú ý §7** |
 | `moduleNumber` `cardNumber` | (PII) | `modem_number` `sim_iccid` | |
 | `diameter` `tubeLength` `sendFrequency` | `2100` `2310` `60` | — | hình học bồn / chu kỳ báo |
-| `gpsLatitude` `gpsLongitude` | `10.971047` `106.750161` | — | **giai đoạn 1 không dùng**; có trong `raw_payload` |
+| `gpsLatitude` `gpsLongitude` | `10.971047` `106.750161` | `terminals.latitude/longitude` | **thỉnh thoảng có**: cùng thiết bị, ngày 2026-07-23 trả toạ độ này, ngày 2026-06-02 trả `0.000000` cho cả 17 dòng. `0,0` là MẤT ĐỊNH VỊ nên bị loại ở `extract_gps` |
+| `gpsAddress` | `'--'` | — | placeholder, chưa bao giờ thấy giá trị thật |
 | `index` | `1` | — | **số dòng phía client, không phải dữ liệu** |
 | `pressureOne/Two/Three(+Mpa)` · `pressureTwpMpa` · `temperatureTwo/Three` · `color` · `electricityPercentage` · `currentChargingCurrent` | `None` / `0` | — | sensor phụ, không dùng |
 

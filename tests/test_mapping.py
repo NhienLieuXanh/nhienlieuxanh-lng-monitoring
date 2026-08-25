@@ -135,6 +135,79 @@ def test_out_of_range_value_rejected_not_stored():
     assert any("ngoai khoang" in e or "ngoài khoảng" in e for _, e in rep.errors)
 
 
+def _gps(lat, lon):
+    """Chuẩn hoá một dòng chỉ có GPS, trả về (latitude, longitude, report)."""
+    rep = MappingReport()
+    row = {"time": "2026-07-23 16:03:29", "gpsLatitude": lat, "gpsLongitude": lon}
+    r = normalize_reading(
+        row, psn="X", source="xingke", vendor_tz=SHANGHAI, report=rep
+    )
+    assert r is not None
+    return r.latitude, r.longitude, rep
+
+
+class TestGps:
+    """GPS là dữ liệu THỈNH THOẢNG CÓ, và có một giá trị hợp lệ mà nguy hiểm.
+
+    Xác minh trên vendor thật: PSN 2604200016 ngày 2026-07-23 trả
+    10.971047/106.750161, còn ngày 2026-06-02 trả 0,0 cho cả 17 dòng. Nên không
+    được kết luận "vendor không có GPS" từ một ngày, mà cũng không được nhận 0,0.
+    """
+
+    def test_toa_do_that_di_qua_nguyen_ven(self):
+        lat, lon, _ = _gps("10.971047", "106.750161")
+        assert lat == Decimal("10.971047")
+        assert lon == Decimal("106.750161")
+
+    def test_cap_0_0_bi_loai(self):
+        """0,0 là Null Island giữa vịnh Guinea — giá trị khi module MẤT định vị."""
+        lat, lon, _ = _gps("0.000000", "0.000000")
+        assert lat is None
+        assert lon is None
+
+    def test_kinh_tuyen_greenwich_khong_bi_loai_oan(self):
+        """Chỉ CẶP 0,0 mới là tín hiệu mất định vị. lon=0 riêng lẻ là vị trí thật."""
+        lat, lon, _ = _gps("51.478", "0")
+        assert lat == Decimal("51.478")
+        assert lon == Decimal("0")
+
+    def test_nua_toa_do_bi_loai_ca_cap(self):
+        """Một bên thiếu thì không vẽ được điểm nào, và DB cấm trạng thái đó."""
+        assert _gps("10.971047", None)[:2] == (None, None)
+        assert _gps(None, "106.750161")[:2] == (None, None)
+
+    def test_dao_thu_tu_lat_lon_bi_bat(self):
+        """Kinh độ Việt Nam (106.75) đặt vào ô vĩ độ vượt 90 -> loại + báo lỗi.
+
+        Không có luật này thì bồn im lặng nhảy sang Siberia.
+        """
+        lat, lon, rep = _gps("106.750161", "10.971047")
+        assert lat is None
+        assert lon is None
+        assert any(f == "latitude" for f, _ in rep.errors)
+
+    def test_gps_khong_di_vao_bang_telemetry(self):
+        """Toạ độ thuộc terminals. Quên loại là một INSERT vào cột không tồn tại."""
+        from uuid import uuid4
+
+        from app.repositories.telemetry import to_row
+
+        rep = MappingReport()
+        row = {
+            "time": "2026-07-23 16:03:29",
+            "gpsLatitude": "10.971047",
+            "gpsLongitude": "106.750161",
+            "cylinderVolume": 10425,
+        }
+        r = normalize_reading(
+            row, psn="X", source="xingke", vendor_tz=SHANGHAI, report=rep
+        )
+        assert r is not None
+        d = to_row(r, uuid4())
+        for k in ("latitude", "longitude", "capacity_l"):
+            assert k not in d
+
+
 def test_bad_timestamp_rejects_row():
     """Dòng không có instant đáng tin bị loại, không lưu với thời gian đoán."""
     rep = MappingReport()

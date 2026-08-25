@@ -35,6 +35,10 @@ SOURCE = "fake"
 
 # Hai PSN thật, và dung tích thật của chúng.
 DEMO_PSNS: tuple[str, ...] = ("2604200016", "2605090007")
+
+# Toạ độ duy nhất từng thấy trong dữ liệu vendor thật (DISCOVERY.md, và xác minh
+# lại bằng cách gọi thẳng vendor cho ngày 2026-07-23).
+DEMO_GPS: tuple[Decimal, Decimal] = (Decimal("10.971047"), Decimal("106.750161"))
 DEMO_CAPACITY_L = Decimal("10425")
 
 # Ngày cuối có dữ liệu thật của mỗi thiết bị. Mặc định seed-demo dừng ở đây để tái
@@ -200,6 +204,15 @@ class FakeAdapter:
                     capacity_l=self._capacity,
                     raw_payload={"_fake": True, "psn": psn},
                 )
+            )
+        # GPS chỉ trên bản đọc MỚI NHẤT, các dòng còn lại None. Đây là hình dạng
+        # thật của dữ liệu vendor, không phải cho tiện: PSN 2604200016 ngày
+        # 2026-07-23 có toạ độ, còn ngày 2026-06-02 thì cả 17 dòng đều 0,0 (adapter
+        # thật quy 0,0 về None). Nhờ vậy fake TẬP LUYỆN đúng nhánh "lấy cặp gần nhất
+        # còn dùng được" trong ingest_psn_day, thay vì nhánh "mọi dòng đều có".
+        if out:
+            out[-1] = out[-1].model_copy(
+                update={"latitude": DEMO_GPS[0], "longitude": DEMO_GPS[1]}
             )
         return out
 

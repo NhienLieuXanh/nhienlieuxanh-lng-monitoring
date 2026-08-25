@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from stub_adapter import DEMO_PSNS, FakeAdapter
+from stub_adapter import DEMO_GPS, DEMO_PSNS, FakeAdapter
 
 from app.domain.alerts import fill_percent
 from app.repositories import telemetry as tel_repo
@@ -62,6 +63,55 @@ def test_operator_name_survives_resync(session, session_factory, settings):
     term = term_repo.get_by_psn(session, psn)
     assert term is not None
     assert term.name == "Bồn A - Kho Long An"
+
+
+@pytest.mark.db
+def test_vendor_gps_dien_vao_o_dang_trong(session, session_factory, settings):
+    """Bồn chưa ghim vị trí thì GPS của module tự điền vào — không phải nhập tay.
+
+    Đây là lý do đường tự động tồn tại: vendor CÓ trả toạ độ (đã xác minh trên
+    2604200016 ngày 2026-07-23), chỉ là không phải ngày nào cũng có.
+    """
+    now = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+    fake = FakeAdapter(days=1, fresh=True, now=now)
+    svc = IngestionService(fake, session_factory, settings, psns=list(DEMO_PSNS))
+    psn, day = fake.demo_days()[0]
+    svc.ingest_psn_day(psn, day, IngestStats())
+
+    term = term_repo.get_by_psn(session, psn)
+    assert term is not None
+    assert term.latitude == DEMO_GPS[0]
+    assert term.longitude == DEMO_GPS[1]
+
+
+@pytest.mark.db
+def test_ghim_tay_song_sot_qua_ingest(session, session_factory, settings):
+    """Người vận hành ghim đúng nhà kho thì vòng ingest sau KHÔNG được kéo về.
+
+    Cùng luật với ``name`` và ``capacity_l``: ingest chỉ COALESCE vào chỗ NULL.
+    Nếu ghi đè vô điều kiện thì (a) mất vị trí chính xác người ta tự đo, và (b) một
+    ngày module mất định vị sẽ XOÁ luôn toạ độ đang đúng.
+    """
+    now = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+    fake = FakeAdapter(days=1, fresh=True, now=now)
+    svc = IngestionService(fake, session_factory, settings, psns=list(DEMO_PSNS))
+    psn, day = fake.demo_days()[0]
+    svc.ingest_psn_day(psn, day, IngestStats())
+
+    pinned = (Decimal("10.800000"), Decimal("106.600000"))
+    with session.begin():
+        term_repo.update_operator(
+            session,
+            psn,
+            location_sent=True,
+            latitude=pinned[0],
+            longitude=pinned[1],
+        )
+
+    svc.ingest_psn_day(psn, day, IngestStats())
+    term = term_repo.get_by_psn(session, psn)
+    assert term is not None
+    assert (term.latitude, term.longitude) == pinned
 
 
 @pytest.mark.db

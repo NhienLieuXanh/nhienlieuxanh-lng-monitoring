@@ -84,14 +84,20 @@ class Terminal(Base):
     # mỗi ngày. Ở đây nó cũng sửa tay được khi vendor sai.
     capacity_l: Mapped[Decimal | None] = mapped_column(Numeric(18, 3))
 
-    # Toạ độ bồn, do NGƯỜI VẬN HÀNH nhập — xem update_operator().
+    # Toạ độ bồn. Hai nguồn, và thứ tự ưu tiên là điều quan trọng nhất ở đây:
     #
-    # KHÔNG lấy từ vendor, dù `psn/search` có gửi `gpsLatitude`/`gpsLongitude`:
-    # cả hai thiết bị pilot đều trả `0.000000 / 0.000000` kèm `gpsAddress = "--"`,
-    # tức là module không có định vị. Vẽ thẳng số đó lên bản đồ thì bồn LNG hiện ở
-    # Null Island giữa vịnh Guinea, ngoài khơi châu Phi. Toạ độ thật duy nhất từng
-    # thấy (10.971047, 106.750161) chỉ nằm trong DISCOVERY.md, không có trong
-    # fixture nào, nên không tái lập được.
+    # 1. **GPS của module**, tự lấy qua `psn/search` mỗi vòng ingest. Nhưng nó là
+    #    dữ liệu THỈNH THOẢNG CÓ: cùng một thiết bị có ngày trả toạ độ thật, có
+    #    ngày trả `0.000000 / 0.000000` — 0,0 là Null Island giữa vịnh Guinea, tức
+    #    tín hiệu MẤT ĐỊNH VỊ, không phải một vị trí. Đã xác minh bằng cách gọi
+    #    thẳng vendor: PSN 2604200016 ngày 2026-07-23 trả 10.971047/106.750161,
+    #    còn ngày 2026-06-02 trả 0,0 cho cả 17 dòng.
+    # 2. **Người vận hành ghim tay** qua update_operator(), khi cần vị trí chính
+    #    xác hơn (đúng nhà kho) hoặc khi module không định vị được.
+    #
+    # Ingest chỉ COALESCE vào chỗ NULL nên nguồn 2 luôn thắng nguồn 1 — xem
+    # repositories/terminals.py:upsert(). Không có luật đó thì một ngày mất định vị
+    # sẽ xoá mất toạ độ đang đúng.
     #
     # Bồn LNG là tài sản cố định đặt tại kho khách hàng: toạ độ thuộc *cấu hình tài
     # sản*, cùng loại với capacity_l, không phải telemetry.

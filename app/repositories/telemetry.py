@@ -26,7 +26,10 @@ _REPAIRABLE = (*MEASURE_FIELDS, "volume_percent_source", "medium_name",
 
 
 def to_row(reading: NormalizedTelemetry, terminal_id: UUID) -> dict[str, Any]:
-    d = reading.model_dump(exclude={"capacity_l"})
+    # capacity_l / latitude / longitude thuộc bảng terminals, không phải telemetry
+    # — vendor gửi kèm mỗi lần đọc nhưng chúng là cấu hình tài sản. Quên loại ở
+    # đây là một INSERT tham chiếu cột không tồn tại.
+    d = reading.model_dump(exclude={"capacity_l", "latitude", "longitude"})
     d["terminal_id"] = terminal_id
     # StrEnum -> str để psycopg khỏi phải đoán.
     src = d.get("volume_percent_source")

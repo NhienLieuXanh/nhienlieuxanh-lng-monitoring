@@ -3216,7 +3216,12 @@
         side.innerHTML = `<p class="hint">Chưa có bồn nào trong hệ thống.</p>`;
         return;
       }
-      side.innerHTML = tanks.map(t => {
+      // Nói rõ toạ độ đến từ đâu. Không có dòng này thì một bồn tự nhiên có vị trí
+      // trông như phép lạ, còn một bồn không có vị trí trông như lỗi của app.
+      const note = `<p class="hint">Toạ độ tự lấy từ GPS của thiết bị khi module định `
+        + `vị được. Ghim tay để sửa cho chính xác hơn, hoặc để khai khi thiết bị không `
+        + `định vị — ghim tay không bị vòng đồng bộ ghi đè.</p>`;
+      side.innerHTML = note + tanks.map(t => {
         const has = t.latitude !== null && t.latitude !== undefined;
         const pos = has
           ? `<div class="mp-row-pos">${esc(t.latitude)}, ${esc(t.longitude)}</div>`

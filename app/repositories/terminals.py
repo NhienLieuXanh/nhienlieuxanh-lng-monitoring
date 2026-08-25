@@ -37,6 +37,8 @@ def upsert(
     meta: NormalizedTerminal | None = None,
     default_capacity_l: Decimal | None = None,
     default_name: str | None = None,
+    default_latitude: Decimal | None = None,
+    default_longitude: Decimal | None = None,
 ) -> tuple[UUID, bool]:
     """Tạo terminal nếu chưa có, trả về (id, vừa_được_tạo).
 
@@ -51,6 +53,10 @@ def upsert(
         "psn": psn,
         "name": default_name or f"Bồn LNG - {psn}",
         "capacity_l": (meta.capacity_l if meta else None) or default_capacity_l,
+        # Toạ độ từ GPS của module. Adapter đã loại cặp 0,0 và giá trị ngoài
+        # khoảng, nên tới đây chỉ còn cặp dùng được hoặc (None, None).
+        "latitude": default_latitude,
+        "longitude": default_longitude,
     }
     if meta is not None:
         for f in _VENDOR_META:
@@ -65,6 +71,19 @@ def upsert(
         set_[f] = func.coalesce(getattr(Terminal, f), stmt.excluded[f])
     set_["capacity_l"] = func.coalesce(Terminal.capacity_l, stmt.excluded.capacity_l)
     set_["name"] = func.coalesce(Terminal.name, stmt.excluded.name)
+    # Toạ độ theo cùng luật: CHỈ điền vào chỗ đang NULL. Hai lý do, cả hai đều là
+    # mất dữ liệu nếu làm sai:
+    #
+    # 1. Người vận hành ghim tay một vị trí chính xác (đúng nhà kho) thì vòng
+    #    ingest kế tiếp không được kéo nó về toạ độ thô của module.
+    # 2. GPS của module là dữ liệu thỉnh thoảng có. Nếu ghi đè vô điều kiện thì một
+    #    ngày mất định vị sẽ XOÁ toạ độ đang đúng.
+    #
+    # COALESCE theo từng cột vẫn an toàn với CHECK latlon_paired: bảng chỉ có thể ở
+    # trạng thái cùng NULL hoặc cùng có giá trị, và giá trị vào cũng vậy — nên
+    # không tổ hợp nào tạo ra được nửa toạ độ.
+    set_["latitude"] = func.coalesce(Terminal.latitude, stmt.excluded.latitude)
+    set_["longitude"] = func.coalesce(Terminal.longitude, stmt.excluded.longitude)
 
     row = session.execute(
         stmt.on_conflict_do_update(index_elements=["psn"], set_=set_).returning(

@@ -140,6 +140,27 @@ CAPACITY_FIELD = FieldSpec(
     lo=_D("0"), hi=_D("10000000"), unit="L",
 )
 
+# Toa do bon. Cung ho voi CAPACITY_FIELD: vendor gui kem moi lan doc nhung no
+# thuoc bang terminals, khong phai telemetry.
+#
+# KHAC moi field khac o mot diem: phai lay theo CAP, va co mot gia tri vua hop le
+# ve kieu vua nguy hiem. Module tra 0,0 khi MAT DINH VI - do la Null Island giua
+# vinh Guinea, khong phai mot vi tri. Da xac minh tren du lieu that: PSN
+# 2604200016 ngay 2026-07-23 tra 10.971047/106.750161, con ngay 2026-06-02 tra
+# 0,0 cho ca 17 dong. Nen GPS la du lieu THINH THOANG CO, va luat phai la: nhan
+# cap non-zero trong khoang, bo moi cap khac.
+#
+# lo/hi khong chi de bat sai don vi: no bat luon loi DAO THU TU lat/lon, vi kinh
+# do Viet Nam (106.75) dat vao o latitude se vuot 90 va bi loai ngay.
+GPS_LAT_FIELD = FieldSpec(
+    "latitude", ("gpsLatitude", "latitude", "lat"),
+    lo=_D("-90"), hi=_D("90"), unit="do",
+)
+GPS_LON_FIELD = FieldSpec(
+    "longitude", ("gpsLongitude", "longitude", "lng", "lon"),
+    lo=_D("-180"), hi=_D("180"), unit="do",
+)
+
 # hardwarVersion (thieu e) la chinh ta cua device/list; hardwareVersion la cua
 # psn/search. norm_key lam ca hai resolve nhu nhau, nhung liet ke ca hai de nguoi
 # doc file nay thay duoc su that do.
@@ -180,9 +201,9 @@ IGNORED_KEYS: frozenset[str] = frozenset(
         "tankType",                 # code cua tankTypeName
         "color", "diameter", "tubeLength", "sendFrequency",
         "electricityPercentage", "currentChargingCurrent",
-        # GPS: giai doan 1 KHONG dung ban do. Van nam trong raw_payload nen khong
-        # mat gi neu giai doan 2 can.
-        "gpsLatitude", "gpsLongitude", "gpsAddress",
+        # gpsAddress luon la "--" tren du lieu that (placeholder cua vendor) nen
+        # khong map. gpsLatitude/gpsLongitude thi CO map - xem GPS_LAT_FIELD.
+        "gpsAddress",
         # Sensor phu, null tren ca hai thiet bi. pressureTwpMpa la typo THAT trong
         # payload vendor (Twp thay vi Two) - giu y nguyen.
         "temperatureTwo", "temperatureThree",
@@ -303,6 +324,32 @@ def extract_number(
     return None
 
 
+def extract_gps(
+    index: dict[str, Any], report: MappingReport
+) -> tuple[Decimal | None, Decimal | None]:
+    """Toa do theo CAP. Tra (None, None) neu khong dung duoc.
+
+    Ba luat, moi luat ung voi mot cach du lieu that bi sai:
+
+    1. **Cap 0,0 bi loai.** Do la gia tri module gui khi MAT DINH VI, khong phai
+       mot vi tri. Nhan no thi bon LNG hien o Null Island giua vinh Guinea.
+    2. **Nua toa do bi loai.** Mot ben co mot ben khong thi khong ve duoc diem
+       nao, va DB cung cam trang thai do (ck_terminals_latlon_paired).
+    3. **Ngoai khoang bi loai** ngay trong extract_number, kem WARNING - bat ca
+       sai don vi lan dao thu tu lat/lon.
+
+    KHONG loai lat=0 hoac lon=0 rieng le: kinh tuyen Greenwich va duong xich dao
+    la vi tri that. Chi CAP 0,0 moi la tin hieu mat dinh vi.
+    """
+    lat = extract_number(index, GPS_LAT_FIELD, report)
+    lon = extract_number(index, GPS_LON_FIELD, report)
+    if lat is None or lon is None:
+        return None, None
+    if lat == 0 and lon == 0:
+        return None, None
+    return lat, lon
+
+
 def extract_text(
     index: dict[str, Any], spec: FieldSpec, report: MappingReport
 ) -> str | None:
@@ -351,7 +398,14 @@ def find_timestamp(index: dict[str, Any]) -> Any:
 _ALL_KNOWN_NORM: frozenset[str] = (
     frozenset(
         a
-        for spec in (*TELEMETRY_FIELDS, *TEXT_FIELDS, *TERMINAL_FIELDS, CAPACITY_FIELD)
+        for spec in (
+            *TELEMETRY_FIELDS,
+            *TEXT_FIELDS,
+            *TERMINAL_FIELDS,
+            CAPACITY_FIELD,
+            GPS_LAT_FIELD,
+            GPS_LON_FIELD,
+        )
         for a in spec.norm_aliases()
     )
     | frozenset(norm_key(a) for a in TIMESTAMP_ALIASES)
