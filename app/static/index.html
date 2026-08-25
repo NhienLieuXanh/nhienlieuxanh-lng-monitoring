@@ -5,6 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GAS Nhiên Liệu Xanh – LNG Monitoring</title>
   <link rel="icon" href="logo-gx.png" type="image/png" />
+
+  <!-- Cài lên màn hình chính điện thoại. Đường dẫn TƯƠNG ĐỐI để trang chạy đúng ở
+       bất kỳ mount nào (hiện là /ui/), không hard-code host.
+
+       CỐ Ý KHÔNG có service worker: đây là màn hình theo dõi, và một service worker
+       phục vụ lại nội dung đã cache có thể hiện SỐ CŨ trông như số đang sống — trên
+       một app giám sát LNG thì đó tệ hơn là báo lỗi mạng. Đổi lại: không dùng được
+       khi mất mạng. Chrome không còn đòi service worker để cho phép cài, nên vẫn
+       thêm được vào màn hình chính.
+
+       CỐ Ý KHÔNG có viewport-fit=cover: bật nó là tự nhận trách nhiệm chèn
+       env(safe-area-inset-*) cho tai thỏ và vạch home, mà tôi không có iPhone thật
+       để kiểm. Không bật thì trình duyệt tự tránh vùng đó — mặc định an toàn. -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0d4fb5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Giám sát LNG" />
+  <link rel="apple-touch-icon" href="logo-gx.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -159,7 +178,14 @@
     .btn-quiet:hover { background: var(--surface-3); color: var(--fg); }
     /* 44x44 la nguong vung bam toi thieu. Giu icon 17px ben trong, chi mo rong vung
    bam: nut 34x34 tren tablet o kho la thu nguoi ta bam truot. */
-    .icon-btn { min-height: 44px; width: 44px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
+    /* flex: 0 0 auto là phần BẮT BUỘC, không phải trang trí. `width: 44px` chỉ là
+       kích thước CƠ SỞ của flex item; flex-shrink mặc định là 1 nên trong một thanh
+       chật nó co xuống dưới 44px mà không báo gì. Đo được trên khổ 375px: cả 5 nút
+       ở thanh trên (menu, chuông, theme, làm mới, đăng xuất) chỉ còn 33px ngang —
+       đúng những nút bấm nhiều nhất, và đúng trên thiết bị mà vùng bấm quan trọng
+       nhất. Cùng họ với bẫy `1fr` vs `minmax(0, 1fr)`: sàn/trần ngầm của layout
+       thắng giá trị mình khai tường minh. */
+    .icon-btn { min-height: 44px; width: 44px; flex: 0 0 auto; padding: 0; justify-content: center; border-radius: var(--r-sm); }
     .icon-btn svg { width: 17px; height: 17px; }
     svg { flex: 0 0 auto; }
 
@@ -438,7 +464,11 @@
        Nặng thêm vì .plan-table-wrap có overflow -> min-height:auto tính ra 0. */
     .plan-scroll > * { flex: 0 0 auto; min-width: 0; }
     .plan-params { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
-    @media (max-width: 900px) { .plan-params { grid-template-columns: repeat(2, 1fr); } }
+    /* minmax(0, 1fr) chứ KHÔNG phải 1fr: `1fr` là `minmax(auto, 1fr)`, có sàn
+       min-content, nên một <select> có option dài đẩy cột rộng hơn khung và form
+       phải cuộn ngang. Đo được ở khổ 375px: ô .p-wide chạm mốc 486px trong khung
+       chỉ 347px. Cùng bẫy đã ghi cho .app-shell ở khối RESPONSIVE. */
+    @media (max-width: 900px) { .plan-params { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .plan-params label { display: grid; gap: 5px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
     /* .field trong label dang grid bi KEO GIAN theo o cao nhat cua hang: mot o co
        them nut phu ("Ap dung so do thuc te") lam MOI o nhap cung hang cao len 70px
@@ -555,7 +585,35 @@
       #ingest-label, #last-update, #user-chip { display: none !important; }
       #health-pill #health-text { display: none; }
       #health-pill { flex: 0 0 auto; }
-      .page-title { overflow: hidden; text-overflow: ellipsis; }
+      /* Phải CO ĐƯỢC, không chỉ có ellipsis: `flex: 0 0 auto` nghĩa là nó không
+         nhường một pixel nào, nên toàn bộ việc co dồn hết sang .head-right và bóp
+         các nút icon. Cho nó co thì ellipsis mới thật sự có tác dụng. Đổi tiêu đề
+         bị cắt bớt lấy 5 vùng bấm đủ 44px — trên điện thoại đó là đánh đổi đúng,
+         và tên trang vẫn đọc được ở menu lẫn tiêu đề trong từng trang. */
+      .page-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    }
+
+    /* Khổ điện thoại: thu lề và khoảng cách của thanh trên để tiêu đề đủ chỗ.
+       Đo được sau khi nút icon giữ đúng 44px: tiêu đề "Giám sát bồn LNG" cần 123px
+       mà chỉ còn 104px, tức thiếu 19px và bị cắt thành "Giám sát bồ…". Lề 14->8 và
+       khoảng cách 12->8 trả lại đúng 20px. Chọn cách này thay vì ẩn tiêu đề: giữ
+       được thông tin mà không mất vùng bấm nào. */
+    @media (max-width: 560px) {
+      header.topbar { padding: 0 8px; gap: 8px; }
+    }
+
+    /* ===== ĐIỆN THOẠI / MÀN HÌNH CẢM ỨNG ===== */
+    /* Điều kiện theo LOẠI CON TRỎ, không theo bề rộng: iOS tự phóng to trang khi
+       người dùng bấm vào một ô nhập có cỡ chữ dưới 16px, và nó KHÔNG tự thu lại —
+       chuyện đó phụ thuộc thiết bị cảm ứng, không phụ thuộc màn rộng bao nhiêu. Đo
+       được: cả 12 ô nhập ở Kế hoạch nạp và Cài đặt đều 12px, nên mỗi lần gõ một số
+       là trang nhảy zoom. Chỉ nâng cỡ chữ của Ô ĐIỀU KHIỂN, không nâng cả thang chữ,
+       nên mật độ số liệu trên desktop giữ nguyên. */
+    @media (hover: none) and (pointer: coarse) {
+      .field, input, select, textarea { font-size: 16px; }
+      /* 16px làm nội dung ô rộng ra; minmax(0, ...) để cột grid vẫn co được. */
+      .plan-params { grid-template-columns: minmax(0, 1fr); }
+      .mp-body { grid-template-columns: minmax(0, 1fr); }
     }
     @media (min-width: 981px) { .drawer-scrim { display: none; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -1591,6 +1649,12 @@
       const dark = document.documentElement.getAttribute("data-theme") !== "light";
       const btn = document.getElementById("btn-theme");
       if (btn) btn.innerHTML = dark ? SUN : MOON;
+      // Màu thanh trạng thái điện thoại phải theo theme ĐANG dùng. Không dùng
+      // `media="(prefers-color-scheme)"` trên thẻ meta được: theme của app do
+      // localStorage quyết định, nên nó có thể ngược hẳn với cài đặt hệ điều hành —
+      // lúc đó thanh trạng thái tối chồng lên một app sáng, hoặc ngược lại.
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", dark ? "#0b1120" : "#eef1f5");
     }
     function toggleTheme() {
       const dark = document.documentElement.getAttribute("data-theme") !== "light";

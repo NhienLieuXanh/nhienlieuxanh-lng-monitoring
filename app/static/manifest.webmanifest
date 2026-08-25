@@ -1,0 +1,21 @@
+{
+  "name": "Giám sát bồn LNG — GAS Nhiên Liệu Xanh",
+  "short_name": "Giám sát LNG",
+  "description": "Theo dõi mức chứa, áp suất và cảnh báo của các bồn LNG.",
+  "lang": "vi",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f5",
+  "theme_color": "#0d4fb5",
+  "icons": [
+    {
+      "src": "logo-gx.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

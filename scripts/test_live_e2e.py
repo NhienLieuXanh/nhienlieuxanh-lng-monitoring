@@ -257,6 +257,70 @@ def check_map(rep: Report, anon: httpx.Client) -> None:
     )
 
 
+def check_phone(rep: Report, anon: httpx.Client) -> None:
+    """Cài được lên màn hình chính điện thoại.
+
+    Kiểm bản ĐANG CHẠY, không kiểm file trong repo: manifest sai kiểu MIME hay icon
+    404 thì trình duyệt lặng lẽ không cho cài, và không endpoint nào báo lỗi.
+    """
+    r = anon.get("/ui/manifest.webmanifest")
+    if r.status_code != 200:
+        rep.fail("điện thoại · manifest", f"/ui/manifest.webmanifest trả {r.status_code}")
+        return
+    ctype = (r.headers.get("content-type") or "").split(";")[0].strip()
+    if ctype not in ("application/manifest+json", "application/json"):
+        # Kiểu MIME sai là ca hỏng âm thầm: file vẫn tải được nhưng Chrome bỏ qua.
+        rep.fail(
+            "điện thoại · manifest", f"content-type {ctype!r} không phải kiểu manifest"
+        )
+        return
+    try:
+        m = r.json()
+    except ValueError as exc:
+        rep.fail("điện thoại · manifest", f"không phải JSON: {exc}")
+        return
+
+    thieu = [
+        k for k in ("name", "short_name", "start_url", "display", "icons") if not m.get(k)
+    ]
+    if thieu:
+        rep.fail("điện thoại · manifest", f"thiếu khoá bắt buộc: {thieu}")
+        return
+    if m["display"] != "standalone":
+        rep.fail("điện thoại · manifest", f"display={m['display']!r}, không mở như app")
+        return
+
+    # Icon phải TẢI ĐƯỢC và >= 192px, nếu không Chrome không cho cài.
+    icon = m["icons"][0]
+    ir = anon.get(f"/ui/{icon['src']}")
+    if ir.status_code != 200:
+        rep.fail("điện thoại · icon", f"{icon['src']} trả {ir.status_code}")
+        return
+    try:
+        px = min(int(x) for x in str(icon.get("sizes", "0x0")).lower().split("x"))
+    except ValueError:
+        px = 0
+    if px < 192:
+        rep.fail("điện thoại · icon", f"icon {icon.get('sizes')} nhỏ hơn 192px")
+        return
+
+    page = anon.get("/ui/").text
+    thieu_meta = [
+        s
+        for s in ('rel="manifest"', 'name="theme-color"', 'rel="apple-touch-icon"')
+        if s not in page
+    ]
+    if thieu_meta:
+        rep.fail("điện thoại · thẻ meta", f"trang thiếu: {thieu_meta}")
+        return
+
+    rep.ok(
+        "điện thoại",
+        f"manifest {ctype} · display={m['display']} · icon {icon.get('sizes')} "
+        f"tải được · thẻ meta đủ",
+    )
+
+
 def check_guards(rep: Report, anon: httpx.Client, psn: str) -> None:
     """Không phiên -> đúng 401 ở mọi endpoint dữ liệu. Không nhận 5xx thay thế."""
     bad = []
@@ -776,6 +840,7 @@ def main() -> int:
     health = check_health(rep, anon)
     check_ui(rep, anon)
     check_map(rep, anon)
+    check_phone(rep, anon)
     check_login_rejects_bad_password(rep, anon)
 
     c = authenticate(rep, base, args.user, args.password, settings.session_secret)
