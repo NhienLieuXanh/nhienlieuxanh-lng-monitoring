@@ -244,6 +244,13 @@ Cột **Thực tế đo được** nhận con số đó. Từ ngày đã nhập 
 thực tế (ngày 3 = 48 − 7,4 = 40,60), và ô hiện `ước tính 46.6 · +1.4`. Ô tổng
 *Thực tế so với ước tính* cộng dồn độ lệch của các ngày đã nhập.
 
+**Phải thấy được ảnh hưởng lan tới đâu.** Bản đầu chỉ đánh dấu đúng cái hàng vừa nhập,
+nên các ngày sau — dù ĐÃ tính lại — trông y như cũ, và người dùng đọc ra là "số tôi nhập
+không ảnh hưởng gì". Mỗi ngày sau một lần nhập tay giờ có **vạch xanh** ở cột Thể tích
+đầu ngày kèm dòng *ước tính gốc*: con số kế hoạch sẽ có nếu không nhập gì. Nó tính từ một
+chuỗi song song bỏ qua toàn bộ số nhập tay, nên nó còn cho thấy lịch nạp **dịch ngày** —
+ví dụ không nhập tay thì 12/08 phải nạp, nhập rồi thì lùi tới 15/08.
+
 Hai quyết định cố ý, đừng "sửa" mà không đọc:
 
 1. **Mức tiêu thụ/ngày KHÔNG bị tính lại** từ số thực tế. Nếu tính lại thì một ngày
@@ -276,6 +283,27 @@ trữ* được gợi ý theo `capacity_l` **đã lưu**, nên bồn Fuji Seal n
 cạn mới nạp. Trang Kế hoạch giờ **nói ra chỗ lệch này** khi dung tích đã lưu khác dung
 tích đang nhập quá 10%, chứ không tự sửa: không biết số nào đúng, chỉ biết hai số không
 thể cùng đúng.
+
+### Ngưỡng kích hoạt nạp là "≤ ngưỡng", KHÔNG phải một dải có sàn
+
+Bản đầu theo đúng công thức bảng tính: nạp khi thể tích đầu ngày rơi **vào dải**
+`[dự trữ, dự trữ + 1 ngày dùng)`, và Thứ Bảy là `[dự trữ + 1, dự trữ + 2)` (nạp sớm một
+nhịp vì Chủ Nhật không giao hàng). Cái **sàn** của dải đó là lỗi.
+
+Dải chỉ rộng đúng một ngày tiêu thụ, mà chuỗi cũng bước đúng một ngày tiêu thụ — nên tuỳ
+pha, nó **nhảy qua** dải. Với mức dự trữ 1,56 và mức dùng 1,04/ngày: `2,70 → 1,66` thì
+khớp, nhưng `2,60 → 1,56 → 0,52` thì trượt. Trượt một lần là trượt mãi, vì từ đó thể
+tích luôn nhỏ hơn sàn. Đo được trên máy người dùng: `−4,1`, `−5,14`, `−6,18`, `−7,22` —
+kế hoạch chỉ trừ dần trong 5 ngày liền, không đề xuất gì, và hiển thị **thể tích bồn
+âm**, một con số không tồn tại.
+
+Bỏ sàn: nạp khi `thể tích < dự trữ + 1 ngày dùng` (Thứ Bảy: `< dự trữ + 2 ngày`). Hành vi
+**trong** dải cũ không đổi một chút nào — dải cũ là tập con — chỉ thêm đúng cái ca đang
+hỏng: đã ở dưới mức dự trữ thì phải nạp ngay, không chờ.
+
+Kèm một cảnh báo mới: nếu `mức sau khi nạp ≤ ngưỡng kích hoạt` thì nạp xong vẫn dưới
+ngưỡng, nên lịch sẽ đòi nạp **mỗi ngày** với lượng đặt 0. Cấu hình đó vô nghĩa và giờ nó
+tự nói ra.
 
 ### Không dự báo từ dữ liệu đã lỗi thời
 

@@ -532,6 +532,13 @@
     .plan-table td.c { padding-top: 0; padding-bottom: 0; }
     .tag-fill { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--brand); background: var(--sel); padding: 2px 9px; border-radius: 999px; }
     .plan-table td.trigger { color: var(--warn); font-weight: 700; background: var(--warn-bg); }
+    /* inset box-shadow chứ không border-left: với border-collapse: collapse thì
+       border của ô bị gộp và không vẽ được đáng tin ở mọi trình duyệt. */
+    .plan-table td.fromact { box-shadow: inset 3px 0 0 var(--brand); }
+    .p-goc { display: block; font-size: var(--fs-micro); font-family: var(--mono); font-weight: 400; color: var(--muted); white-space: nowrap; }
+    /* Ô có nền màu (ngưỡng kích hoạt / dưới dự trữ) ăn mất tương phản của --muted:
+       đo được 4,10:1 ở theme tối. Trên đúng hai ô đó thì dùng --fg. */
+    .plan-table td.trigger .p-goc, .plan-table td.low .p-goc { color: var(--fg); }
     /* Ô nhập thể tích thực tế. Trông như một ô số trong bảng chứ không như một
        form: viền chỉ hiện khi hover/focus. Ba mươi hàng mỗi hàng một viền là một
        cái lưới ồn ào che mất chính con số cần đọc.
@@ -541,12 +548,18 @@
        cùng cách đã dùng cho ô toạ độ ở trang Bản đồ.
        Cao 44px: hàng bảng vốn đã 44px vì ô checkbox, nên không tốn thêm chiều cao. */
     .plan-table td.act { padding-top: 0; padding-bottom: 0; }
+    /* Màu chữ là --fg, KHÔNG phải --brand. Đo được: trên hàng có nạp (tr.is-fill,
+       nền --sel trong suốt) ở theme tối, --brand chỉ còn 4,39:1 — dưới 4,5. Hai lớp
+       nền trong suốt xếp lên nhau (--sel của hàng, --warn-bg của ô ngưỡng) ăn hết
+       tương phản của một màu chữ vốn đã gần màu nền. Dấu hiệu "đây là số bạn nhập"
+       chuyển sang ĐỘ ĐẬM (.has) — một tín hiệu không phụ thuộc nền. */
     .p-act {
       width: 92px; min-height: 44px; padding: 6px 8px; text-align: right;
-      font-family: var(--mono); font-size: var(--fs-body); font-weight: 700;
-      color: var(--brand); background: transparent;
+      font-family: var(--mono); font-size: var(--fs-body); font-weight: 400;
+      color: var(--fg); background: transparent;
       border: 1px solid transparent; border-radius: 6px;
     }
+    .p-act.has { font-weight: 700; }
     .p-act::placeholder { color: var(--faint); font-weight: 400; font-family: var(--font); }
     .p-act:hover:not(:disabled) { border-color: var(--line); background: var(--surface-2); }
     .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface-2); }
@@ -562,6 +575,7 @@
     .plan-params .p-wide { grid-column: 1 / -1; }
     .lg { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: var(--fs-tiny); font-weight: 700; }
     .lg-trig { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
+    .lg-from { color: var(--brand); background: var(--sel); border: 1px solid var(--brand); }
     .lg-low { color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); }
 
     /* ============ LOGIN ============ */
@@ -1190,6 +1204,7 @@
             vào Chủ Nhật.
             Ô <span class="lg lg-trig">vàng</span>: đang ở ngưỡng kích hoạt.
             Ô <span class="lg lg-low">đỏ</span>: dưới mức dự trữ.
+            <span class="lg lg-from">vạch xanh</span>: ngày đang tính từ một số thực tế bạn đã nhập.
             Cột <b>Ngày nghỉ</b>: ngày không tiêu thụ. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
             bất kể thể tích.
           </p>
@@ -1198,7 +1213,10 @@
             tích hôm trước trừ mức tiêu thụ/ngày. Mức tiêu thụ là con số bình quân nên chuỗi này
             trượt khỏi thực tế ngay ngày thứ hai. Gõ số <i>đo được</i> vào cột
             <b>Thực tế đo được</b> của ngày bạn đo — từ ngày đó trở đi kế hoạch tính lại từ số
-            thực tế, và ô đó hiện luôn độ lệch so với ước tính. Mức tiêu thụ/ngày
+            thực tế, và ô đó hiện luôn độ lệch so với ước tính. Mọi ngày <b>sau</b> ngày đó mang
+            một <b>vạch xanh</b> ở cột Thể tích đầu ngày kèm dòng <i>ước tính gốc</i> — con số kế
+            hoạch sẽ có nếu bạn không nhập gì; đó là cách thấy số bạn nhập ảnh hưởng tới đâu.
+            Mức tiêu thụ/ngày
             <b>không</b> bị tính lại: một ngày dùng ít bất thường không được phép kéo lệch cả kỳ.
             Xoá trắng ô là quay về dùng số ước tính. Số này lưu theo từng bồn nên phải
             <b>chọn bồn</b> trước; nó chỉ dùng cho trang này, không ảnh hưởng số đo trên
@@ -2404,14 +2422,40 @@
         days: Math.max(1, Math.min(62, parseInt(document.getElementById("p-days").value, 10) || 30)),
       };
     }
-    // Ngưỡng kích hoạt tự nhiên theo công thức row 14 (KHÔNG tính "chủ động nạp"):
-    // Thứ 7 & [res+use, res+2*use) | [res, res+use) & không phải Chủ Nhật.
+    // Ngưỡng kích hoạt: nạp khi thể tích đầu ngày ĐÃ TỚI hoặc ĐÃ QUA ngưỡng.
+    //
+    // Bản trước là một DẢI có cả sàn: [res, res+use) cho ngày thường và
+    // [res+use, res+2*use) cho Thứ Bảy. Cái sàn đó là lỗi, và nó tạo ra thể tích ÂM
+    // trên production: dải chỉ rộng đúng một ngày tiêu thụ, nên tuỳ pha mà chuỗi
+    // NHẢY QUA nó (ví dụ mức dự trữ 1,56 và dùng 1,04/ngày: 2,7 -> 1,66 thì khớp,
+    // nhưng 2,6 -> 1,56 -> 0,52 thì trượt). Trượt một lần là trượt mãi, vì từ đó
+    // level luôn nhỏ hơn sàn — đo được trên máy người dùng: −4,1 rồi −5,14 rồi
+    // −7,22, tức kế hoạch chỉ trừ dần chứ không đề xuất gì trong 5 ngày liền.
+    //
+    // Bỏ sàn đi thì hành vi TRONG dải không đổi một chút nào (dải cũ là tập con),
+    // chỉ thêm đúng cái ca đang hỏng: đã ở dưới mức dự trữ thì phải nạp, không chờ.
     function planShouldFill(level, dateObj, p) {
       const iso = ((dateObj.getDay() + 6) % 7) + 1;
       const R = p.res, U = p.use;
-      if (iso === 6 && level >= R + U && level < R + 2 * U) return true;
-      if (level >= R && level < R + U && iso !== 7) return true;
+      // Thứ Bảy nạp sớm một nhịp vì Chủ Nhật không giao hàng.
+      if (iso === 6 && level < R + 2 * U) return true;
+      if (level < R + U && iso !== 7) return true;
       return false;
+    }
+
+    // Chuỗi THUẦN ƯỚC TÍNH: đúng công thức, bỏ qua mọi số nhập tay. Chỉ để hiển thị.
+    // Đây là câu trả lời cho "không thấy số tôi nhập ảnh hưởng ngày sau": có nó thì
+    // mỗi ngày sau một lần nhập tay đều chỉ ra được kế hoạch LẼ RA sẽ là bao nhiêu.
+    function planShadow(p, base, postFill) {
+      const out = [];
+      let level = p.start;
+      for (let i = 0; i < p.days; i++) {
+        const d = new Date(base.getTime() + i * 86400000);
+        out.push(level);
+        const fill = planForce.has(i) || planShouldFill(level, d, p);
+        level = fill ? postFill : (planRest.has(i) ? level : level - p.use);
+      }
+      return out;
     }
     function computePlan() {
       const p = planParams();
@@ -2420,7 +2464,11 @@
       const tp = p.time.split(":").map(Number);
       const base = p.date ? new Date(p.date + "T00:00:00") : new Date();
       base.setHours(tp[0] || 0, tp[1] || 0, tp[2] || 0, 0);      // giờ:phút:giây nạp
+      const shadow = planShadow(p, base, postFill);
       let level = p.start, total = 0, fills = 0;
+      // Từ lần nhập tay ĐẦU TIÊN trở đi, mọi ngày sau đều là hệ quả của nó. Giữ
+      // ngày nguồn để nói rõ trên bảng "ngày này tính từ số thực tế ngày nào".
+      let fromKey = null;
       const rows = [];
       for (let i = 0; i < p.days; i++) {
         const d = new Date(base.getTime() + i * 86400000);
@@ -2432,13 +2480,19 @@
         // Giữ `est` lại để hiển thị độ lệch — nếu ghi đè mất thì không còn gì để so.
         const est = level;
         const act = planReadings.has(key) ? planReadings.get(key) : null;
-        if (act !== null) level = act;
+        if (act !== null) { level = act; fromKey = key; }
         const forced = planForce.has(i), rest = planRest.has(i);
         const trig = planShouldFill(level, d, p);                // ngưỡng tự nhiên
         const fill = forced || trig;
         const order = fill ? round2(postFill - level) : null;    // = row 15
         if (fill) { total += order; fills++; }
-        rows.push({ i, d, key, level, est, act, fill, order, rest, forced, trig });
+        rows.push({
+          i, d, key, level, est, act, fill, order, rest, forced, trig,
+          // Ngày này có đang tính từ một số thực tế nào không, và nếu không nhập tay
+          // thì nó sẽ là bao nhiêu.
+          fromKey: act !== null ? null : fromKey,
+          shadow: shadow[i],
+        });
         // mức đầu ngày kế: vừa nạp -> về mức sau nạp; ngày nghỉ -> giữ; còn lại -> trừ mức dùng
         level = fill ? postFill : (rest ? level : level - p.use);
       }
@@ -2446,7 +2500,9 @@
     }
     function renderPlan(rows, total, fills, postFill, p) {
       const U = p.use, R = p.res;
-      const band = `${round2(R)}–${round2(R + U)} m³` + (U > 0 ? ` · T7: đến ${round2(R + 2 * U)}` : "");
+      // Không còn sàn nên không còn "dải": ghi thành "≤ ngưỡng" cho khớp luật thật.
+      // Ghi "1.56–8.96" như trước là nói sai: thể tích 0,5 m³ cũng phải nạp.
+      const band = `≤ ${round2(R + U)} m³` + (U > 0 ? ` · T7: ≤ ${round2(R + 2 * U)}` : "");
       document.getElementById("plan-summary").innerHTML =
         `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
@@ -2456,8 +2512,13 @@
       const warn = document.getElementById("plan-warn");
       const msgs = [];
       if (rows.length && rows[0].level < R) {
-        msgs.push(`Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
-          + `Hệ thống chỉ tự xếp lịch khi thể tích đạt mức dự trữ; tích cột "Nạp chỉ định" để đưa vào kế hoạch.`);
+        msgs.push(`Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay.`);
+      }
+      // Mức đích không được nằm dưới ngưỡng kích hoạt: nạp xong mà vẫn dưới ngưỡng
+      // thì ngày nào cũng "phải nạp" với lượng đặt bằng 0 — một lịch vô nghĩa.
+      if (postFill <= R + U) {
+        msgs.push(`Nạp tới ${round2(postFill)} m³ nhưng ngưỡng kích hoạt là ${round2(R + U)} m³ — `
+          + `nạp xong vẫn ở dưới ngưỡng nên kế hoạch sẽ đòi nạp mỗi ngày. Giảm "Mức dự trữ" hoặc tăng "Nạp tới mức".`);
       }
       // Dung tích lưu trong hệ thống lệch xa dung tích đang lập kế hoạch. Đây KHÔNG
       // phải chuyện nhỏ: khi chọn bồn, "Mức dự trữ" được đặt bằng 15% dung tích LƯU
@@ -2482,12 +2543,20 @@
         let cls = "r num";
         if (r.level < R) cls += " low";
         else if (r.trig) cls += " trigger";
+        // Vạch xanh: ngày này là hệ quả của một số thực tế đã nhập. Dùng vạch chứ
+        // không dùng màu chữ để không tranh chấp với đỏ (dưới dự trữ) và vàng
+        // (ngưỡng kích hoạt) — hai màu đó nói về an toàn nên phải thắng.
+        const derived = r.fromKey !== null && round2(r.shadow) !== lvl;
+        if (derived) cls += " fromact";
+        const goc = derived
+          ? `<span class="p-goc" title="Nếu không nhập số thực tế ngày ${r.fromKey} thì ngày này là ${round2(r.shadow)} m³">ước tính gốc ${round2(r.shadow)}</span>`
+          : "";
         const res = r.fill ? `<span class="tag-fill">Nạp LNG</span>` : "";
         const when = r.fill ? fmtDT(r.d) : "";
         const order = r.order === null ? "" : `<b>${r.order}</b>`;
         return `<tr${r.fill ? ' class="is-fill"' : ""}>
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
-          <td class="${cls}">${lvl}</td>
+          <td class="${cls}">${lvl}${goc}</td>
           ${planActCell(r)}
           <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
           <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
