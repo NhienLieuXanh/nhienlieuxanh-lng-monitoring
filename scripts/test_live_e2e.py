@@ -756,6 +756,112 @@ def check_no_vendor_leak(rep: Report, c: httpx.Client, psn: str) -> None:
         )
 
 
+def check_plan_readings(rep: Report, c: httpx.Client, psn: str, allow_writes: bool) -> None:
+    """Số đo tay của trang Kế hoạch: đọc luôn, ghi thì chỉ khi --allow-writes.
+
+    Kiểm cả ba thứ dễ sai nhất mà không cần biết dữ liệu thật:
+
+    1. Bảng ``plan_readings`` TỒN TẠI trên production — nếu migration chưa chạy thì
+       GET sẽ 500 chứ không 200, và đó là lỗi im lặng duy nhất của tính năng này.
+    2. Trần theo dung tích chặn được ca gõ m³ vào API nói bằng lít.
+    3. Ghi → đọc → xoá → đọc, rồi PHỤC HỒI nguyên trạng ngày đã thử.
+    """
+    r = c.get(f"/api/plan/readings/{psn}")
+    if r.status_code != 200:
+        rep.fail(
+            "kế hoạch · số đo tay",
+            f"GET trả {r.status_code} — bảng plan_readings có thể chưa được migrate",
+        )
+        return
+    rows = r.json()
+    if not isinstance(rows, list):
+        rep.fail("kế hoạch · số đo tay", f"phải trả list, nhận {type(rows).__name__}")
+        return
+    rep.ok("kế hoạch · số đo tay", f"{psn}: đọc được, {len(rows)} ngày đã nhập")
+
+    # PSN lạ phải 404, không phải 200 rỗng: nếu trả rỗng thì một PSN gõ sai không
+    # phân biệt được với "bồn này chưa nhập số nào".
+    r404 = c.get("/api/plan/readings/9999999999")
+    if r404.status_code == 404:
+        rep.ok("kế hoạch · PSN lạ", "trả 404 đúng như /api/terminals/{psn}")
+    else:
+        rep.fail("kế hoạch · PSN lạ", f"trả {r404.status_code}, cần 404")
+
+    if not allow_writes:
+        rep.skip(
+            "kế hoạch · ghi số đo tay",
+            "chạy với --allow-writes để kiểm PUT/DELETE + phục hồi",
+        )
+        return
+
+    day = "2026-01-02"
+    baseline = next((x for x in rows if x["reading_date"] == day), None)
+
+    cap = c.get(f"/api/terminals/{psn}").json().get("capacity_l")
+    if cap is not None:
+        # Gõ 48 (m³) vào API nói bằng lít là ca sai đơn vị hay xảy ra nhất. Ở đây thử
+        # chiều ngược lại — vượt hẳn dung tích — vì đó là chiều DUY NHẤT bắt được:
+        # 48 L trên bồn 60.000 L không sai kiểu và không vi phạm CHECK nào.
+        over = c.put(
+            f"/api/plan/readings/{psn}/{day}",
+            json={"volume_l": str(float(cap) * 2 + 1)},
+        )
+        if over.status_code == 422:
+            rep.ok("kế hoạch · trần dung tích", f"vượt {cap} L bị chặn 422")
+        else:
+            rep.fail(
+                "kế hoạch · trần dung tích",
+                f"vượt dung tích trả {over.status_code}, cần 422",
+            )
+
+    probe = 1234.5
+    up = c.put(f"/api/plan/readings/{psn}/{day}", json={"volume_l": str(probe)})
+    if up.status_code != 200 or not near(float(up.json()["volume_l"]), probe, 0.01):
+        rep.fail(
+            "kế hoạch · ghi số đo tay",
+            f"PUT trả {up.status_code}, không nhận giá trị mới",
+        )
+        return
+
+    # Ghi lại cùng ngày phải GHI ĐÈ, không sinh dòng thứ hai.
+    c.put(f"/api/plan/readings/{psn}/{day}", json={"volume_l": str(probe)})
+    same = [x for x in c.get(f"/api/plan/readings/{psn}").json() if x["reading_date"] == day]
+    if len(same) != 1:
+        rep.fail("kế hoạch · ghi số đo tay", f"{len(same)} dòng cho một ngày, cần đúng 1")
+        return
+
+    # Phục hồi: xoá nếu ngày đó vốn trống, ghi lại giá trị cũ nếu vốn có.
+    if baseline is None:
+        d = c.delete(f"/api/plan/readings/{psn}/{day}")
+        after = [x for x in c.get(f"/api/plan/readings/{psn}").json() if x["reading_date"] == day]
+        if d.status_code != 204 or after:
+            rep.fail(
+                "kế hoạch · ghi số đo tay",
+                f"PHỤC HỒI THẤT BẠI (DELETE {d.status_code}) — {psn} còn số thử ngày {day}",
+            )
+            return
+        rep.ok(
+            "kế hoạch · ghi số đo tay",
+            f"{psn}/{day}: ghi {probe:g} L, ghi đè không nhân dòng, xoá sạch",
+        )
+    else:
+        c.put(f"/api/plan/readings/{psn}/{day}", json={"volume_l": baseline["volume_l"]})
+        after = next(
+            (x for x in c.get(f"/api/plan/readings/{psn}").json() if x["reading_date"] == day),
+            None,
+        )
+        if after is None or str(after["volume_l"]) != str(baseline["volume_l"]):
+            rep.fail(
+                "kế hoạch · ghi số đo tay",
+                f"phục hồi lệch baseline: {after and after['volume_l']} vs {baseline['volume_l']}",
+            )
+            return
+        rep.ok(
+            "kế hoạch · ghi số đo tay",
+            f"{psn}/{day}: ghi {probe:g} L rồi phục hồi đúng baseline {baseline['volume_l']}",
+        )
+
+
 def check_writes(rep: Report, c: httpx.Client, psn: str) -> None:
     """Ghi rồi phục hồi, và ASSERT phục hồi khớp baseline."""
     base = c.get(f"/api/terminals/{psn}").json()
@@ -861,6 +967,7 @@ def main() -> int:
             check_exports(rep, c, items, psn)
             check_admin_guards(rep, c, anon, args.admin_token or settings.admin_token)
             check_no_vendor_leak(rep, c, psn)
+            check_plan_readings(rep, c, psn, args.allow_writes)
             if args.allow_writes:
                 check_writes(rep, c, psn)
             else:
