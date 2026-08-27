@@ -23,25 +23,30 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import SessionDep, UserDep
 from app.api.schemas import PlanReadingIn, PlanReadingOut
-from app.db.models import Terminal
 from app.repositories import plan_readings as pr_repo
 from app.repositories import terminals as term_repo
 
 router = APIRouter(prefix="/plan", tags=["plan"])
 
-#: Trần khi chưa biết dung tích bồn. Bồn LNG trong tầm nhìn của hệ thống này ở mức
-#: vài chục m³; 1.000 m³ là ngưỡng "chắc chắn gõ sai đơn vị" (thêm một số 0, hoặc
-#: nhập lít vào ô m³) mà vẫn không cản trở ca dùng thật nào.
+#: Trần tuyệt đối, KHÔNG theo dung tích lưu trong DB. 1.000 m³ là ngưỡng "chắc chắn
+#: gõ sai đơn vị" (thêm một số 0, hoặc nhập lít vào ô m³) mà vẫn không cản trở ca
+#: dùng thật nào — bồn LNG ở đây cỡ vài chục m³.
+#:
+#: Vì sao KHÔNG chặn theo ``terminals.capacity_l``: bản đầu có chặn, và nó đã chặn
+#: đúng một lần nhập hợp lệ trên production. `capacity_l` được ingest từ vendor
+#: (``cylinderVolume``) và với bồn Fuji Seal nó là 10425 L trong khi bồn thật là
+#: 54 m³ — người vận hành gõ 42 m³ thì bị từ chối 422 kèm một thông điệp nói rằng
+#: chính số đo của họ là sai. Một con số vendor có thể sai không được phép phủ quyết
+#: số người vận hành TỰ ĐO. Cảnh báo vượt dung tích nằm ở client, nơi có con số
+#: "Dung tích" mà chính người dùng đang lập kế hoạch với, và nó CẢNH BÁO chứ không chặn.
 FALLBACK_MAX_L = 1_000_000
 
 
-def _require_terminal(session: SessionDep, psn: str) -> Terminal:
-    term = term_repo.get_by_psn(session, psn)
-    if term is None:
+def _require_terminal(session: SessionDep, psn: str) -> None:
+    if term_repo.get_by_psn(session, psn) is None:
         # 404 chứ không phải 200 rỗng: PSN gõ sai phải phân biệt được với "bồn này
         # chưa nhập số nào". Cùng luật với /api/terminals/{psn}.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Terminal not found")
-    return term
 
 
 @router.get("/readings/{psn}", response_model=list[PlanReadingOut])
@@ -73,21 +78,16 @@ def put_reading(
     PUT chứ không POST: địa chỉ ``(bồn, ngày)`` xác định đúng một số đo, nên lệnh
     này idempotent — bấm Lưu hai lần không được sinh ra hai dòng.
     """
-    term = _require_terminal(session, psn)
+    _require_terminal(session, psn)
 
-    # Trần theo dung tích THẬT của bồn. Đây là cái chặn lỗi hay xảy ra nhất: nhập
-    # 48 (m³) vào một API nói bằng lít. 48 lít trên bồn 60.000 lít không sai kiểu
-    # dữ liệu, không vi phạm CHECK nào, và sẽ âm thầm biến kế hoạch thành vô nghĩa
-    # — nên phải chặn bằng ngữ nghĩa, không bằng kiểu.
-    cap = float(term.capacity_l) if term.capacity_l is not None else None
-    limit = cap if cap else float(FALLBACK_MAX_L)
-    if float(body.volume_l) > limit:
-        detail = (
-            f"Thể tích {body.volume_l} L vượt dung tích bồn ({limit:g} L)"
-            if cap
-            else f"Thể tích {body.volume_l} L vượt ngưỡng hợp lý ({limit:g} L)"
+    # Chỉ trần TUYỆT ĐỐI. Xem FALLBACK_MAX_L: chặn theo capacity_l của DB đã từ chối
+    # một lần nhập hợp lệ trên production vì chính capacity_l sai.
+    if float(body.volume_l) > FALLBACK_MAX_L:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Thể tích {body.volume_l} L vượt ngưỡng hợp lý ({FALLBACK_MAX_L:g} L) — "
+            "kiểm lại đơn vị, giá trị này tính bằng lít",
         )
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail)
 
     row = pr_repo.upsert(session, psn, day, body.volume_l, by=user)
     session.commit()

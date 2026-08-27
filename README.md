@@ -261,9 +261,21 @@ tức số vừa gõ biến mất không một lời báo. JS parse cả `,` và
 trang Bản đồ.
 
 API nói bằng **lít** (`volume_l`) như mọi field thể tích khác; UI quy đổi m³ ở đúng một
-chỗ. Router chặn giá trị vượt `capacity_l` của chính bồn đó — đó là cái bắt được ca gõ
-`48` (m³) vào một API nói bằng lít, vì 48 L trên bồn 60.000 L không sai kiểu, không vi
-phạm CHECK nào, và làm kế hoạch vô nghĩa một cách im lặng.
+chỗ. Server chỉ chặn **trần tuyệt đối** 1.000 m³ (sai đơn vị hàng nghìn lần).
+
+Bản đầu chặn theo `terminals.capacity_l` và **điều đó đã sai**: `capacity_l` ingest từ
+vendor (`cylinderVolume`), và với bồn Fuji Seal nó là 10425 L trong khi bồn thật là
+54 m³ — người vận hành gõ 42 m³ liền nhận 422 kèm thông điệp nói rằng chính số họ tự đo
+là sai. **Một con số vendor có thể sai không được phép phủ quyết số người vận hành tự
+đo.** Cảnh báo vượt dung tích chuyển sang client, so với ô *Dung tích* mà người dùng
+đang lập kế hoạch với, và nó **cảnh báo chứ không chặn**.
+
+Cùng gốc rễ đó còn gây một cái bẫy khác: khi chọn bồn, *Mức tiêu thụ/ngày* và *Mức dự
+trữ* được gợi ý theo `capacity_l` **đã lưu**, nên bồn Fuji Seal nhận mức dự trữ 1,56 m³
+(15% của 10,425) và ngưỡng kích hoạt 1,56–8,96 m³ — kế hoạch để bồn 54 m³ tụt xuống gần
+cạn mới nạp. Trang Kế hoạch giờ **nói ra chỗ lệch này** khi dung tích đã lưu khác dung
+tích đang nhập quá 10%, chứ không tự sửa: không biết số nào đúng, chỉ biết hai số không
+thể cùng đúng.
 
 ### Không dự báo từ dữ liệu đã lỗi thời
 

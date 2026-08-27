@@ -763,7 +763,10 @@ def check_plan_readings(rep: Report, c: httpx.Client, psn: str, allow_writes: bo
 
     1. Bảng ``plan_readings`` TỒN TẠI trên production — nếu migration chưa chạy thì
        GET sẽ 500 chứ không 200, và đó là lỗi im lặng duy nhất của tính năng này.
-    2. Trần theo dung tích chặn được ca gõ m³ vào API nói bằng lít.
+    2. Trần tuyệt đối chặn sai đơn vị hàng nghìn lần, nhưng KHÔNG chặn theo dung
+       tích lưu trong DB — số đó ingest từ vendor và có thể sai (bồn Fuji Seal lưu
+       10425 L trong khi bồn thật 54 m³), nên nó không được phủ quyết số người vận
+       hành tự đo.
     3. Ghi → đọc → xoá → đọc, rồi PHỤC HỒI nguyên trạng ngày đã thử.
     """
     r = c.get(f"/api/plan/readings/{psn}")
@@ -797,22 +800,34 @@ def check_plan_readings(rep: Report, c: httpx.Client, psn: str, allow_writes: bo
     day = "2026-01-02"
     baseline = next((x for x in rows if x["reading_date"] == day), None)
 
+    # Vượt dung tích lưu trong DB phải ĐƯỢC ghi: đó chính là ca đã hỏng trên
+    # production (42 m³ trên bồn DB ghi 10425 L bị từ chối 422).
     cap = c.get(f"/api/terminals/{psn}").json().get("capacity_l")
     if cap is not None:
-        # Gõ 48 (m³) vào API nói bằng lít là ca sai đơn vị hay xảy ra nhất. Ở đây thử
-        # chiều ngược lại — vượt hẳn dung tích — vì đó là chiều DUY NHẤT bắt được:
-        # 48 L trên bồn 60.000 L không sai kiểu và không vi phạm CHECK nào.
         over = c.put(
             f"/api/plan/readings/{psn}/{day}",
-            json={"volume_l": str(float(cap) * 2 + 1)},
+            json={"volume_l": str(float(cap) * 4 + 1)},
         )
-        if over.status_code == 422:
-            rep.ok("kế hoạch · trần dung tích", f"vượt {cap} L bị chặn 422")
+        if over.status_code == 200:
+            rep.ok(
+                "kế hoạch · không phủ quyết số người đo",
+                f"ghi được {float(cap) * 4 + 1:g} L dù DB ghi dung tích {cap} L",
+            )
         else:
             rep.fail(
-                "kế hoạch · trần dung tích",
-                f"vượt dung tích trả {over.status_code}, cần 422",
+                "kế hoạch · không phủ quyết số người đo",
+                f"vượt dung tích DB trả {over.status_code}, phải 200 — "
+                "capacity_l ingest từ vendor có thể sai, không được chặn số người đo",
             )
+
+    # Sai đơn vị hàng nghìn lần thì vẫn phải chặn.
+    absurd = c.put(f"/api/plan/readings/{psn}/{day}", json={"volume_l": "42000000"})
+    if absurd.status_code == 422:
+        rep.ok("kế hoạch · trần tuyệt đối", "42 triệu lít bị chặn 422")
+    else:
+        rep.fail(
+            "kế hoạch · trần tuyệt đối", f"42 triệu lít trả {absurd.status_code}, cần 422"
+        )
 
     probe = 1234.5
     up = c.put(f"/api/plan/readings/{psn}/{day}", json={"volume_l": str(probe)})

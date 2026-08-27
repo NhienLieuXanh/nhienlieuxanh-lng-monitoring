@@ -278,8 +278,14 @@
       background: var(--surface); border-bottom: 1px solid var(--line);
     }
     .page-title { font-weight: 700; font-size: var(--fs-lg); letter-spacing: -.01em; white-space: nowrap; flex: 0 0 auto; }
-    .kpis { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; overflow: hidden; }
+    /* `.kpis` là phần tử co giãn duy nhất ở thanh trên, nên nó hứng toàn bộ chỗ
+       thiếu. Với `overflow: hidden` thì chip cuối bị CẮT GIỮA CON SỐ: đo được
+       "0.091 m³" hiện ra thành "0.0" — một số sai chứ không phải một số bị thiếu.
+       Sửa hai đầu: chip không co (flex: 0 0 auto) và .head-right nhường chỗ trước
+       bằng cách cho phần chữ ở đó rút gọn có dấu ba chấm. */
+    .kpis { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
     .kpi {
+      flex: 0 0 auto;
       display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap;
       padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px;
       background: var(--surface-2); font-size: var(--fs-sm); color: var(--muted);
@@ -289,10 +295,19 @@
     .kpi.ok b { color: var(--ok); }
     .kpi.bad { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
     .kpi.bad b { color: var(--crit); }
+    /* BẮT BUỘC. `display: inline-flex` ở .kpi là luật của tác giả (0,1,0) nên nó
+       THẮNG luật `[hidden] { display: none }` của trình duyệt — đo được: đặt
+       hidden = true mà chip vẫn rộng 87px, khiến fitKpis() ẩn hết mọi chip mà vẫn
+       thấy tràn. Cùng lý do đã phải viết `.plan-warn[hidden]`. */
+    .kpi[hidden] { display: none; }
     .kpi.vol { border-style: dashed; }
     .kpi.vol b { color: var(--brand); }
-    .head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-    .meta-chip { color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+    /* flex: 0 1 auto — được phép co. Trước là 0 0 auto nên khối này luôn thắng và
+       .kpis lãnh hết phần thiếu. Chữ ở đây (mốc thu thập, tên người dùng) rút gọn
+       bằng ba chấm thì vẫn đọc được là gì; một con số bị cắt thì không. */
+    .head-right { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+    .meta-chip { min-width: 0; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; }
+    .head-right .icon-btn { flex: 0 0 auto; }
     .meta-chip[hidden] { display: none; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
     .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
@@ -473,7 +488,7 @@
        them nut phu ("Ap dung so do thuc te") lam MOI o nhap cung hang cao len 70px
        thay vi 44px. Loi nay co truoc, va viec nang min-height 34->44 chi lam no ro
        hon. align-self: start giu o nhap o dung chieu cao that cua no. */
-    .plan-params label { align-content: start; }
+    .plan-params label { align-content: start; min-width: 0; }
     .plan-params .field { min-height: 44px; align-self: start; }
     .p-out { display: flex; align-items: center; font-family: var(--mono); font-weight: 700; color: var(--brand); background: var(--surface-2); }
     .plan-summary { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -485,7 +500,7 @@
        thang thay vì ghim px inline trong JS. */
     .ps-tile b.tight { font-size: var(--fs-body); }
     .plan-help { margin: 0; font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 10px 12px; }
-    .plan-warn { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 9px 12px; }
+    .plan-warn { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 9px 12px; display: grid; gap: 6px; }
     .plan-warn[hidden] { display: none; }
     .plan-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: auto; }
     .plan-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
@@ -536,6 +551,10 @@
     .p-act:hover:not(:disabled) { border-color: var(--line); background: var(--surface-2); }
     .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface-2); }
     .p-act:disabled { cursor: not-allowed; }
+    /* Bị từ chối: GIỮ con số người dùng vừa gõ và đánh dấu đỏ. Bản đầu vẽ lại bảng
+       ngay khi lỗi nên số vừa gõ biến mất, và người dùng đọc ra là "gõ vào không
+       nhận được gì cả, một lát sau tự mất" — tệ hơn cả việc không lưu được. */
+    .p-act[aria-invalid="true"] { color: var(--crit); border-color: var(--crit-line); background: var(--crit-bg); }
     .p-est { display: block; padding-bottom: 4px; font-size: var(--fs-micro); font-family: var(--mono); color: var(--muted); white-space: nowrap; }
     /* Còn NHIỀU hơn ước tính là tin tốt (dùng ít hơn dự kiến) -> màu ok.
        Còn ÍT hơn là tin cần để ý -> màu cảnh báo. Không dùng đỏ: đây không phải lỗi. */
@@ -682,12 +701,17 @@
     .runpill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
 
     /* ===== KẾ HOẠCH: trợ lý đề xuất ===== */
-    .p-measure { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+    /* min-width: 0 ở CẢ khối và dòng chú thích. Mặc định flex item có
+       min-width: auto, tức sàn là min-content — nên `text-overflow: ellipsis` bên
+       dưới KHÔNG BAO GIỜ chạy: đo được dòng chú thích 274px đẩy khối thành 407px
+       trong một cột 394px, tràn sang đè cột "Mức dự trữ" bên cạnh. Cùng họ với bẫy
+       `1fr` vs `minmax(0, 1fr)` đã gặp ở .plan-params. */
+    .p-measure { display: flex; align-items: center; gap: 6px; margin-top: 3px; min-width: 0; }
     .p-measure button { font-size: var(--fs-tiny); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--brand);
                         background: transparent; color: var(--brand); cursor: pointer; white-space: nowrap; }
     .p-measure button:hover { background: var(--sel); }
     .p-measure button[disabled] { opacity: .45; cursor: not-allowed; border-color: var(--line); color: var(--faint); }
-    .p-measure .note { font-size: var(--fs-tiny); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p-measure .note { min-width: 0; font-size: var(--fs-tiny); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ===== PHÂN TÍCH =====
        Dùng lại token thang chữ và biến màu như mọi khung khác. `> *` phải là
@@ -1904,6 +1928,32 @@
       on.classList.toggle("ok", summary.online > 0);
       off.classList.toggle("bad", summary.offline > 0);
       al.classList.toggle("bad", alertTanks > 0);
+      fitKpis();
+    }
+
+    // Thứ tự BỎ chip khi thanh trên hết chỗ — bỏ dần từ đầu danh sách. "Cảnh báo" ở
+    // cuối nên nó là thứ cuối cùng biến mất. "Bồn" bỏ trước vì suy được từ
+    // trực tuyến + ngoại tuyến.
+    const KPI_DROP = ["stat-total", "stat-online", "stat-volume", "stat-offline", "stat-alert"];
+
+    // Vì sao phải đo bằng JS thay vì một media query. `.kpis` là phần tử co giãn duy
+    // nhất ở thanh trên nên nó hứng toàn bộ chỗ thiếu, và `overflow: hidden` cắt chip
+    // cuối GIỮA CON SỐ: đo được "0.091 m³" hiện thành "0.0" — đó là một số SAI, tệ
+    // hơn hẳn một số không hiển thị. CSS không có cách bỏ hẳn phần tử tràn, và ngưỡng
+    // tràn phụ thuộc NỘI DUNG (tên đăng nhập dài, mốc thời gian) chứ không phụ thuộc
+    // bề rộng cửa sổ, nên media query không đặt đúng chỗ được.
+    function fitKpis() {
+      const box = document.querySelector(".kpis");
+      if (!box) return;
+      const chips = KPI_DROP
+        .map(id => (document.getElementById(id) || {}).parentElement)
+        .filter(Boolean);
+      for (const c of chips) c.hidden = false;
+      for (const c of chips) {
+        // Đọc lại mỗi vòng: mỗi lần ẩn là một lần dàn lại trang.
+        if (box.scrollWidth <= box.clientWidth) break;
+        c.hidden = true;
+      }
     }
 
     function sortedTanks() {
@@ -2404,13 +2454,28 @@
         `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num tight">${band}</b></div>` +
         planDeviationTile(rows);
       const warn = document.getElementById("plan-warn");
+      const msgs = [];
       if (rows.length && rows[0].level < R) {
-        warn.textContent = `Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
-          + `Hệ thống chỉ tự xếp lịch khi thể tích đạt mức dự trữ; tích cột "Nạp chỉ định" để đưa vào kế hoạch.`;
-        warn.hidden = false;
-      } else {
-        warn.hidden = true;
+        msgs.push(`Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
+          + `Hệ thống chỉ tự xếp lịch khi thể tích đạt mức dự trữ; tích cột "Nạp chỉ định" để đưa vào kế hoạch.`);
       }
+      // Dung tích lưu trong hệ thống lệch xa dung tích đang lập kế hoạch. Đây KHÔNG
+      // phải chuyện nhỏ: khi chọn bồn, "Mức dự trữ" được đặt bằng 15% dung tích LƯU
+      // TRONG HỆ THỐNG. Bồn Fuji Seal lưu 10425 L (số vendor gửi) trong khi bồn thật
+      // 54 m³ -> mức dự trữ tự thành 1,56 m³ và ngưỡng kích hoạt thành 1,56–8,96 m³,
+      // tức kế hoạch để bồn tụt xuống gần cạn mới nạp. Nói ra chỗ này, đừng tự sửa:
+      // không biết số nào đúng, chỉ biết hai số không thể cùng đúng.
+      const capStored = planPsn ? (tanks.find(t => t.psn === planPsn) || {}).capacity_l : null;
+      if (capStored != null) {
+        const cs = round2(Number(capStored) / 1000);
+        if (cs > 0 && Math.abs(cs - p.cap) / Math.max(cs, p.cap) > 0.1) {
+          msgs.push(`Dung tích lưu trong hệ thống cho bồn này là ${cs} m³, nhưng bạn đang lập kế hoạch với ${round2(p.cap)} m³. `
+            + `Khi chọn bồn, "Mức tiêu thụ/ngày" (${round2(U)} m³) và "Mức dự trữ" (${round2(R)} m³) được gợi ý theo số ĐÃ LƯU — `
+            + `kiểm lại cả hai. Sửa dung tích thật của bồn để lần sau không phải sửa tay.`);
+        }
+      }
+      warn.innerHTML = msgs.map(m => `<span>${m}</span>`).join("");
+      warn.hidden = !msgs.length;
       document.getElementById("plan-body").innerHTML = rows.map(r => {
         const lvl = round2(r.level);
         let cls = "r num";
@@ -2479,6 +2544,24 @@
       computePlan();
     }
 
+    // Cảnh báo vượt dung tích nằm ở ĐÂY, không ở server. Server chỉ có
+    // `terminals.capacity_l` ingest từ vendor, và với bồn Fuji Seal nó là 10425 L
+    // trong khi bồn thật 54 m³ — chặn theo số đó thì từ chối chính số người vận hành
+    // tự đo. Ô "Dung tích" trên trang này là con số người dùng đang lập kế hoạch
+    // với, nên so với nó mới có nghĩa; và là CẢNH BÁO, không chặn.
+    function planCapWarn(m3) {
+      const cap = parseFloat(document.getElementById("p-cap").value);
+      if (!Number.isFinite(cap) || cap <= 0 || m3 <= cap) return "";
+      return `Đã lưu ${m3} m³, nhưng lớn hơn Dung tích đang đặt (${round2(cap)} m³) — `
+        + `kiểm lại một trong hai số.`;
+    }
+
+    function planMarkInvalid(key, raw, msg) {
+      const el = document.querySelector(`#plan-body .p-act[data-day="${key}"]`);
+      if (el) { el.value = raw; el.setAttribute("aria-invalid", "true"); }
+      setMsg("plan-msg", msg, "bad");
+    }
+
     async function savePlanReading(key, raw) {
       if (!planPsn) return;
       // Dấu phẩy là dấu thập phân của người Việt. Đây là lý do ô này là type="text"
@@ -2498,8 +2581,9 @@
         } else {
           const m3 = Number(txt);
           if (!Number.isFinite(m3) || m3 < 0) {
-            setMsg("plan-msg", `"${raw}" không phải thể tích hợp lệ. Ví dụ: 48 hoặc 47,5`, "bad");
-            computePlan();
+            // KHÔNG vẽ lại: vẽ lại sẽ xoá con số vừa gõ, và người dùng mất luôn thứ
+            // họ cần sửa. Giữ nguyên rồi đánh dấu ô đó là sai.
+            planMarkInvalid(key, raw, `"${raw}" không phải thể tích hợp lệ. Ví dụ: 48 hoặc 47,5`);
             return;
           }
           // API nói bằng LÍT như mọi field thể tích khác; quy đổi đúng ở biên này.
@@ -2510,13 +2594,14 @@
           });
           const v = round2(Number(row.volume_l) / 1000);
           planReadings.set(key, v);
-          setMsg("plan-msg", `Đã lưu ${v} m³ cho ngày ${key}.`, "ok");
+          const warn = planCapWarn(v);
+          setMsg("plan-msg", warn || `Đã lưu ${v} m³ cho ngày ${key}.`, warn ? "warn" : "ok");
         }
       } catch (e) {
-        if (e.name !== "AuthError") setMsg("plan-msg", e.message, "bad");
+        if (e.name !== "AuthError") planMarkInvalid(key, raw, e.message);
+        // KHÔNG vẽ lại khi server từ chối: số vừa gõ phải còn đó để sửa.
+        return;
       }
-      // Vẽ lại kể cả khi lỗi: ô nhập phải trở về đúng trạng thái đã lưu trên server,
-      // không được ở lại con số vừa bị từ chối.
       computePlan();
     }
 
@@ -3664,6 +3749,9 @@
       // preserveAspectRatio="none" mà không tính lại thì hình các nước bị bóp méo.
       window.addEventListener("resize", () => {
         if (!document.getElementById("view-map").hidden) mpApply();
+        // Chip nào vừa đủ chỗ thì hiện lại, chip nào không thì ẩn — tính lại theo
+        // bề rộng mới, không giữ quyết định của lần dàn trước.
+        fitKpis();
       });
 
       // Cài đặt

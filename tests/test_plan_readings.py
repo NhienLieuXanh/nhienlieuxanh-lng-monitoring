@@ -7,7 +7,8 @@ Ba nhóm test chạy KHÔNG cần DB, một nhóm cần DB thật:
    DO NOTHING. Đây là chỗ dễ sao chép sai nhất: bảng ``telemetry`` ngay bên cạnh
    dùng DO NOTHING (điểm đo của máy là sự thật bất biến), nhưng số người nhập thì
    sửa lại là việc bình thường — DO NOTHING ở đây làm nút Lưu im lặng không làm gì.
-3. Trần theo ``capacity_l`` ở router — chặn ca nhập m³ vào API nói bằng lít.
+3. Trần TUYỆT ĐỐI ở router — chặn sai đơn vị hàng nghìn lần, nhưng KHÔNG chặn
+   theo ``capacity_l`` của DB (số đó có thể sai; xem TestTranTuyetDoi).
 """
 
 from __future__ import annotations
@@ -98,12 +99,14 @@ class TestUpsertGhiDeChuKhongBoQua:
         assert "entered_by" in self._sql()
 
 
-class TestTranTheoDungTich:
-    """Chặn ca nhập m³ vào một API nói bằng lít.
+class TestTranTuyetDoi:
+    """Chỉ chặn giá trị vô lý về đơn vị, KHÔNG chặn theo dung tích lưu trong DB.
 
-    48 (m³ gõ vào ô lít) trên bồn 60.000 L không sai kiểu, không vi phạm CHECK nào,
-    và biến kế hoạch thành vô nghĩa một cách im lặng. Chỉ ngữ nghĩa bắt được nó,
-    nên trần phải nằm ở router — nơi duy nhất biết bồn nào.
+    Bản đầu chặn theo ``terminals.capacity_l`` và nó đã từ chối một lần nhập hợp lệ
+    trên production: bồn Fuji Seal lưu 10425 L (số vendor gửi) trong khi bồn thật là
+    54 m³, nên người vận hành gõ 42 m³ nhận 422 kèm thông điệp nói rằng chính số đo
+    của họ sai. Một con số vendor có thể sai không được phép phủ quyết số người vận
+    hành tự đo — cảnh báo vượt dung tích chuyển sang client và chỉ CẢNH BÁO.
     """
 
     def _put(self, volume_l: str, capacity_l: str | None) -> None:
@@ -114,13 +117,11 @@ class TestTranTheoDungTich:
 
         class _S:
             def execute(self, *a, **kw):  # type: ignore[no-untyped-def]
-                raise AssertionError("không được ghi khi thể tích vượt trần")
+                raise AssertionError("TOI TANG GHI")
 
             def commit(self) -> None:
-                raise AssertionError("không được commit khi thể tích vượt trần")
+                raise AssertionError("TOI TANG GHI")
 
-        # Thay get_by_psn bằng hàm trả terminal dựng sẵn: test này kiểm LUẬT TRẦN,
-        # không kiểm đường truy vấn DB.
         orig = plan_router.term_repo.get_by_psn
         plan_router.term_repo.get_by_psn = lambda *a, **kw: term  # type: ignore[assignment]
         try:
@@ -134,23 +135,24 @@ class TestTranTheoDungTich:
         finally:
             plan_router.term_repo.get_by_psn = orig  # type: ignore[assignment]
 
-    def test_vuot_dung_tich_bi_tu_choi(self) -> None:
-        with pytest.raises(HTTPException) as e:
-            self._put("70000", "60000")
-        assert e.value.status_code == 422
-        assert "dung tích" in e.value.detail
+    def test_vuot_dung_tich_DB_van_duoc_ghi(self) -> None:
+        """Đây là ca đã hỏng trên production: 42 m³ trên bồn DB ghi 10425 L.
 
-    def test_bang_dung_tich_van_chap_nhan(self) -> None:
-        """Bồn đầy đúng bằng dung tích là trạng thái thật, không phải lỗi."""
-        with pytest.raises(AssertionError, match="không được ghi"):
-            # Tới được tầng ghi nghĩa là đã qua trần — session giả chặn ở đó.
-            self._put("60000", "60000")
+        Tới được tầng ghi nghĩa là đã qua mọi trần — session giả chặn ở đó.
+        """
+        with pytest.raises(AssertionError, match="TOI TANG GHI"):
+            self._put("42000", "10425")
 
-    def test_chua_biet_dung_tich_thi_dung_tran_du_phong(self) -> None:
+    def test_sai_don_vi_hang_nghin_lan_bi_chan(self) -> None:
+        """42.000 m³ gõ vào ô lít = 42 triệu lít — không bồn nào như vậy."""
         with pytest.raises(HTTPException) as e:
-            self._put("2000000", None)
+            self._put("42000000", "10425")
         assert e.value.status_code == 422
-        assert "ngưỡng hợp lý" in e.value.detail
+        assert "đơn vị" in e.value.detail
+
+    def test_khong_biet_dung_tich_van_ghi_duoc(self) -> None:
+        with pytest.raises(AssertionError, match="TOI TANG GHI"):
+            self._put("42000", None)
 
     def test_psn_la_bi_404(self) -> None:
         orig = plan_router.term_repo.get_by_psn
