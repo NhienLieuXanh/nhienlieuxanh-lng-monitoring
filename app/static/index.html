@@ -2652,6 +2652,7 @@
 
     async function savePlanSettings(id) {
       if (!planPsn || planLoading) return;
+      const psn = planPsn;
       const body = {};
       if (id === "p-time") {
         const t = document.getElementById("p-time").value;
@@ -2666,11 +2667,12 @@
         body[f.key] = String(f.toApi(v));
       }
       try {
-        await api(`/api/plan/settings/${encodeURIComponent(planPsn)}`, {
+        await api(`/api/plan/settings/${encodeURIComponent(psn)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        if (planPsn !== psn) return;
         setMsg("plan-msg", "Đã lưu thông số cho bồn này.", "ok");
       } catch (e) {
         if (e.name !== "AuthError") setMsg("plan-msg", e.message, "bad");
@@ -2698,18 +2700,19 @@
 
     async function saveCapacityToTank() {
       if (!planPsn) return;
+      const psn = planPsn;
       const m3 = parseFloat(document.getElementById("p-cap").value);
       if (!Number.isFinite(m3) || m3 <= 0) {
         setMsg("plan-msg", "Dung tích phải là số lớn hơn 0.", "bad");
         return;
       }
       try {
-        const t = await api(`/api/terminals/${encodeURIComponent(planPsn)}`, {
+        const t = await api(`/api/terminals/${encodeURIComponent(psn)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ capacity_l: String(round2(m3 * 1000)) }),
         });
-        const i = tanks.findIndex(x => x.psn === planPsn);
+        const i = tanks.findIndex(x => x.psn === psn);
         if (i >= 0) tanks[i].capacity_l = t.capacity_l;
         setMsg("plan-msg", `Đã lưu dung tích ${m3} m³ cho bồn này. `
           + `Mức chứa %, cảnh báo và dự báo giờ tính theo số này.`, "ok");
@@ -2772,17 +2775,23 @@
 
     async function savePlanReading(key, raw) {
       if (!planPsn) return;
+      // Chốt bồn NGAY ở đây rồi kiểm lại sau mỗi await. Hàm này là async, và giữa
+      // lúc gửi request với lúc nhận trả lời người dùng có thể đã đổi bồn — khi đó
+      // `planPsn` đã là bồn khác, và mọi dòng phía sau (planReadings.set, thông
+      // điệp, computePlan) sẽ gán số của bồn A vào kế hoạch bồn B. Sai im lặng.
+      const psn = planPsn;
       // Dấu phẩy là dấu thập phân của người Việt. Đây là lý do ô này là type="text"
       // chứ không phải type="number": type="number" trả chuỗi rỗng cho "47,5", tức
       // số vừa gõ biến mất mà không báo gì.
       const txt = String(raw).trim().replace(",", ".");
-      const url = `/api/plan/readings/${encodeURIComponent(planPsn)}/${key}`;
+      const url = `/api/plan/readings/${encodeURIComponent(psn)}/${key}`;
       try {
         if (!txt) {
           // Ô để trống = "bỏ số tay, quay về ước tính". Ngày vốn chưa có số thì
           // không gửi request nào — DELETE lúc đó trả 404 và báo lỗi vô cớ.
           if (planReadings.has(key)) {
             await api(url, { method: "DELETE" });
+            if (planPsn !== psn) return;   // đã đổi bồn trong lúc chờ mạng
             planReadings.delete(key);
             setMsg("plan-msg", `Đã xoá số thực tế ngày ${key} — ngày này quay về dùng ước tính.`, "ok");
           }
@@ -2800,6 +2809,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ volume_l: String(round2(m3 * 1000)) }),
           });
+          if (planPsn !== psn) return;   // đã đổi bồn trong lúc chờ mạng
           const v = round2(Number(row.volume_l) / 1000);
           planReadings.set(key, v);
           const warn = planCapWarn(v);
