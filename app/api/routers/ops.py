@@ -43,6 +43,9 @@ def _thresholds(settings: SettingsDep) -> AlertThresholds:
         low_volume_percent=Decimal(str(settings.alert_low_volume_percent)),
         low_battery_v=Decimal(str(settings.alert_low_battery_v)),
         low_signal_percent=Decimal(str(settings.alert_low_signal_percent)),
+        # Cùng một con số với dự báo: MỘT định nghĩa "số đo quá cũ để tin" cho cả
+        # sản phẩm, thay vì hai tầng tự đặt ngưỡng riêng rồi nói khác nhau.
+        max_reading_age=timedelta(hours=settings.forecast_max_reading_age_hours),
     )
 
 

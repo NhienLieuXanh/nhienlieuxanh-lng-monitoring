@@ -63,6 +63,7 @@ SESSION_GET = frozenset({
     "/api/analytics/{psn}",
     "/api/refills/{psn}",
     "/api/plan/readings/{psn}",
+    "/api/plan/settings/{psn}",
     "/api/delivery-plan",
     "/api/export/report.html",
     "/api/export/tanks.csv",
@@ -74,7 +75,10 @@ SESSION_PATCH = frozenset({"/api/settings", "/api/terminals/{psn}"})
 SESSION_POST = frozenset({"/api/settings/test-email"})
 # Số đo tay của trang Kế hoạch. Ghi bằng PUT vì địa chỉ (bồn, ngày) xác định đúng
 # một số đo — bấm Lưu hai lần không được sinh hai dòng.
-SESSION_PUT = frozenset({"/api/plan/readings/{psn}/{day}"})
+SESSION_PUT = frozenset({
+    "/api/plan/readings/{psn}/{day}",
+    "/api/plan/settings/{psn}",
+})
 SESSION_DELETE = frozenset({"/api/plan/readings/{psn}/{day}"})
 
 # Cần header X-Admin-Token, KHÔNG dùng phiên.

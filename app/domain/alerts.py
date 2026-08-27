@@ -49,6 +49,10 @@ class AlertThresholds:
     low_volume_percent: Decimal
     low_battery_v: Decimal
     low_signal_percent: Decimal
+    #: Lần đọc cũ hơn mức này thì KHÔNG còn dùng để kết luận về thiết bị.
+    #: Cùng một con số với ``forecast_max_reading_age_hours`` (mặc định 24 giờ) —
+    #: cố ý dùng chung để cả sản phẩm có MỘT định nghĩa "số đo quá cũ để tin".
+    max_reading_age: timedelta = timedelta(hours=24)
     # Lệch quá ngưỡng này giữa volume_percent (vendor gửi) và fill_percent (ta tự
     # tính) là dấu hiệu vendor đổi thang hoặc capacity_l sai.
     percent_mismatch_points: Decimal = Decimal("5")
@@ -94,8 +98,41 @@ def elapsed_vi(delta: timedelta) -> str:
 def evaluate(
     snap: TerminalSnapshot, th: AlertThresholds, now: datetime
 ) -> list[Alert]:
-    """Sinh alert cho một terminal. Nhận `now` để test không cần mock clock."""
+    """Sinh alert cho một terminal. Nhận `now` để test không cần mock clock.
+
+    **Lần đọc quá cũ thì không được kết luận như số hiện tại.** Đây là lỗi đã quan
+    sát được trên production: bồn 2605090007 im 85 ngày, và API phát ra hai dòng
+    cạnh nhau —
+
+        LOW_VOLUME  critical  "Mức chứa thấp: 0.29%"
+        OFFLINE     warning   "không có dữ liệu trong 85 ngày"
+
+    Hệ thống vừa nói không biết gì về bồn suốt 85 ngày, vừa phát cảnh báo NGHIÊM
+    TRỌNG về mức chứa dựa trên đúng con số 85 ngày tuổi đó. ``forecast.py`` đã có
+    chốt chặn này (``stale`` -> không phát runout/hold); ``alerts.py`` thì không, nên
+    hai tầng nói khác nhau về cùng một dữ liệu. Nếu hộp thư đã cấu hình thì nó gửi
+    "mức chứa thấp nghiêm trọng" mỗi ngày về một bồn có thể đang đầy — loại cảnh báo
+    làm người ta ngừng đọc cảnh báo.
+
+    Xử lý phân biệt theo *đối tượng* của từng mã, không cắt hết:
+
+    * ``LOW_BATTERY`` / ``WEAK_SIGNAL`` / ``PERCENT_MISMATCH`` nói về THIẾT BỊ. Khi
+      thiết bị đã im thì ``OFFLINE`` đã mang đúng một hành động cần làm ("ra xem cái
+      thiết bị"); thêm ba dòng nữa chỉ là nhiễu. -> bỏ.
+    * ``LOW_VOLUME`` nói về BỒN, và "lần cuối nhìn thấy thì đã cạn" vẫn là thông tin
+      thật, có thể còn đúng hơn theo thời gian. -> giữ, nhưng hạ xuống WARNING và
+      ghi rõ tuổi của số đo. Không cắt (mất tín hiệu thật), không để CRITICAL (đòi
+      hành động dựa trên thông tin không ai có).
+    """
     out: list[Alert] = []
+    age = None if snap.last_seen_at is None else now - snap.last_seen_at
+    stale_reading = age is None or age > th.max_reading_age
+    #: Chuỗi gắn vào message để không ai đọc số cũ như số hiện tại.
+    aged = (
+        " (chưa từng có số đo)"
+        if age is None
+        else f" — số đo {elapsed_vi(age)} trước, thiết bị đã ngoại tuyến"
+    )
 
     if derive_status(snap.last_seen_at, now, th.stale_after) is TerminalStatus.OFFLINE:
         if snap.last_seen_at is None:
@@ -110,8 +147,18 @@ def evaluate(
     # vs 0-100 mà không constraint nào bắt được.
     pct = snap.fill_percent if snap.fill_percent is not None else snap.volume_percent
     if pct is not None and pct < th.low_volume_percent:
-        out.append(Alert(snap.psn, AlertCode.LOW_VOLUME, Severity.CRITICAL,
-                         f"Mức chứa thấp: {pct:.2f}%", pct, th.low_volume_percent))
+        out.append(Alert(
+            snap.psn,
+            AlertCode.LOW_VOLUME,
+            Severity.WARNING if stale_reading else Severity.CRITICAL,
+            f"Mức chứa thấp: {pct:.2f}%" + (aged if stale_reading else ""),
+            pct,
+            th.low_volume_percent,
+        ))
+
+    # Ba mã dưới đây nói về THIẾT BỊ. Thiết bị đã im thì OFFLINE nói đủ.
+    if stale_reading:
+        return out
 
     if snap.battery_v is not None and snap.battery_v < th.low_battery_v:
         out.append(Alert(snap.psn, AlertCode.LOW_BATTERY, Severity.WARNING,

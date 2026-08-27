@@ -99,6 +99,7 @@ def collect_notices(
         low_volume_percent=Decimal(str(settings.alert_low_volume_percent)),
         low_battery_v=Decimal(str(settings.alert_low_battery_v)),
         low_signal_percent=Decimal(str(settings.alert_low_signal_percent)),
+        max_reading_age=timedelta(hours=settings.forecast_max_reading_age_hours),
     )
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])

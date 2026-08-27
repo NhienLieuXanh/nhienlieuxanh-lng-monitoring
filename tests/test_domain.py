@@ -140,6 +140,81 @@ class TestAlerts:
         assert [a.severity for a in alerts] == [Severity.CRITICAL]
 
 
+class TestSoDoQuaCu:
+    """Lần đọc quá cũ thì không được kết luận như số hiện tại.
+
+    Tình huống thật trên production: bồn 2605090007 im 85,6 ngày, API phát ra
+    ``LOW_VOLUME critical`` cạnh ``OFFLINE warning "không có dữ liệu trong 85 ngày"``.
+    Hai dòng đó mâu thuẫn nhau về cùng một dữ liệu.
+    """
+
+    #: 85,6 ngày im — đúng bằng bồn 2605090007 trên production.
+    OLD = NOW - timedelta(days=85, hours=14)
+
+    def _snap(self, last_seen):  # type: ignore[no-untyped-def]
+        return TerminalSnapshot(
+            psn="2605090007",
+            last_seen_at=last_seen,
+            volume_percent=Decimal("0.29"),
+            fill_percent=Decimal("0.29"),
+            battery_v=Decimal("3.39"),      # dưới ngưỡng -> lẽ ra có LOW_BATTERY
+            signal_percent=Decimal("5"),    # dưới ngưỡng -> lẽ ra có WEAK_SIGNAL
+        )
+
+    def test_low_volume_ha_xuong_warning_va_ghi_ro_tuoi(self) -> None:
+        alerts = evaluate(self._snap(self.OLD), TH, NOW)
+        lv = next(a for a in alerts if a.code is AlertCode.LOW_VOLUME)
+        # Hạ cấp, KHÔNG cắt: "lần cuối nhìn thấy thì đã cạn" vẫn là thông tin thật.
+        assert lv.severity is Severity.WARNING
+        # Và phải nói ra tuổi của số đo, nếu không người đọc vẫn hiểu là số hiện tại.
+        assert "85 ngày trước" in lv.message
+        assert "ngoại tuyến" in lv.message
+
+    def test_canh_bao_ve_thiet_bi_bi_bo(self) -> None:
+        """OFFLINE đã mang đúng một hành động; ba dòng nữa chỉ là nhiễu."""
+        codes = {a.code for a in evaluate(self._snap(self.OLD), TH, NOW)}
+        assert AlertCode.OFFLINE in codes
+        assert AlertCode.LOW_VOLUME in codes
+        assert AlertCode.LOW_BATTERY not in codes
+        assert AlertCode.WEAK_SIGNAL not in codes
+        assert AlertCode.PERCENT_MISMATCH not in codes
+
+    def test_so_do_moi_thi_khong_doi_gi(self) -> None:
+        """Chốt chặn chỉ được kích hoạt khi số đo CŨ — không làm hỏng ca bình thường."""
+        alerts = evaluate(self._snap(NOW), TH, NOW)
+        codes = {a.code for a in alerts}
+        assert codes == {
+            AlertCode.LOW_VOLUME,
+            AlertCode.LOW_BATTERY,
+            AlertCode.WEAK_SIGNAL,
+        }
+        lv = next(a for a in alerts if a.code is AlertCode.LOW_VOLUME)
+        assert lv.severity is Severity.CRITICAL
+        assert "trước" not in lv.message
+
+    def test_ngay_qua_nguong_la_cu(self) -> None:
+        """Ngưỡng là max_reading_age (24 giờ), KHÔNG phải stale_after (90 phút).
+
+        Hai ngưỡng khác nhau có chủ ý: 2 giờ mất tín hiệu thì thiết bị đã "ngoại
+        tuyến" nhưng thể tích đo 2 giờ trước vẫn dùng được để cảnh báo; 25 giờ thì
+        không.
+        """
+        vua_du = evaluate(self._snap(NOW - timedelta(hours=23, minutes=59)), TH, NOW)
+        assert next(a for a in vua_du if a.code is AlertCode.LOW_VOLUME).severity is Severity.CRITICAL
+        assert AlertCode.LOW_BATTERY in {a.code for a in vua_du}
+
+        qua_nguong = evaluate(self._snap(NOW - timedelta(hours=24, minutes=1)), TH, NOW)
+        assert next(a for a in qua_nguong if a.code is AlertCode.LOW_VOLUME).severity is Severity.WARNING
+        assert AlertCode.LOW_BATTERY not in {a.code for a in qua_nguong}
+
+    def test_chua_tung_co_so_do(self) -> None:
+        snap = TerminalSnapshot(psn="X", last_seen_at=None, fill_percent=Decimal("1"))
+        alerts = evaluate(snap, TH, NOW)
+        lv = next(a for a in alerts if a.code is AlertCode.LOW_VOLUME)
+        assert lv.severity is Severity.WARNING
+        assert "chưa từng có số đo" in lv.message
+
+
 class TestElapsedVi:
     """Chuỗi thời lượng trong cảnh báo. Dùng CHUNG thang với fmtAgo() ở dashboard."""
 

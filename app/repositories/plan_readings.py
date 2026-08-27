@@ -1,4 +1,5 @@
-"""Đọc/ghi bảng ``plan_readings`` — thể tích đo tay dùng cho trang Kế hoạch.
+"""Đọc/ghi ``plan_readings`` (thể tích đo tay) và ``plan_settings`` (thông số
+lập kế hoạch theo từng bồn) — cả hai đều chỉ dùng cho trang Kế hoạch.
 
 Đơn vị ở tầng này là **lít**, khớp với ``telemetry.volume_l`` và
 ``terminals.capacity_l``. Trang Kế hoạch làm việc bằng m³ và quy đổi ở biên UI.
@@ -14,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.db.models import PlanReading
+from app.db.models import PlanReading, PlanSetting
 
 
 def list_for(
@@ -79,3 +80,41 @@ def delete(session: Session, psn: str, day: date) -> bool:
         )
     )
     return bool(res.rowcount)
+
+
+# --------------------------------------------------------------------------- #
+# Thông số lập kế hoạch theo từng bồn
+# --------------------------------------------------------------------------- #
+
+
+def get_settings_for(session: Session, psn: str) -> PlanSetting | None:
+    """Thông số đã lưu của một bồn. Chưa lưu gì -> ``None``, KHÔNG phải lỗi."""
+    return session.execute(
+        select(PlanSetting).where(PlanSetting.psn == psn)
+    ).scalar_one_or_none()
+
+
+def save_settings(
+    session: Session,
+    psn: str,
+    patch: dict[str, object],
+    *,
+    by: str | None = None,
+) -> PlanSetting:
+    """Trộn ``patch`` vào thông số đang lưu.
+
+    Trộn chứ không thay thế: trang Kế hoạch lưu theo từng ô người dùng vừa sửa, nên
+    thay cả cục sẽ xoá mất các ô khác về NULL. Cùng lý do như ``app_settings.save``.
+
+    ``updated_at`` set tường minh vì ``onupdate`` của SQLAlchemy KHÔNG chạy trên câu
+    lệnh Core như ``ON CONFLICT DO UPDATE``.
+    """
+    values: dict[str, object] = {"psn": psn, "updated_by": by, **patch}
+    set_: dict[str, object] = {**patch, "updated_by": by, "updated_at": func.now()}
+    stmt = (
+        pg_insert(PlanSetting)
+        .values(**values)
+        .on_conflict_do_update(index_elements=["psn"], set_=set_)
+        .returning(PlanSetting)
+    )
+    return session.execute(stmt).scalar_one()

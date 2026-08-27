@@ -22,7 +22,12 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import SessionDep, UserDep
-from app.api.schemas import PlanReadingIn, PlanReadingOut
+from app.api.schemas import (
+    PlanReadingIn,
+    PlanReadingOut,
+    PlanSettingsIn,
+    PlanSettingsOut,
+)
 from app.repositories import plan_readings as pr_repo
 from app.repositories import terminals as term_repo
 
@@ -102,3 +107,33 @@ def delete_reading(psn: str, day: date, session: SessionDep, _: UserDep) -> Resp
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ngày này chưa có số đo tay")
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/settings/{psn}", response_model=PlanSettingsOut)
+def get_plan_settings(psn: str, session: SessionDep, _: UserDep) -> PlanSettingsOut:
+    """Thông số lập kế hoạch đã lưu của một bồn.
+
+    Chưa lưu gì thì trả một bản ghi toàn ``null`` chứ KHÔNG phải 404: "bồn này chưa
+    ai đặt thông số" là trạng thái bình thường của mọi bồn mới, còn 404 sẽ buộc client
+    phải phân biệt hai ca không khác nhau về hành vi.
+    """
+    _require_terminal(session, psn)
+    row = pr_repo.get_settings_for(session, psn)
+    if row is None:
+        return PlanSettingsOut(psn=psn)
+    return PlanSettingsOut.model_validate(row)
+
+
+@router.put("/settings/{psn}", response_model=PlanSettingsOut)
+def put_plan_settings(
+    psn: str,
+    body: PlanSettingsIn,
+    session: SessionDep,
+    user: UserDep,
+) -> PlanSettingsOut:
+    """Lưu thông số lập kế hoạch. Chỉ ghi những field được gửi."""
+    _require_terminal(session, psn)
+    patch = body.model_dump(include=body.model_fields_set)
+    row = pr_repo.save_settings(session, psn, patch, by=user)
+    session.commit()
+    return PlanSettingsOut.model_validate(row)

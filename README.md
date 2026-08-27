@@ -62,9 +62,12 @@ Natural Earth bỏ hẳn hai quần đảo. Toạ độ bồn **tự lấy từ 
 ingest, và ghim tay được để sửa hoặc để khai khi module không định vị — xem "GPS của
 vendor là dữ liệu THỈNH THOẢNG CÓ" bên dưới.
 
-**Kế hoạch nạp.** Lập lịch theo tháng cho một bồn thật (tự lấy dung tích + thể tích
-hiện tại), có nút áp dụng mức tiêu thụ đo được, cột ngày nghỉ / nạp chỉ định, và giờ
-nạp tới từng giây. Cột **Thực tế đo được** cho phép nhập thể tích thật của một ngày:
+**Kế hoạch nạp.** Lập lịch theo tháng cho một bồn thật, có nút áp dụng mức tiêu thụ đo
+được, cột ngày nghỉ / nạp chỉ định, và giờ nạp tới từng giây. **Thông số lưu theo từng
+bồn** (`plan_settings`) nên không phải gõ lại mỗi lần mở trang; **dung tích sửa được
+ngay tại đây** và ghi thẳng vào `terminals.capacity_l` — một chỗ duy nhất giữ dung tích.
+Mốc khởi đầu lấy từ **số đo tay mới nhất**, không lấy từ telemetry: với thiết bị đã im
+hàng tháng, số người vừa đo mới là thứ đúng. Cột **Thực tế đo được** cho phép nhập thể tích thật của một ngày:
 từ ngày đó kế hoạch tính lại từ số thực tế, và ô đó hiện độ lệch so với ước tính. Số
 này lưu ở bảng `plan_readings` theo `(bồn, ngày)` — xem *Ước tính và thực tế* bên dưới.
 
@@ -304,6 +307,38 @@ hỏng: đã ở dưới mức dự trữ thì phải nạp ngay, không chờ.
 Kèm một cảnh báo mới: nếu `mức sau khi nạp ≤ ngưỡng kích hoạt` thì nạp xong vẫn dưới
 ngưỡng, nên lịch sẽ đòi nạp **mỗi ngày** với lượng đặt 0. Cấu hình đó vô nghĩa và giờ nó
 tự nói ra.
+
+### Cảnh báo suy từ số đo CŨ: hạ cấp cái nói về bồn, bỏ cái nói về thiết bị
+
+Lỗi quan sát được trên production: bồn 2605090007 im **85,6 ngày**, và `/api/alerts`
+phát ra hai dòng cạnh nhau —
+
+```
+LOW_VOLUME  critical  Mức chứa thấp: 0.29%
+OFFLINE     warning   không có dữ liệu trong 85 ngày
+```
+
+Hệ thống vừa nói không biết gì về bồn suốt 85 ngày, vừa phát cảnh báo **nghiêm trọng**
+về mức chứa dựa trên đúng con số 85 ngày tuổi đó. `forecast.py` đã có chốt chặn này
+(`stale` → không phát runout/hold); `alerts.py` thì **không**, nên hai tầng nói khác
+nhau về cùng một dữ liệu. Nếu hộp thư đã cấu hình, nó gửi "mức chứa thấp nghiêm trọng"
+mỗi ngày về một bồn có thể đang đầy — loại cảnh báo làm người ta ngừng đọc cảnh báo.
+
+Xử lý phân biệt theo **đối tượng** của từng mã, không cắt hết:
+
+| Mã | Nói về | Khi số đo cũ |
+|---|---|---|
+| `LOW_BATTERY`, `WEAK_SIGNAL`, `PERCENT_MISMATCH` | thiết bị | **bỏ** — `OFFLINE` đã mang đúng một hành động ("ra xem thiết bị"), thêm ba dòng nữa chỉ là nhiễu |
+| `LOW_VOLUME` | bồn | **giữ, hạ xuống `warning`**, và ghi tuổi vào message — "lần cuối nhìn thấy thì đã cạn" vẫn là thông tin thật |
+
+Ngưỡng dùng chung `forecast_max_reading_age_hours` (mặc định 24 giờ), **không** dùng
+`online_stale_minutes` (90 phút). Hai ngưỡng khác nhau có chủ ý: mất tín hiệu 2 giờ thì
+thiết bị đã "ngoại tuyến" nhưng thể tích đo 2 giờ trước vẫn dùng được để cảnh báo; 25
+giờ thì không. Dùng chung một con số với dự báo để cả sản phẩm có MỘT định nghĩa "số đo
+quá cũ để tin".
+
+Cùng họ: chip tổng thể tích ở thanh trên là tổng các **lần đọc cuối**, nên khi mọi bồn
+đều ngoại tuyến nó hiện `0.091 m³ · cũ 34 ngày` thay vì trơ như số hiện tại.
 
 ### Không dự báo từ dữ liệu đã lỗi thời
 

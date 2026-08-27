@@ -15,7 +15,7 @@ Tên field ở ``TerminalOut`` cố ý KHỚP ĐÚNG những gì dashboard proto
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -641,3 +641,43 @@ class PlanReadingOut(BaseModel):
     #: Ai nhập. Số tay ghi đè ước tính nên phải truy được người chịu trách nhiệm.
     entered_by: str | None = None
     updated_at: datetime
+
+
+class PlanSettingsIn(BaseModel):
+    """Thông số lập kế hoạch của một bồn. Gửi field nào thì sửa field đó.
+
+    Ngữ nghĩa **trộn**: field không gửi = giữ nguyên. Trang Kế hoạch lưu theo từng ô
+    người dùng vừa sửa nên không bao giờ gửi cả cục; nếu coi "không gửi" là "xoá" thì
+    sửa một ô sẽ xoá năm ô còn lại.
+
+    ``capacity_l`` KHÔNG có ở đây — dung tích bồn thuộc ``PATCH /api/terminals/{psn}``
+    và phải chỉ có một chỗ. Hai chỗ giữ dung tích là cách chắc chắn nhất để chúng lệch.
+    """
+
+    max_fill_percent: Decimal | None = Field(None, gt=0, le=100)
+    #: Lít, như mọi field thể tích khác của API. UI quy đổi m³ ở biên.
+    daily_use_l: Decimal | None = Field(None, ge=0)
+    reserve_l: Decimal | None = Field(None, ge=0)
+    refill_time: time | None = None
+    horizon_days: int | None = Field(None, ge=1, le=62)
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> PlanSettingsIn:
+        if not self.model_fields_set:
+            raise ValueError("cần ít nhất một field")
+        return self
+
+
+class PlanSettingsOut(BaseModel):
+    """Thông số đã lưu. Field chưa từng lưu trả ``null`` -> UI dùng mặc định."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    psn: str
+    max_fill_percent: Decimal | None = None
+    daily_use_l: Decimal | None = None
+    reserve_l: Decimal | None = None
+    refill_time: time | None = None
+    horizon_days: int | None = None
+    updated_at: datetime | None = None
+    updated_by: str | None = None

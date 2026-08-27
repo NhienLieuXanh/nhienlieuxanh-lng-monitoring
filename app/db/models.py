@@ -10,7 +10,7 @@ Ba sai lệch có chủ ý so với spec gốc, đều được giải thích t�
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -28,6 +28,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
     text,
@@ -463,5 +464,67 @@ class PlanReading(Base):
             ["terminals.psn"],
             onupdate="CASCADE",
             ondelete="RESTRICT",
+        ),
+    )
+
+
+class PlanSetting(Base):
+    """Thông số lập kế hoạch của MỘT bồn, để không phải gõ lại mỗi lần mở trang.
+
+    Vì sao cần. Trang Kế hoạch là phần duy nhất của hệ thống còn dùng được khi thiết
+    bị đã chết — nó không đọc telemetry một dòng nào. Nhưng toàn bộ thông số của nó
+    chỉ sống trong DOM: mở lại trang là gõ lại sáu con số, mỗi ngày, cho mỗi bồn. Với
+    thứ dùng hằng ngày thì đó là ma sát đủ để người ta quay về Excel.
+
+    ``capacity_l`` CỐ Ý không có ở đây: dung tích bồn đã thuộc ``terminals.capacity_l``
+    và phải chỉ có MỘT chỗ. Hai chỗ giữ dung tích là cách chắc chắn nhất để chúng lệch
+    nhau — đúng chuyện đang xảy ra giữa số vendor gửi (10425 L) và dung tích người
+    vận hành lập kế hoạch với.
+
+    Mọi cột nullable: lưu được từng phần, và thiếu thì rơi về mặc định của app. Không
+    cần một dòng đầy đủ mới dùng được.
+    """
+
+    __tablename__ = "plan_settings"
+
+    psn: Mapped[str] = mapped_column(String(32), primary_key=True)
+
+    #: Nạp tới bao nhiêu % dung tích. Bồn lạnh sâu phải chừa khoảng hơi giãn nở.
+    max_fill_percent: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
+    #: Mức tiêu thụ/ngày, LÍT (API và DB nói lít ở mọi nơi; UI quy đổi m³ ở biên).
+    daily_use_l: Mapped[Decimal | None] = mapped_column(Numeric(18, 3))
+    #: Mức dự trữ, lít.
+    reserve_l: Mapped[Decimal | None] = mapped_column(Numeric(18, 3))
+    #: Giờ nạp trong ngày. TIME không TIMESTAMP: đây là "8 giờ sáng theo giờ kho",
+    #: một giờ trong ngày lặp lại, không phải một thời điểm.
+    refill_time: Mapped[time | None] = mapped_column(Time)
+    #: Số ngày lập kế hoạch.
+    horizon_days: Mapped[int | None] = mapped_column(SmallInteger)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    updated_by: Mapped[str | None] = mapped_column(String(128))
+
+    __table_args__ = (
+        CheckConstraint(
+            "max_fill_percent IS NULL OR (max_fill_percent > 0 AND max_fill_percent <= 100)",
+            name="max_fill_percent_range",
+        ),
+        CheckConstraint(
+            "daily_use_l IS NULL OR daily_use_l >= 0", name="daily_use_non_negative"
+        ),
+        CheckConstraint(
+            "reserve_l IS NULL OR reserve_l >= 0", name="reserve_non_negative"
+        ),
+        CheckConstraint(
+            "horizon_days IS NULL OR (horizon_days >= 1 AND horizon_days <= 62)",
+            name="horizon_days_range",
+        ),
+        ForeignKeyConstraint(
+            ["psn"], ["terminals.psn"], onupdate="CASCADE", ondelete="RESTRICT"
         ),
     )

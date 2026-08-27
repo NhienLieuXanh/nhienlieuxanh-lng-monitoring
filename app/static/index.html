@@ -1173,7 +1173,17 @@
         <div class="plan-scroll">
           <form class="plan-params" id="plan-form">
             <label class="p-wide">Bồn<select id="p-tank" class="field"><option value="">Tự nhập thông số</option></select></label>
-            <label>Dung tích (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.01" min="0" /></label>
+            <!-- Dung tích là thông số của BỒN, không của trang này: nó nằm ở
+                 terminals.capacity_l và ảnh hưởng cả fill_percent, cảnh báo, dự báo.
+                 Vì vậy KHÔNG tự lưu như các ô khác — phải bấm, và nút chỉ hiện khi
+                 số đang gõ khác số đã lưu. Trước đây không có đường nào sửa nó trong
+                 app, nên bồn Fuji Seal đứng mãi ở 10425 L của vendor. -->
+            <label>Dung tích (m³)<input type="number" id="p-cap" class="field num" value="60" step="0.01" min="0" />
+              <span class="p-measure">
+                <button type="button" id="p-cap-save" hidden>Lưu vào bồn</button>
+                <span class="note" id="p-cap-note"></span>
+              </span>
+            </label>
             <label>Nạp tới mức (%)<input type="number" id="p-pct" class="field num" value="90" step="1" min="0" max="100" /></label>
             <!-- Đây là ô từng phải gõ tay. Giờ nó lấy được số ĐO ĐƯỢC từ lịch sử
                  của chính bồn đang chọn; nút vẫn để người vận hành quyết định
@@ -1938,8 +1948,21 @@
       document.getElementById("stat-alert").textContent = alertTanks;
       document.getElementById("stat-critical").textContent = critTanks;
       const vol = summary.total_volume_l;
-      document.getElementById("stat-volume").textContent =
-        (vol === null || vol === undefined) ? "--" : `${(Number(vol) / 1000).toFixed(3)} m³`;
+      const volEl = document.getElementById("stat-volume");
+      // Tổng thể tích là tổng của các LẦN ĐỌC CUỐI, không phải số hiện tại. Khi mọi
+      // bồn đều ngoại tuyến thì không một thành phần nào của tổng này là mới — trình
+      // bày nó trơ như số hiện tại là nói sai. Đã quan sát: chip hiện "0.091 m³" cho
+      // hai bồn im 35 và 86 ngày. Ghi tuổi bằng CHỮ, không chỉ bằng màu.
+      const newest = tanks.reduce(
+        (a, t) => (t.last_seen_at && (!a || t.last_seen_at > a) ? t.last_seen_at : a), null);
+      const cu = summary.online === 0 && newest;
+      volEl.textContent = (vol === null || vol === undefined)
+        ? "--"
+        : `${(Number(vol) / 1000).toFixed(3)} m³` + (cu ? ` · cũ ${fmtAgo(newest)}` : "");
+      volEl.parentElement.title = cu
+        ? `Tổng các lần đọc cuối. Bồn mới nhất cũng đã ${fmtAgo(newest)} không báo — `
+          + `đây KHÔNG phải thể tích hiện tại.`
+        : "Tổng thể tích theo lần đọc mới nhất của mỗi bồn";
       const on = document.getElementById("stat-online").parentElement;
       const off = document.getElementById("stat-offline").parentElement;
       const al = document.getElementById("stat-alert").parentElement;
@@ -2406,6 +2429,9 @@
     //: PSN mà planReadings đang thuộc về. Rỗng = đang "Tự nhập thông số", lúc đó
     //: không có bồn nào để lưu vào nên ô nhập bị vô hiệu thay vì nhận rồi mất im lặng.
     let planPsn = "";
+    //: Chống lưu vòng: khi nạp thông số đã lưu vào form, sự kiện change không được
+    //: kích hoạt lưu lại (vô ích, và ghi đè updated_by/updated_at oan).
+    let planLoading = false;
     const planDayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const WD_VI = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
     const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
@@ -2532,8 +2558,8 @@
         if (cs > 0 && Math.abs(cs - p.cap) / Math.max(cs, p.cap) > 0.1) {
           msgs.push(`Dung tích lưu trong hệ thống cho bồn này là ${cs} m³, nhưng bạn đang lập kế hoạch với ${round2(p.cap)} m³. `
             + `Khi chọn bồn, "Mức tiêu thụ/ngày" (${round2(U)} m³) và "Mức dự trữ" (${round2(R)} m³) được gợi ý theo số ĐÃ LƯU — `
-            + `kiểm lại cả hai. Dung tích của bồn CHƯA sửa được trong app — hai số không thể `
-            + `cùng đúng, nên cần người quản trị sửa lại số đã lưu.`);
+            + `kiểm lại cả hai. Hai số không thể cùng đúng: nếu ${round2(p.cap)} m³ là số đúng thì `
+            + `bấm "Lưu vào bồn" cạnh ô Dung tích để hệ thống dùng nó ở mọi nơi.`);
         }
       }
       warn.innerHTML = msgs.map(m => `<span>${m}</span>`).join("");
@@ -2597,20 +2623,132 @@
         + `<b class="num tight">${dev > 0 ? "+" : ""}${dev} m³ · ${acts.length} ngày</b></div>`;
     }
 
+    // Ánh xạ ô trên form <-> field API. Đơn vị: API nói LÍT, form nói m³.
+    // `p-cap` CỐ Ý không có ở đây — nó thuộc bồn, lưu bằng nút riêng.
+    const PLAN_FIELDS = [
+      { id: "p-pct",  key: "max_fill_percent", toApi: (v) => v,        fromApi: (v) => round2(v) },
+      { id: "p-use",  key: "daily_use_l",      toApi: (v) => v * 1000, fromApi: (v) => round2(v / 1000) },
+      { id: "p-res",  key: "reserve_l",        toApi: (v) => v * 1000, fromApi: (v) => round2(v / 1000) },
+      { id: "p-days", key: "horizon_days",     toApi: (v) => Math.round(v), fromApi: (v) => Math.round(v) },
+    ];
+
+    async function loadPlanSettings(psn) {
+      try {
+        const st = await api(`/api/plan/settings/${encodeURIComponent(psn)}`);
+        if (planPsn !== psn) return;   // đã đổi bồn trong lúc chờ mạng
+        planLoading = true;
+        for (const f of PLAN_FIELDS) {
+          if (st[f.key] !== null && st[f.key] !== undefined) {
+            document.getElementById(f.id).value = f.fromApi(Number(st[f.key]));
+          }
+        }
+        if (st.refill_time) document.getElementById("p-time").value = st.refill_time;
+        planLoading = false;
+      } catch (e) {
+        planLoading = false;
+        if (e.name !== "AuthError") setMsg("plan-msg", `Không tải được thông số đã lưu: ${e.message}`, "bad");
+      }
+    }
+
+    async function savePlanSettings(id) {
+      if (!planPsn || planLoading) return;
+      const body = {};
+      if (id === "p-time") {
+        const t = document.getElementById("p-time").value;
+        if (!t) return;
+        // <input type=time> có thể trả "08:00" — API cần HH:MM:SS.
+        body.refill_time = t.length === 5 ? t + ":00" : t;
+      } else {
+        const f = PLAN_FIELDS.find(x => x.id === id);
+        if (!f) return;
+        const v = parseFloat(document.getElementById(id).value);
+        if (!Number.isFinite(v)) return;
+        body[f.key] = String(f.toApi(v));
+      }
+      try {
+        await api(`/api/plan/settings/${encodeURIComponent(planPsn)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        setMsg("plan-msg", "Đã lưu thông số cho bồn này.", "ok");
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg("plan-msg", e.message, "bad");
+      }
+    }
+
+    // Nút lưu dung tích vào bồn. Chỉ hiện khi số đang gõ khác số đã lưu — nếu hiện
+    // thường trực thì nó thành một nút "không rõ để làm gì" ở cạnh mọi ô.
+    function updateCapSaveBtn() {
+      const btn = document.getElementById("p-cap-save");
+      const note = document.getElementById("p-cap-note");
+      if (!btn || !note) return;
+      const t = planPsn ? tanks.find(x => x.psn === planPsn) : null;
+      const cur = parseFloat(document.getElementById("p-cap").value);
+      if (!t) { btn.hidden = true; note.textContent = planPsn ? "" : "Chọn bồn để lưu dung tích"; return; }
+      const stored = t.capacity_l != null ? round2(Number(t.capacity_l) / 1000) : null;
+      if (!Number.isFinite(cur) || cur <= 0 || stored === cur) {
+        btn.hidden = true;
+        note.textContent = stored === null ? "Bồn chưa khai dung tích" : `Đã lưu: ${stored} m³`;
+        return;
+      }
+      btn.hidden = false;
+      note.textContent = stored === null ? "chưa khai" : `đang lưu ${stored} m³`;
+    }
+
+    async function saveCapacityToTank() {
+      if (!planPsn) return;
+      const m3 = parseFloat(document.getElementById("p-cap").value);
+      if (!Number.isFinite(m3) || m3 <= 0) {
+        setMsg("plan-msg", "Dung tích phải là số lớn hơn 0.", "bad");
+        return;
+      }
+      try {
+        const t = await api(`/api/terminals/${encodeURIComponent(planPsn)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ capacity_l: String(round2(m3 * 1000)) }),
+        });
+        const i = tanks.findIndex(x => x.psn === planPsn);
+        if (i >= 0) tanks[i].capacity_l = t.capacity_l;
+        setMsg("plan-msg", `Đã lưu dung tích ${m3} m³ cho bồn này. `
+          + `Mức chứa %, cảnh báo và dự báo giờ tính theo số này.`, "ok");
+        updateCapSaveBtn();
+        computePlan();
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg("plan-msg", e.message, "bad");
+      }
+    }
+
     async function loadPlanReadings() {
       const psn = document.getElementById("p-tank").value;
       planPsn = psn;
       planReadings = new Map();
       if (!psn) { computePlan(); return; }
+      await loadPlanSettings(psn);
       try {
         const rows = await api(`/api/plan/readings/${encodeURIComponent(psn)}`);
         // Đổi bồn trong lúc chờ mạng thì bỏ kết quả cũ: nếu không, số của bồn A sẽ
         // hiện trên kế hoạch của bồn B — sai im lặng và rất khó nhận ra.
         if (planPsn !== psn) return;
         for (const r of rows) planReadings.set(r.reading_date, round2(Number(r.volume_l) / 1000));
+
+        // Mốc khởi đầu lấy từ SỐ ĐO TAY MỚI NHẤT, không lấy từ telemetry. Với hai
+        // thiết bị đang im 35 và 86 ngày, telemetry cho 0,061 m³ — một con số của
+        // tháng 7 dùng làm điểm khởi đầu cho kế hoạch tháng 8. Số người vừa đo bằng
+        // tay mới là thứ đúng ở đây.
+        const keys = [...planReadings.keys()].sort();
+        if (keys.length) {
+          const last = keys[keys.length - 1];
+          planLoading = true;
+          document.getElementById("p-start").value = planReadings.get(last);
+          document.getElementById("p-date").value = last;
+          planLoading = false;
+        }
       } catch (e) {
         if (e.name !== "AuthError") setMsg("plan-msg", `Không tải được số thực tế đã lưu: ${e.message}`, "bad");
       }
+      updateCapSaveBtn();
       computePlan();
     }
 
@@ -3831,7 +3969,16 @@
       document.getElementById("s-user").addEventListener("input", syncSmtpUserToFrom);
       document.getElementById("s-save-test").addEventListener("click", () => onSaveEmail(true));
       document.getElementById("s-save2").addEventListener("click", onSaveParams);
-      document.getElementById("plan-form").addEventListener("input", computePlan);
+      document.getElementById("plan-form").addEventListener("input", () => {
+        computePlan();
+        updateCapSaveBtn();
+      });
+      // Tự lưu ở `change` (rời ô / Enter) chứ không `input`: lưu theo từng ký tự là
+      // một request mỗi lần bấm phím.
+      document.getElementById("plan-form").addEventListener("change", (e) => {
+        if (e.target && e.target.id) savePlanSettings(e.target.id);
+      });
+      document.getElementById("p-cap-save").addEventListener("click", saveCapacityToTank);
       document.getElementById("p-tank").addEventListener("change", applyTankToPlan);
       document.getElementById("p-use-measured").addEventListener("click", useMeasuredDaily);
 
