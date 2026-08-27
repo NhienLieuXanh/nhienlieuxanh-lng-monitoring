@@ -2471,7 +2471,8 @@
         if (cs > 0 && Math.abs(cs - p.cap) / Math.max(cs, p.cap) > 0.1) {
           msgs.push(`Dung tích lưu trong hệ thống cho bồn này là ${cs} m³, nhưng bạn đang lập kế hoạch với ${round2(p.cap)} m³. `
             + `Khi chọn bồn, "Mức tiêu thụ/ngày" (${round2(U)} m³) và "Mức dự trữ" (${round2(R)} m³) được gợi ý theo số ĐÃ LƯU — `
-            + `kiểm lại cả hai. Sửa dung tích thật của bồn để lần sau không phải sửa tay.`);
+            + `kiểm lại cả hai. Dung tích của bồn CHƯA sửa được trong app — hai số không thể `
+            + `cùng đúng, nên cần người quản trị sửa lại số đã lưu.`);
         }
       }
       warn.innerHTML = msgs.map(m => `<span>${m}</span>`).join("");
