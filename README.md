@@ -64,7 +64,9 @@ vendor là dữ liệu THỈNH THOẢNG CÓ" bên dưới.
 
 **Kế hoạch nạp.** Lập lịch theo tháng cho một bồn thật (tự lấy dung tích + thể tích
 hiện tại), có nút áp dụng mức tiêu thụ đo được, cột ngày nghỉ / nạp chỉ định, và giờ
-nạp tới từng giây.
+nạp tới từng giây. Cột **Thực tế đo được** cho phép nhập thể tích thật của một ngày:
+từ ngày đó kế hoạch tính lại từ số thực tế, và ô đó hiện độ lệch so với ước tính. Số
+này lưu ở bảng `plan_readings` theo `(bồn, ngày)` — xem *Ước tính và thực tế* bên dưới.
 
 **Báo cáo.** Ba file CSV (tổng hợp bồn + dự báo, nhật ký nạp, dữ liệu đo chi tiết),
 UTF-8 có BOM và mốc thời gian giờ Việt Nam để Excel mở không lỗi phông. Nhật ký nạp
@@ -230,6 +232,38 @@ Bốn lưới an toàn ở tầng DB (`ck_terminals_*`): cấm đúng cặp `0,0
 chặn `latitude`/`longitude` ngoài khoảng — luật cuối bắt lỗi **đảo thứ tự lat/lon**, vì
 với Việt Nam thì kinh độ 106,75 đặt vào ô vĩ độ sẽ vượt ±90 ngay thay vì âm thầm đưa bồn
 sang Siberia.
+
+### Ước tính và thực tế là HAI con số khác nhau, và số tay không chạm telemetry
+
+Kế hoạch nạp là một chuỗi số học: thể tích đầu ngày kế = thể tích hôm nay − mức tiêu
+thụ/ngày. Mức tiêu thụ là con số **bình quân** nên chuỗi đó trượt khỏi thực tế ngay
+ngày thứ hai. Ví dụ thật: nạp tới 54 m³ ngày 1, mức dùng 7,4 m³/ngày, công thức cho
+ngày 2 là 46,60 m³ — nhưng hôm đó xưởng chạy ít nên đo được 48 m³.
+
+Cột **Thực tế đo được** nhận con số đó. Từ ngày đã nhập trở đi, chuỗi tính lại từ số
+thực tế (ngày 3 = 48 − 7,4 = 40,60), và ô hiện `ước tính 46.6 · +1.4`. Ô tổng
+*Thực tế so với ước tính* cộng dồn độ lệch của các ngày đã nhập.
+
+Hai quyết định cố ý, đừng "sửa" mà không đọc:
+
+1. **Mức tiêu thụ/ngày KHÔNG bị tính lại** từ số thực tế. Nếu tính lại thì một ngày
+   nghỉ lễ hay một lần đo lệch sẽ kéo lệch toàn bộ phần còn lại của kỳ. Số thực tế chỉ
+   **dịch mốc**, không đổi độ dốc.
+2. **`plan_readings` là bảng riêng, không ghi vào `telemetry`.** `telemetry` có đúng
+   một đường ghi là ingestion từ vendor, và mọi con số "đo được" của hệ thống (mức tiêu
+   thụ, nhận diện lần nạp, cảnh báo, báo cáo) đọc từ đó. Cho một form web ghi vào cùng
+   bảng thì không còn ai phân biệt được số máy với số người. Số tay **chỉ** dùng cho
+   trang Kế hoạch.
+
+Ô nhập là `type="text"` + `inputmode="decimal"`, **không** `type="number"`: người Việt
+gõ `47,5` và `<input type="number">` trả chuỗi rỗng cho dấu phẩy ở phần lớn locale —
+tức số vừa gõ biến mất không một lời báo. JS parse cả `,` và `.`, giống ô toạ độ ở
+trang Bản đồ.
+
+API nói bằng **lít** (`volume_l`) như mọi field thể tích khác; UI quy đổi m³ ở đúng một
+chỗ. Router chặn giá trị vượt `capacity_l` của chính bồn đó — đó là cái bắt được ca gõ
+`48` (m³) vào một API nói bằng lít, vì 48 L trên bồn 60.000 L không sai kiểu, không vi
+phạm CHECK nào, và làm kế hoạch vô nghĩa một cách im lặng.
 
 ### Không dự báo từ dữ liệu đã lỗi thời
 

@@ -15,7 +15,7 @@ Tên field ở ``TerminalOut`` cố ý KHỚP ĐÚNG những gì dashboard proto
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -608,3 +608,36 @@ class AnalyticsOut(BaseModel):
     #: Thời điểm chuỗi đổi chế độ tiêu thụ — để dashboard vẽ mốc trên đồ thị.
     regime_changes: list[datetime] = Field(default_factory=list)
     generated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Số đo tay cho trang Kế hoạch
+# --------------------------------------------------------------------------- #
+
+
+class PlanReadingIn(BaseModel):
+    """Thể tích ĐO TAY của một ngày, đơn vị lít.
+
+    Lít chứ không m³, dù trang Kế hoạch hiển thị m³: mọi field thể tích khác của
+    API này đều là lít (``volume_l``, ``capacity_l``), và một API trộn hai đơn vị
+    là đúng loại lỗi sai-1000-lần mà adapter đã phải dựng hàng rào lo/hi để chặn.
+    UI quy đổi ở biên, đúng một chỗ.
+
+    Không có giới hạn trên ở đây vì trần thật là dung tích của chính bồn đó, mà
+    schema thì không biết bồn nào — router kiểm tiếp bằng ``capacity_l``.
+    """
+
+    volume_l: Decimal = Field(..., ge=0)
+
+
+class PlanReadingOut(BaseModel):
+    """Một số đo tay đã lưu."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    psn: str
+    reading_date: date
+    volume_l: Decimal
+    #: Ai nhập. Số tay ghi đè ước tính nên phải truy được người chịu trách nhiệm.
+    entered_by: str | None = None
+    updated_at: datetime

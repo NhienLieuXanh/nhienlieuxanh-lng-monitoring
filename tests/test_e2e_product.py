@@ -62,6 +62,7 @@ SESSION_GET = frozenset({
     "/api/analytics",
     "/api/analytics/{psn}",
     "/api/refills/{psn}",
+    "/api/plan/readings/{psn}",
     "/api/delivery-plan",
     "/api/export/report.html",
     "/api/export/tanks.csv",
@@ -71,6 +72,10 @@ SESSION_GET = frozenset({
 })
 SESSION_PATCH = frozenset({"/api/settings", "/api/terminals/{psn}"})
 SESSION_POST = frozenset({"/api/settings/test-email"})
+# Số đo tay của trang Kế hoạch. Ghi bằng PUT vì địa chỉ (bồn, ngày) xác định đúng
+# một số đo — bấm Lưu hai lần không được sinh hai dòng.
+SESSION_PUT = frozenset({"/api/plan/readings/{psn}/{day}"})
+SESSION_DELETE = frozenset({"/api/plan/readings/{psn}/{day}"})
 
 # Cần header X-Admin-Token, KHÔNG dùng phiên.
 ADMIN_GET = frozenset({"/api/admin/ingest/runs", "/api/admin/notifications"})
@@ -82,7 +87,16 @@ ADMIN_POST = frozenset({
     "/api/admin/db/sync",
 })
 
-ALL_DOCUMENTED = PUBLIC | SESSION_GET | SESSION_PATCH | SESSION_POST | ADMIN_GET | ADMIN_POST
+ALL_DOCUMENTED = (
+    PUBLIC
+    | SESSION_GET
+    | SESSION_PATCH
+    | SESSION_POST
+    | SESSION_PUT
+    | SESSION_DELETE
+    | ADMIN_GET
+    | ADMIN_POST
+)
 
 
 @pytest.fixture
@@ -139,10 +153,14 @@ def test_unauthenticated_guard(client: TestClient) -> None:
         [("GET", p) for p in SESSION_GET | ADMIN_GET]
         + [("PATCH", p) for p in SESSION_PATCH]
         + [("POST", p) for p in SESSION_POST | ADMIN_POST]
+        + [("PUT", p) for p in SESSION_PUT]
+        + [("DELETE", p) for p in SESSION_DELETE]
     )
     for method, path in sorted(checks):
-        url = path.replace("{psn}", "2604200016")
-        resp = client.request(method, url, json={} if method in ("PATCH", "POST") else None)
+        url = path.replace("{psn}", "2604200016").replace("{day}", "2026-08-28")
+        resp = client.request(
+            method, url, json={} if method in ("PATCH", "POST", "PUT") else None
+        )
         assert resp.status_code == 401, f"{method} {url} trả {resp.status_code}, cần 401"
 
     # /api/health phải mở: monitor bên ngoài không có phiên, và một health endpoint

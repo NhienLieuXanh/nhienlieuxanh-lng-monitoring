@@ -10,13 +10,14 @@ Ba sai lệch có chủ ý so với spec gốc, đều được giải thích t�
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKeyConstraint,
     Identity,
@@ -392,4 +393,75 @@ class IngestRun(Base):
         CheckConstraint("trigger IN ('scheduler','cli','api')", name="trigger_valid"),
         # Truy vấn nóng duy nhất: "lần thành công gần nhất" cho health check.
         Index("ix_ingest_runs_status_finished_at", "status", "finished_at"),
+    )
+
+
+class PlanReading(Base):
+    """Thể tích ĐO TAY của một bồn vào một ngày cụ thể, dùng cho trang Kế hoạch.
+
+    Vì sao cần bảng này. Kế hoạch nạp là một chuỗi số học: thể tích đầu ngày kế =
+    thể tích hôm nay trừ mức tiêu thụ/ngày. Mức tiêu thụ là một con số *bình quân*
+    nên chuỗi đó trượt khỏi thực tế ngay ngày thứ hai — hôm nay xưởng chạy ít thì
+    còn 48 m³ chứ không phải 46,60 m³ như công thức. Không có đường nhập số thực
+    tế thì người vận hành phải sửa "thể tích ban đầu" rồi dịch "ngày bắt đầu", tức
+    xoá mất lịch sử và xoá luôn khả năng so ước tính với thực tế.
+
+    Đây là dữ liệu NGƯỜI nhập, KHÔNG phải telemetry, và cố ý đứng ngoài bảng
+    ``telemetry``:
+
+    * ``telemetry`` có đúng một đường ghi — ingestion từ vendor. Cho một form web
+      ghi vào đó thì mọi con số "đo được" (mức tiêu thụ, nhận diện lần nạp, cảnh
+      báo) trở thành pha giữa số máy và số người mà không ai phân biệt được nữa.
+    * Phạm vi đã chốt với người dùng: số này chỉ dùng cho trang Kế hoạch. Dashboard
+      và dự báo vẫn chỉ đọc số từ thiết bị.
+
+    Khoá chính ``(psn, reading_date)`` là khoá tự nhiên: một bồn một ngày có đúng
+    một số đo. Cùng lý do như PK của ``telemetry`` — thoả ràng buộc duy nhất bằng
+    một index thay vì hai, và làm cho "nhập lại số của hôm nay" là một UPSERT chứ
+    không phải một dòng trùng thứ hai.
+
+    ``reading_date`` là DATE, không phải timestamptz. Kế hoạch làm việc theo *ngày
+    lịch Việt Nam* ("thể tích đầu ngày"), nên hạ granularity xuống ngày là cách
+    duy nhất không phải chọn múi giờ — và dự án này đã có đủ ba múi giờ để nhầm.
+    """
+
+    __tablename__ = "plan_readings"
+
+    psn: Mapped[str] = mapped_column(String(32), nullable=False)
+    reading_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    #: Lít, KHÔNG phải m³. Toàn bộ API và DB nói bằng lít (``volume_l``,
+    #: ``capacity_l``); trang Kế hoạch nói bằng m³ và quy đổi ở đúng biên UI. Trộn
+    #: hai đơn vị trong cùng một API là đúng loại lỗi sai-1000-lần mà dự án này đã
+    #: dựng cả hàng rào lo/hi trong adapter để chặn.
+    volume_l: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)
+
+    #: Ai nhập. Số tay ghi đè số ước tính thì phải truy được người chịu trách
+    #: nhiệm — cùng lý do như ``app_settings.updated_by``.
+    entered_by: Mapped[str | None] = mapped_column(String(128))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        PrimaryKeyConstraint("psn", "reading_date"),
+        # 0 là hợp lệ: bồn cạn là một số đo thật, và chính là lúc người ta cần
+        # nhập tay nhất. Chỉ số âm là vô nghĩa.
+        CheckConstraint("volume_l >= 0", name="volume_non_negative"),
+        # ON UPDATE CASCADE để sửa được một PSN gõ sai; ON DELETE RESTRICT theo
+        # đúng luật của telemetry — không đường nào trong app này xoá terminal, và
+        # nếu có thì mất im lặng dữ liệu người nhập tay là kết cục tệ nhất.
+        ForeignKeyConstraint(
+            ["psn"],
+            ["terminals.psn"],
+            onupdate="CASCADE",
+            ondelete="RESTRICT",
+        ),
     )

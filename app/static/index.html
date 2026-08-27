@@ -517,6 +517,29 @@
     .plan-table td.c { padding-top: 0; padding-bottom: 0; }
     .tag-fill { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--brand); background: var(--sel); padding: 2px 9px; border-radius: 999px; }
     .plan-table td.trigger { color: var(--warn); font-weight: 700; background: var(--warn-bg); }
+    /* Ô nhập thể tích thực tế. Trông như một ô số trong bảng chứ không như một
+       form: viền chỉ hiện khi hover/focus. Ba mươi hàng mỗi hàng một viền là một
+       cái lưới ồn ào che mất chính con số cần đọc.
+       type="text" + inputmode="decimal", KHÔNG phải type="number": người Việt gõ
+       "46,60" và <input type=number> trả về chuỗi RỖNG cho dấu phẩy ở phần lớn
+       locale — tức số vừa nhập biến mất không một lời báo. Parse cả , và . ở JS,
+       cùng cách đã dùng cho ô toạ độ ở trang Bản đồ.
+       Cao 44px: hàng bảng vốn đã 44px vì ô checkbox, nên không tốn thêm chiều cao. */
+    .plan-table td.act { padding-top: 0; padding-bottom: 0; }
+    .p-act {
+      width: 92px; min-height: 44px; padding: 6px 8px; text-align: right;
+      font-family: var(--mono); font-size: var(--fs-body); font-weight: 700;
+      color: var(--brand); background: transparent;
+      border: 1px solid transparent; border-radius: 6px;
+    }
+    .p-act::placeholder { color: var(--faint); font-weight: 400; font-family: var(--font); }
+    .p-act:hover:not(:disabled) { border-color: var(--line); background: var(--surface-2); }
+    .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface-2); }
+    .p-act:disabled { cursor: not-allowed; }
+    .p-est { display: block; padding-bottom: 4px; font-size: var(--fs-micro); font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+    /* Còn NHIỀU hơn ước tính là tin tốt (dùng ít hơn dự kiến) -> màu ok.
+       Còn ÍT hơn là tin cần để ý -> màu cảnh báo. Không dùng đỏ: đây không phải lỗi. */
+    .p-est b.up { color: var(--ok); } .p-est b.dn { color: var(--warn); }
     .plan-params .p-wide { grid-column: 1 / -1; }
     .lg { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: var(--fs-tiny); font-weight: 700; }
     .lg-trig { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
@@ -610,6 +633,11 @@
        nên mật độ số liệu trên desktop giữ nguyên. */
     @media (hover: none) and (pointer: coarse) {
       .field, input, select, textarea { font-size: 16px; }
+      /* `.p-act` phải khai LẠI ở đây. `input` là (0,0,1) còn `.p-act` là (0,1,0),
+         nên luật 16px ở trên THUA và ô nhập giữ 13px — đo được đúng 13px. Dưới
+         16px thì Safari iOS tự phóng to trang khi focus và không phóng lại. Cùng
+         cái bẫy specificity đã mắc với `button:hover` và `.side-brand img`. */
+      .p-act { font-size: 16px; width: 104px; }
       /* 16px làm nội dung ô rộng ra; minmax(0, ...) để cột grid vẫn co được. */
       .plan-params { grid-template-columns: minmax(0, 1fr); }
       .mp-body { grid-template-columns: minmax(0, 1fr); }
@@ -1141,11 +1169,23 @@
             Cột <b>Ngày nghỉ</b>: ngày không tiêu thụ. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
             bất kể thể tích.
           </p>
+          <p class="plan-help">
+            <b>Ước tính và thực tế.</b> Cột <b>Thể tích đầu ngày</b> là số <i>ước tính</i>: lấy thể
+            tích hôm trước trừ mức tiêu thụ/ngày. Mức tiêu thụ là con số bình quân nên chuỗi này
+            trượt khỏi thực tế ngay ngày thứ hai. Gõ số <i>đo được</i> vào cột
+            <b>Thực tế đo được</b> của ngày bạn đo — từ ngày đó trở đi kế hoạch tính lại từ số
+            thực tế, và ô đó hiện luôn độ lệch so với ước tính. Mức tiêu thụ/ngày
+            <b>không</b> bị tính lại: một ngày dùng ít bất thường không được phép kéo lệch cả kỳ.
+            Xoá trắng ô là quay về dùng số ước tính. Số này lưu theo từng bồn nên phải
+            <b>chọn bồn</b> trước; nó chỉ dùng cho trang này, không ảnh hưởng số đo trên
+            Bảng điều khiển hay Dự báo.
+          </p>
+          <p class="set-msg" id="plan-msg" hidden></p>
           <div class="plan-table-wrap">
             <table class="plan-table">
               <thead>
                 <tr>
-                  <th scope="col">Ngày</th><th scope="col">Thứ</th><th scope="col" class="r">Thể tích đầu ngày (m³)</th>
+                  <th scope="col">Ngày</th><th scope="col">Thứ</th><th scope="col" class="r">Thể tích đầu ngày (m³)</th><th scope="col" class="r">Thực tế đo được (m³)</th>
                   <th scope="col" class="c">Ngày nghỉ</th><th scope="col" class="c">Nạp chỉ định</th><th scope="col">Hoạt động</th><th scope="col">Thời điểm nạp</th><th scope="col" class="r">Lượng đặt (m³)</th>
                 </tr>
               </thead>
@@ -2290,6 +2330,15 @@
     // Row 14 quyết định nạp; Row 15 lượng đặt = mức_sau_nạp - mức_hiện_tại.
     // WEEKDAY(,2): Thứ 2=1 ... Chủ Nhật=7. JS getDay(): CN=0..T7=6 -> iso = (getDay()+6)%7+1.
     const planRest = new Set(), planForce = new Set();
+    // Số ĐO TAY theo ngày: khoá "YYYY-MM-DD" -> m³. Nguồn là bảng plan_readings
+    // trên server, không phải localStorage: hai người cùng theo một bồn phải thấy
+    // cùng một con số, và số này là căn cứ để đặt hàng nên không được sống trong
+    // trình duyệt của một máy.
+    let planReadings = new Map();
+    //: PSN mà planReadings đang thuộc về. Rỗng = đang "Tự nhập thông số", lúc đó
+    //: không có bồn nào để lưu vào nên ô nhập bị vô hiệu thay vì nhận rồi mất im lặng.
+    let planPsn = "";
+    const planDayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const WD_VI = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
     const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
     const pad2 = (n) => String(n).padStart(2, "0");
@@ -2325,12 +2374,21 @@
       const rows = [];
       for (let i = 0; i < p.days; i++) {
         const d = new Date(base.getTime() + i * 86400000);
+        const key = planDayKey(d);
+        // `est` là con số công thức sinh ra cho ngày này; `act` là số người đo được.
+        // Có số đo thì DỊCH MỐC về nó — đó là toàn bộ mục đích của cột Thực tế: mức
+        // tiêu thụ/ngày là bình quân nên chuỗi thuần số học trượt khỏi thực tế ngay
+        // ngày thứ hai, và mỗi số đo đưa chuỗi về đúng chỗ mà không mất lịch sử.
+        // Giữ `est` lại để hiển thị độ lệch — nếu ghi đè mất thì không còn gì để so.
+        const est = level;
+        const act = planReadings.has(key) ? planReadings.get(key) : null;
+        if (act !== null) level = act;
         const forced = planForce.has(i), rest = planRest.has(i);
         const trig = planShouldFill(level, d, p);                // ngưỡng tự nhiên
         const fill = forced || trig;
         const order = fill ? round2(postFill - level) : null;    // = row 15
         if (fill) { total += order; fills++; }
-        rows.push({ i, d, level, fill, order, rest, forced, trig });
+        rows.push({ i, d, key, level, est, act, fill, order, rest, forced, trig });
         // mức đầu ngày kế: vừa nạp -> về mức sau nạp; ngày nghỉ -> giữ; còn lại -> trừ mức dùng
         level = fill ? postFill : (rest ? level : level - p.use);
       }
@@ -2343,7 +2401,8 @@
         `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
         `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
-        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num tight">${band}</b></div>`;
+        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num tight">${band}</b></div>` +
+        planDeviationTile(rows);
       const warn = document.getElementById("plan-warn");
       if (rows.length && rows[0].level < R) {
         warn.textContent = `Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay. `
@@ -2363,12 +2422,104 @@
         return `<tr${r.fill ? ' class="is-fill"' : ""}>
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
           <td class="${cls}">${lvl}</td>
+          ${planActCell(r)}
           <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
           <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
           <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
       }).join("");
     }
+    // Ô nhập số đo tay + dòng độ lệch. Đặt trong CÙNG cột với thể tích đầu ngày thì
+    // sẽ mất khả năng đọc nhanh cả cột (con số nào là ước tính, con số nào là đo
+    // được), nên tách thành cột riêng: cột trước là số kế hoạch ĐANG dùng, cột này
+    // là chỗ gõ số đo được.
+    function planActCell(r) {
+      const has = r.act !== null && r.act !== undefined;
+      const dd = `${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}`;
+      let est = "";
+      if (has) {
+        const diff = round2(r.act - r.est);
+        // diff > 0: còn nhiều hơn ước tính, tức hôm đó dùng ÍT hơn dự kiến.
+        const cls = diff >= 0 ? "up" : "dn";
+        est = `<span class="p-est">ước tính ${round2(r.est)} · <b class="${cls}">${diff > 0 ? "+" : ""}${diff}</b></span>`;
+      }
+      const off = planPsn ? "" : ' disabled title="Chọn bồn để nhập số thực tế"';
+      return `<td class="r act">` +
+        `<input type="text" inputmode="decimal" class="p-act" data-day="${r.key}" ` +
+        `value="${has ? round2(r.act) : ""}" placeholder="${planPsn ? "—" : "chọn bồn"}"${off} ` +
+        `aria-label="Thể tích thực tế ngày ${dd}, mét khối">` + est + `</td>`;
+    }
+
+    // Tổng độ lệch tích luỹ. Mỗi ngày có số đo đóng góp (thực tế − ước tính của
+    // riêng ngày đó), vì sau mỗi lần dịch mốc thì ước tính ngày kế đã tính từ số
+    // thực tế — nên cộng lại là "cả kỳ đã dùng ít/nhiều hơn kế hoạch bao nhiêu m³".
+    function planDeviationTile(rows) {
+      const acts = rows.filter(r => r.act !== null && r.act !== undefined);
+      if (!acts.length) return "";
+      const dev = round2(acts.reduce((a, r) => a + (r.act - r.est), 0));
+      return `<div class="ps-tile" title="Cộng dồn (thực tế − ước tính) của các ngày đã nhập. `
+        + `Số dương nghĩa là dùng ít hơn kế hoạch."><span>Thực tế so với ước tính</span>`
+        + `<b class="num tight">${dev > 0 ? "+" : ""}${dev} m³ · ${acts.length} ngày</b></div>`;
+    }
+
+    async function loadPlanReadings() {
+      const psn = document.getElementById("p-tank").value;
+      planPsn = psn;
+      planReadings = new Map();
+      if (!psn) { computePlan(); return; }
+      try {
+        const rows = await api(`/api/plan/readings/${encodeURIComponent(psn)}`);
+        // Đổi bồn trong lúc chờ mạng thì bỏ kết quả cũ: nếu không, số của bồn A sẽ
+        // hiện trên kế hoạch của bồn B — sai im lặng và rất khó nhận ra.
+        if (planPsn !== psn) return;
+        for (const r of rows) planReadings.set(r.reading_date, round2(Number(r.volume_l) / 1000));
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg("plan-msg", `Không tải được số thực tế đã lưu: ${e.message}`, "bad");
+      }
+      computePlan();
+    }
+
+    async function savePlanReading(key, raw) {
+      if (!planPsn) return;
+      // Dấu phẩy là dấu thập phân của người Việt. Đây là lý do ô này là type="text"
+      // chứ không phải type="number": type="number" trả chuỗi rỗng cho "47,5", tức
+      // số vừa gõ biến mất mà không báo gì.
+      const txt = String(raw).trim().replace(",", ".");
+      const url = `/api/plan/readings/${encodeURIComponent(planPsn)}/${key}`;
+      try {
+        if (!txt) {
+          // Ô để trống = "bỏ số tay, quay về ước tính". Ngày vốn chưa có số thì
+          // không gửi request nào — DELETE lúc đó trả 404 và báo lỗi vô cớ.
+          if (planReadings.has(key)) {
+            await api(url, { method: "DELETE" });
+            planReadings.delete(key);
+            setMsg("plan-msg", `Đã xoá số thực tế ngày ${key} — ngày này quay về dùng ước tính.`, "ok");
+          }
+        } else {
+          const m3 = Number(txt);
+          if (!Number.isFinite(m3) || m3 < 0) {
+            setMsg("plan-msg", `"${raw}" không phải thể tích hợp lệ. Ví dụ: 48 hoặc 47,5`, "bad");
+            computePlan();
+            return;
+          }
+          // API nói bằng LÍT như mọi field thể tích khác; quy đổi đúng ở biên này.
+          const row = await api(url, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ volume_l: String(round2(m3 * 1000)) }),
+          });
+          const v = round2(Number(row.volume_l) / 1000);
+          planReadings.set(key, v);
+          setMsg("plan-msg", `Đã lưu ${v} m³ cho ngày ${key}.`, "ok");
+        }
+      } catch (e) {
+        if (e.name !== "AuthError") setMsg("plan-msg", e.message, "bad");
+      }
+      // Vẽ lại kể cả khi lỗi: ô nhập phải trở về đúng trạng thái đã lưu trên server,
+      // không được ở lại con số vừa bị từ chối.
+      computePlan();
+    }
+
     function renderPlanTankOptions() {
       const sel = document.getElementById("p-tank");
       if (!sel) return;
@@ -2406,7 +2557,9 @@
       }
       updateMeasuredBtn();
       renderPlanAssist();
-      computePlan();
+      // loadPlanReadings() gọi computePlan() ở cuối — số thực tế thuộc về TỪNG bồn
+      // nên đổi bồn phải nạp lại, nếu không kế hoạch bồn mới dùng số của bồn cũ.
+      loadPlanReadings();
     }
 
     // Nút "Dùng số đo được" + dòng chú thích. Cố ý là một hành động rõ ràng chứ
@@ -3419,7 +3572,7 @@
       }
       document.querySelector(".page-title").textContent = VIEWS[name].title;
       if (name === "map") openMap();
-      if (name === "planner") { renderPlanTankOptions(); updateMeasuredBtn(); renderPlanAssist(); computePlan(); }
+      if (name === "planner") { renderPlanTankOptions(); updateMeasuredBtn(); renderPlanAssist(); loadPlanReadings(); }
       if (name === "reports") { renderRepTankOptions(); loadRefills(); }
       // Tải MỖI LẦN mở: khác trang Cài đặt (nơi người dùng có thể đang gõ nửa dở),
       // ở đây không có gì để mất và số liệu cũ trên một trang chẩn đoán còn tệ hơn
@@ -3550,6 +3703,12 @@
       });
       document.getElementById("plan-body").addEventListener("change", (e) => {
         const t = e.target;
+        // `change` chứ không `input`: computePlan() vẽ lại cả tbody, nên lưu theo
+        // từng ký tự sẽ giật ô nhập ra khỏi tay người đang gõ.
+        if (t.classList && t.classList.contains("p-act")) {
+          savePlanReading(t.dataset.day, t.value);
+          return;
+        }
         if (!t.dataset || t.dataset.kind === undefined) return;
         const i = Number(t.dataset.i);
         const set = t.dataset.kind === "rest" ? planRest : planForce;

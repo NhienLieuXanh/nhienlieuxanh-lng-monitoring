@@ -8,6 +8,7 @@ from app.api.routers import (
     export,
     forecast,
     ops,
+    plan,
     report,
     settings,
     telemetry,
@@ -20,6 +21,7 @@ api_router.include_router(ops.router)
 api_router.include_router(terminals.router)
 api_router.include_router(telemetry.router)
 api_router.include_router(forecast.router)
+api_router.include_router(plan.router)
 api_router.include_router(analytics.router)
 api_router.include_router(export.router)
 api_router.include_router(report.router)
