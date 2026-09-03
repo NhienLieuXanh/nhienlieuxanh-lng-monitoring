@@ -1,0 +1,20 @@
+[
+  {
+    "dateTime": "01/01/2020 07:00",
+    "receivedAt": "01/01/2020 07:00",
+    "totalizer": 100000.0,
+    "flowRate": 0.0,
+    "pressure": 300.0,
+    "temperature": 25.0,
+    "tankVolume": 80.0,
+    "tankNumber": 10,
+    "tankPrecent": 48.0,
+    "pT1_Value": 3.0,
+    "pS1_Value": 3.0,
+    "pS2_Value": 2.0,
+    "tE1_Value": 25.0,
+    "gD1_Value": 1.0,
+    "gD2_Value": 0.2,
+    "gD3_Value": 0.0
+  }
+]

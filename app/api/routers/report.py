@@ -398,7 +398,9 @@ def export_report(
             tot_vol += vol
             n_vol += 1
 
-        rows = tel_repo.series(session, t.psn, period_start, period_end)
+        rows = tel_repo.series(
+            session, t.psn, period_start, period_end, bucket_minutes=30
+        )
         samples = [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows]
         f = fc.build_forecast(
             samples,

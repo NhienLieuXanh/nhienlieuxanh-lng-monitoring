@@ -74,6 +74,20 @@ def _snapshots(
     return outs, snaps, now
 
 
+def storage_status(nbytes: int | None, warn_mb: float) -> CheckOut:
+    """Tín hiệu dung lượng telemetry. None = không đọc được, không phải lỗi nền."""
+    if nbytes is None:
+        return CheckOut(ok=True)
+    warn = warn_mb * 1024 * 1024
+    mb = nbytes / (1024 * 1024)
+    if nbytes > warn:
+        return CheckOut(
+            ok=False,
+            detail=f"telemetry {mb:.0f} MB vượt ngưỡng {warn_mb:g} MB",
+        )
+    return CheckOut(ok=True, detail=f"telemetry {mb:.1f} MB")
+
+
 @router.get("/health", response_model=HealthOut)
 def health(
     request: Request, response: Response, session: SessionDep, settings: SettingsDep
@@ -152,6 +166,14 @@ def health(
 
     # 503 CHỈ khi error. degraded vẫn 200 để monitor phân biệt được "API sống nhưng
     # ingestion tắc" với "database mất" — gộp cả hai thành 503 là phá tín hiệu đó.
+    storage = CheckOut(ok=True)
+    telemetry_bytes: int | None = None
+    if db.ok:
+        telemetry_bytes = tel_repo.relation_size_bytes(session)
+        storage = storage_status(telemetry_bytes, settings.db_size_warn_mb)
+        if not storage.ok:
+            overall = "degraded" if overall == "ok" else overall
+
     if overall == "error":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
@@ -162,6 +184,8 @@ def health(
         database=db,
         migration=mig,
         ingest=ing,
+        storage=storage,
+        telemetry_bytes=telemetry_bytes,
         # Số thiết bị online KHÔNG ảnh hưởng `status`: sức khoẻ thiết bị không phải
         # sức khoẻ platform.
         terminals_total=sum(counts.values()),

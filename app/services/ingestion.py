@@ -12,16 +12,17 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings
-from app.domain.contracts import MappingReport, TelemetryPort
+from app.domain.contracts import MappingReport, TelemetryPort, VendorAlarmPort
 from app.repositories import ingest_runs as runs_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.repositories import vendor_alarms as alarm_repo
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +45,8 @@ class IngestStats:
     errors: list[str] = field(default_factory=list)
     days_processed: int = 0
     mapping: dict[str, Any] = field(default_factory=dict)
+    alarms_inserted: int = 0
+    alarms_duplicates: int = 0
 
     @property
     def status(self) -> str:
@@ -57,6 +60,8 @@ class IngestStats:
         return (
             f"fetched={self.fetched} inserted={self.inserted} "
             f"duplicates={self.duplicates} terminals_created={self.terminals_created} "
+            f"alarms_inserted={self.alarms_inserted} "
+            f"alarms_duplicates={self.alarms_duplicates} "
             f"no_data={len(self.psns_no_data)} errors={len(self.errors)}"
         )
 
@@ -83,13 +88,17 @@ class IngestionService:
         *,
         fatal_exc_types: tuple[type[BaseException], ...] = (),
         psns: list[str] | None = None,
+        ports_by_psn: dict[str, TelemetryPort] | None = None,
+        alarm_port: VendorAlarmPort | None = None,
     ) -> None:
         self._adapter = adapter
         self._sf = session_factory
         self._s = settings
-        # Inject thay vì import: services/ không được biết adapters/xingke tồn tại.
+        # Inject thay vì import: services/ không được biết adapters/* tồn tại.
         self._fatal: tuple[type[BaseException], ...] = fatal_exc_types
         self._configured_psns = psns
+        self._ports_by_psn = ports_by_psn
+        self._alarm_port = alarm_port
 
     # ---------------------------------------------------------------- helpers
 
@@ -103,22 +112,32 @@ class IngestionService:
             return list(self._configured_psns)
         return term_repo.all_psns(session)
 
-    def _vendor_tz(self) -> ZoneInfo:
-        # Service không biết TZ vendor; adapter phơi ra nếu có, mặc định UTC.
-        tz = getattr(self._adapter, "vendor_tz", None)
-        return tz if isinstance(tz, ZoneInfo) else UTC
+    def _begin_cycle(self) -> None:
+        seen: set[int] = set()
+        ports: list[TelemetryPort] = [self._adapter]
+        if self._ports_by_psn:
+            ports.extend(self._ports_by_psn.values())
+        for port in ports:
+            i = id(port)
+            if i in seen:
+                continue
+            seen.add(i)
+            port.begin_cycle()
 
-    def _vendor_days(self, days_back: int) -> list[date]:
-        """Các ngày lịch cần fetch, tính theo giờ VENDOR.
+    def _port(self, psn: str) -> TelemetryPort | None:
+        if self._ports_by_psn is None:
+            return self._adapter
+        return self._ports_by_psn.get(psn)
 
-        Fetch hôm nay + N ngày trước. Không phải hoang tưởng: vendor ở UTC+8, công
-        ty ở UTC+7, lưu UTC — "hôm nay" nhập nhằng qua ba múi giờ, và 23:30 ICT thì
-        Thượng Hải đã sang ngày mai. Cửa sổ 2 ngày phủ mọi cách hiểu mà service này
-        không cần biết TZ của vendor (giữ nguyên biên adapter). Giá: 2 HTTP call
-        cho mỗi thiết bị mỗi cycle.
-        """
-        today_vendor = datetime.now(tz=UTC).astimezone(self._vendor_tz()).date()
-        return [today_vendor - timedelta(days=i) for i in range(days_back + 1)]
+    def _vendor_days_for(self, tz: ZoneInfo) -> list[date]:
+        """Các ngày lịch cần fetch, tính theo giờ VENDOR của ĐÚNG port."""
+        today_vendor = datetime.now(tz=UTC).astimezone(tz).date()
+        # Cũ trước: nguồn stream newest-first, lần fetch ngày cũ nhất lấp cache
+        # cho cả những ngày mới hơn — một stream/cycle thay vì N.
+        return [
+            today_vendor - timedelta(days=i)
+            for i in range(self._s.ingest_days_back, -1, -1)
+        ]
 
     # ---------------------------------------------------------------- ingest
 
@@ -132,8 +151,12 @@ class IngestionService:
         dry_run: bool = False,
     ) -> None:
         """Một PSN, một ngày. Lỗi ở đây không được làm chết các PSN khác."""
+        port = self._port(psn)
+        if port is None:
+            stats.errors.append(f"{psn}: không có cổng telemetry")
+            return
         try:
-            result = self._adapter.fetch_telemetry(psn, day)
+            result = port.fetch_telemetry(psn, day)
         except self._fatal as exc:
             raise FatalIngestError(
                 f"adapter báo lỗi không phục hồi được khi fetch psn={psn} "
@@ -149,7 +172,7 @@ class IngestionService:
         stats.fetched += len(result.readings)
         stats.rejected_rows += result.report.rejected_rows
         stats.dropped_foreign_psn += result.report.dropped_foreign_psn
-        _merge_mapping(stats, result.report)
+        _merge_mapping(stats, result.report, source=port.source)
 
         if not result.readings:
             if psn not in stats.psns_no_data:
@@ -200,32 +223,48 @@ class IngestionService:
         """Làm mới metadata thiết bị. Không fatal nếu thất bại."""
         if not psns:
             return
-        try:
-            metas = self._adapter.fetch_devices(psns)
-        except self._fatal as exc:
-            raise FatalIngestError(
-                f"adapter báo lỗi không phục hồi được khi fetch_devices: {exc}",
-                remediation=str(getattr(exc, "remediation", "")),
-            ) from exc
-        except Exception as exc:
-            # Metadata thiếu không ngăn được việc ingest telemetry — đừng để nó
-            # chặn phần có giá trị hơn.
-            stats.errors.append(f"sync_terminals: {type(exc).__name__}: {exc}")
-            log.warning("ingest: sync_terminals thất bại: %s", exc)
-            return
+        groups: dict[int, tuple[TelemetryPort, list[str]]] = {}
+        skipped: list[str] = []
+        for psn in psns:
+            port = self._port(psn)
+            if port is None:
+                skipped.append(psn)
+                continue
+            rec = groups.setdefault(id(port), (port, []))
+            rec[1].append(psn)
+        if skipped:
+            stats.errors.append(
+                "sync_terminals: không có cổng telemetry cho "
+                + ", ".join(skipped)
+            )
+        for port, group in groups.values():
+            try:
+                metas = port.fetch_devices(group)
+            except self._fatal as exc:
+                raise FatalIngestError(
+                    f"adapter báo lỗi không phục hồi được khi fetch_devices: {exc}",
+                    remediation=str(getattr(exc, "remediation", "")),
+                ) from exc
+            except Exception as exc:
+                stats.errors.append(f"sync_terminals: {type(exc).__name__}: {exc}")
+                log.warning("ingest: sync_terminals thất bại: %s", exc)
+                continue
 
-        with self._sf() as session, session.begin():
-            for meta in metas:
-                _, created = term_repo.upsert(
-                    session,
-                    meta.psn,
-                    meta=meta,
-                    default_capacity_l=Decimal(
-                        str(self._s.default_tank_capacity_l)
-                    ),
-                )
-                if created:
-                    stats.terminals_created += 1
+            with self._sf() as session, session.begin():
+                for meta in metas:
+                    default_cap = (
+                        meta.capacity_l
+                        if meta.capacity_l is not None
+                        else Decimal(str(self._s.default_tank_capacity_l))
+                    )
+                    _, created = term_repo.upsert(
+                        session,
+                        meta.psn,
+                        meta=meta,
+                        default_capacity_l=default_cap,
+                    )
+                    if created:
+                        stats.terminals_created += 1
 
     def refresh_statuses(self, psns: list[str]) -> None:
         with self._sf() as session, session.begin():
@@ -247,6 +286,7 @@ class IngestionService:
     ) -> IngestStats:
         started = datetime.now(tz=UTC)
         stats = IngestStats()
+        self._begin_cycle()
 
         with self._sf() as session:
             psns = self._target_psns(session)
@@ -257,14 +297,17 @@ class IngestionService:
                 "`python -m app.cli discover` để tạo terminal trước."
             )
 
-        days = self._vendor_days(self._s.ingest_days_back)
         fatal: FatalIngestError | None = None
         try:
             if sync_meta:
                 self.sync_terminals(stats, psns)
             for psn in psns:
-                for day in days:
+                port = self._port(psn)
+                tz = port.vendor_tz if port is not None else UTC
+                for day in self._vendor_days_for(tz):
                     self.ingest_psn_day(psn, day, stats, repair=repair)
+            if self._alarm_port is not None:
+                self._ingest_alarms(stats)
         except FatalIngestError as exc:
             fatal = exc
             stats.errors.append(f"FATAL: {exc.detail}")
@@ -280,8 +323,9 @@ class IngestionService:
                 started,
                 {
                     "psns": psns,
-                    "days": [d.isoformat() for d in days],
                     "repair": repair,
+                    "alarms_inserted": stats.alarms_inserted,
+                    "alarms_duplicates": stats.alarms_duplicates,
                 },
             )
 
@@ -289,6 +333,31 @@ class IngestionService:
             raise fatal
         log.info("ingest cycle (%s): %s", trigger, stats.summary())
         return stats
+
+    def _ingest_alarms(self, stats: IngestStats) -> None:
+        port = self._alarm_port
+        if port is None:
+            return
+        try:
+            days = self._vendor_days_for(port.vendor_tz)
+            alarms = []
+            for day in days:
+                alarms.extend(port.fetch_alarms(day))
+        except self._fatal as exc:
+            raise FatalIngestError(
+                f"adapter báo lỗi không phục hồi được khi fetch_alarms: {exc}",
+                remediation=str(getattr(exc, "remediation", "")),
+            ) from exc
+        except Exception as exc:
+            stats.errors.append(f"alarms: {type(exc).__name__}: {exc}")
+            log.warning("ingest: fetch_alarms thất bại: %s", exc)
+            return
+        if not alarms:
+            return
+        with self._sf() as session, session.begin():
+            inserted, dupes = alarm_repo.bulk_insert(session, alarms)
+        stats.alarms_inserted += inserted
+        stats.alarms_duplicates += dupes
 
     def backfill(
         self,
@@ -309,6 +378,7 @@ class IngestionService:
         """
         started = datetime.now(tz=UTC)
         stats = IngestStats()
+        self._begin_cycle()
         fatal: FatalIngestError | None = None
         try:
             for psn in psns:
@@ -374,20 +444,29 @@ class IngestionService:
             log.error("ingest: không ghi được ingest_runs: %s", exc)
 
 
-def _merge_mapping(stats: IngestStats, report: MappingReport) -> None:
-    """Gộp MappingReport của nhiều lần fetch vào một dict để persist."""
-    acc = stats.mapping
-    acc["n_rows"] = acc.get("n_rows", 0) + report.n_rows
-    present = acc.setdefault("present", {})
-    for k, v in report.present.items():
-        present[k] = present.get(k, 0) + v
-    acc.setdefault("resolved_from", {}).update(report.resolved_from)
+def _merge_mapping(
+    stats: IngestStats, report: MappingReport, *, source: str
+) -> None:
+    """Gộp MappingReport. Top-level giữ cho CLI; by_source tránh ghi đè provenance."""
+    acc: dict[str, Any] = stats.mapping
+    acc["n_rows"] = int(acc.get("n_rows", 0)) + report.n_rows
+    present = cast(dict[str, int], acc.setdefault("present", {}))
+    for name, n in report.present.items():
+        present[name] = present.get(name, 0) + n
+    rf = cast(dict[str, str], acc.setdefault("resolved_from", {}))
+    for name, alias in report.resolved_from.items():
+        rf.setdefault(name, alias)
     unmapped = set(acc.get("unmapped_keys", [])) | report.unmapped_keys
     acc["unmapped_keys"] = sorted(unmapped)
     acc["rejected_rows"] = acc.get("rejected_rows", 0) + report.rejected_rows
     acc["dropped_foreign_psn"] = (
         acc.get("dropped_foreign_psn", 0) + report.dropped_foreign_psn
     )
+    acc["zero_as_missing"] = acc.get("zero_as_missing", 0) + report.zero_as_missing
     if report.errors:
         errs = acc.setdefault("errors", [])
         errs.extend({"field": f, "error": e} for f, e in report.errors)
+    by = acc.setdefault("by_source", {})
+    bucket: dict[str, Any] = by.setdefault(source, {})
+    bucket["n_rows"] = bucket.get("n_rows", 0) + report.n_rows
+    bucket.setdefault("resolved_from", {}).update(report.resolved_from)

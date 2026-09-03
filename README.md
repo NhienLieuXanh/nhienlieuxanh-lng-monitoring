@@ -20,6 +20,13 @@ APScheduler **không** chạy trên serverless (không có process nền), nên 
 `SCHEDULER_ENABLED=false` và để Cron làm nhịp. Scheduler chỉ dùng khi chạy máy chủ
 thường.
 
+**Nguồn đo phút thứ hai** (tắt mặc định, `YOKOHAMA_ENABLED`). Cổng đó bỏ qua bộ lọc
+ngày trên lịch sử phút và chỉ stream từ bản ghi mới nhất, nên **không backfill xa
+được**: ngân sách mặc định ~8 MB ≈ 4 ngày. Lùi xa hơn phải nâng
+`YOKOHAMA_MAX_STREAM_BYTES` có ý thức. Lỗi schema của nguồn này không được pause
+ingest của nguồn kia. Gọp giờ + xoá phút cũ là **quyết định hoãn**: ~1,9 MB/ngày
+≈ 130 MB/năm trên Neon 512 MB — làm khi `/api/health` báo dung lượng `degraded`.
+
 ## Đăng nhập
 
 Dashboard yêu cầu đăng nhập bằng **chính tài khoản cổng telemetry**; app không lưu

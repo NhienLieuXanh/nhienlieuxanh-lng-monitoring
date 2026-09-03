@@ -114,6 +114,8 @@ class Settings(BaseSettings):
     session_hours: int = Field(12, ge=1, le=168)
     max_history_limit: int = Field(1000, ge=1)
     max_history_span_days: int = Field(90, ge=1)
+    # Neon free 512 MB. Vượt ngưỡng này thì /api/health = degraded (vẫn HTTP 200).
+    db_size_warn_mb: float = Field(400.0, gt=0)
 
     # ---- adapter selection ----
     # Chỉ có adapter THẬT (live). Không còn adapter giả trong sản phẩm — mọi dữ liệu

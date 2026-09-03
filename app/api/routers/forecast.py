@@ -111,7 +111,9 @@ ParamsDep = Annotated[ForecastParams, Depends(forecast_params)]
 def _samples(
     session: SessionDep, psn: str, *, now: datetime, window_days: int
 ) -> list[fc.Sample]:
-    rows = tel_repo.series(session, psn, now - timedelta(days=window_days), now)
+    rows = tel_repo.series(
+        session, psn, now - timedelta(days=window_days), now, bucket_minutes=30
+    )
     return [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows]
 
 

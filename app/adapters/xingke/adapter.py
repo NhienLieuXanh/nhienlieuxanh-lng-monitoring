@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.adapters.xingke.auth import build_auth
 from app.adapters.xingke.client import XingkeClient
@@ -28,7 +29,12 @@ from app.adapters.xingke.normalizer import (
     normalize_reading,
     normalize_terminal,
 )
-from app.domain.contracts import FetchResult, MappingReport, NormalizedTerminal
+from app.domain.contracts import (
+    MEASURE_FIELDS,
+    FetchResult,
+    MappingReport,
+    NormalizedTerminal,
+)
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +48,7 @@ class XingkeAdapter:
     """Adapter thật. Sync — khớp với TelemetryPort và tầng DB sync."""
 
     source = SOURCE
+    measure_fields = MEASURE_FIELDS
 
     def __init__(
         self,
@@ -68,6 +75,13 @@ class XingkeAdapter:
 
     def close(self) -> None:
         self._client.close()
+
+    def begin_cycle(self) -> None:
+        return None
+
+    @property
+    def vendor_tz(self) -> ZoneInfo:
+        return self._settings.tzinfo
 
     def _permitted(self, psn: str, report: MappingReport) -> bool:
         if not self._allowed:

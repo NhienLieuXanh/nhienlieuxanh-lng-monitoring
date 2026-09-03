@@ -1,0 +1,191 @@
+"""YokohamaAdapter — TelemetryPort + VendorAlarmPort. Chỉ GET."""
+
+from __future__ import annotations
+
+import logging
+from datetime import date, datetime, time
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from app.adapters.yokohama.client import YokohamaClient
+from app.adapters.yokohama.config import YokohamaSettings, get_yokohama_settings
+from app.adapters.yokohama.errors import YokohamaSchemaError
+from app.adapters.yokohama.mapping import MEASURE_TARGETS, TANK_CAPACITY_L
+from app.adapters.yokohama.normalizer import (
+    SOURCE,
+    normalize_alarm,
+    normalize_reading,
+    normalize_terminal,
+)
+from app.domain.contracts import (
+    FetchResult,
+    MappingReport,
+    NormalizedAlarm,
+    NormalizedTerminal,
+)
+
+log = logging.getLogger(__name__)
+
+RECORDS_PATH = "/Data/GetRecordData"
+ALARMS_PATH = "/Alarm/GetAlarmData"
+# Đo được: 12 bản ghi = 16 KB → 1440 bản ghi/ngày ≈ 1,9 MB.
+EST_BYTES_PER_DAY = 2_000_000
+
+
+class YokohamaAdapter:
+    source = SOURCE
+    measure_fields = MEASURE_TARGETS
+
+    def __init__(
+        self,
+        settings: YokohamaSettings | None = None,
+        client: YokohamaClient | None = None,
+        *,
+        store_raw: bool = False,
+    ) -> None:
+        self._settings = settings or get_yokohama_settings()
+        self._client = client or YokohamaClient(self._settings)
+        self._store_raw = store_raw
+        self._allowed = frozenset(self._settings.psn_list)
+        # Một stream/cycle: ngày -> readings. Xoá khi close / cycle mới.
+        self._day_cache: dict[date, list] = {}
+        self._seen: set[tuple[date, datetime]] = set()
+        self._cache_loaded_from: date | None = None
+
+    @property
+    def vendor_tz(self) -> ZoneInfo:
+        return self._settings.tzinfo
+
+    def close(self) -> None:
+        self.begin_cycle()
+        self._client.close()
+
+    def begin_cycle(self) -> None:
+        self._day_cache.clear()
+        self._seen.clear()
+        self._cache_loaded_from = None
+
+    def _permitted(self, psn: str, report: MappingReport) -> bool:
+        if psn in self._allowed:
+            return True
+        report.dropped_foreign_psn += 1
+        return False
+
+    def fetch_telemetry(self, psn: str, day: date) -> FetchResult:
+        result = FetchResult()
+        result.report.fields = self.measure_fields
+        if not self._permitted(psn, result.report):
+            log.error("ykh: PSN %s không thuộc allowlist, không fetch", psn)
+            return result
+        self._ensure_cache(day)
+        readings = list(self._day_cache.get(day, []))
+        result.readings = readings
+        result.total = len(readings)
+        result.pages_fetched = 1 if self._cache_loaded_from is not None else 0
+        result.report.n_rows = len(readings)
+        for r in readings:
+            for f in self.measure_fields:
+                if getattr(r, f, None) is not None:
+                    result.report.present[f] = result.report.present.get(f, 0) + 1
+        return result
+
+    def _ensure_cache(self, day: date) -> None:
+        if day in self._day_cache:
+            return
+        tz = self.vendor_tz
+        now_local = datetime.now(tz=tz)
+        span_days = (now_local.date() - day).days + 1
+        budget = self._settings.max_stream_bytes
+        if span_days > 0 and span_days * EST_BYTES_PER_DAY > budget:
+            allowed = max(1, budget // EST_BYTES_PER_DAY)
+            raise YokohamaSchemaError(
+                f"cửa sổ {span_days} ngày vượt ngân sách stream "
+                f"({budget} byte ≈ {allowed} ngày ở {EST_BYTES_PER_DAY} byte/ngày). "
+                f"Nguồn bỏ qua bộ lọc ngày nên chỉ lấy được từ bản ghi mới nhất. "
+                f"Muốn lùi xa hơn thì đặt YOKOHAMA_MAX_STREAM_BYTES có ý thức.",
+                remediation=f"thu hẹp cửa sổ còn ≤ {allowed} ngày, hoặc nâng trần byte",
+            )
+        # Stream newest-first; dừng khi dateTime < day (đã qua ngày cần).
+        to_s = now_local.strftime("%d/%m/%Y %H:%M")
+        from_s = datetime.combine(day, time.min).strftime("%d/%m/%Y %H:%M")
+        psn = self._settings.psn
+        report = MappingReport(fields=self.measure_fields)
+        cutoff = datetime.combine(day, time.min, tzinfo=tz)
+        n = 0
+        for obj in self._client.iter_record_objects(
+            {
+                "device": "all",
+                "fromDate": from_s,
+                "toDate": to_s,
+                "timeFilter": "",
+            }
+        ):
+            n += 1
+            reading = normalize_reading(
+                obj,
+                psn=psn,
+                vendor_tz=tz,
+                report=report,
+                store_raw=self._store_raw,
+            )
+            if reading is None:
+                continue
+            local_day = reading.sampled_at.astimezone(tz).date()
+            if datetime.combine(local_day, time.min, tzinfo=tz) < cutoff:
+                break
+            key = (local_day, reading.sampled_at)
+            if key in self._seen:
+                continue
+            self._seen.add(key)
+            self._day_cache.setdefault(local_day, []).append(reading)
+        self._cache_loaded_from = day
+        log.info(
+            "ykh: stream %s object, cache %s ngày, report zero_as_missing=%s",
+            n,
+            len(self._day_cache),
+            report.zero_as_missing,
+        )
+
+    def fetch_devices(self, psns: list[str]) -> list[NormalizedTerminal]:
+        out: list[NormalizedTerminal] = []
+        for psn in psns:
+            if psn not in self._allowed:
+                continue
+            term = normalize_terminal(psn)
+            if term.capacity_l != TANK_CAPACITY_L:
+                raise RuntimeError(
+                    f"ykh: capacity_l phải là {TANK_CAPACITY_L}, nhận {term.capacity_l}"
+                )
+            out.append(term)
+        return out
+
+    def fetch_alarms(self, day: date) -> list[NormalizedAlarm]:
+        iso = day.isoformat()
+        payload = self._client.get_json(
+            ALARMS_PATH,
+            params={"Keywords": "", "FromDate": iso, "ToDate": iso},
+        )
+        rows = payload if isinstance(payload, list) else []
+        out: list[NormalizedAlarm] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            alarm = normalize_alarm(
+                row,
+                site_code=self._settings.site_code,
+                vendor_tz=self.vendor_tz,
+            )
+            if alarm is not None:
+                out.append(alarm)
+        return out
+
+    def probe(self) -> dict[str, Any]:
+        today = datetime.now(tz=self.vendor_tz).date()
+        res = self.fetch_telemetry(self._settings.psn, today)
+        return {
+            "psn": self._settings.psn,
+            "day": today.isoformat(),
+            "fetched": len(res.readings),
+            "coverage": res.report.coverage(),
+            "capacity_l": str(TANK_CAPACITY_L),
+        }

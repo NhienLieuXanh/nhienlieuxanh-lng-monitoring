@@ -199,6 +199,8 @@ class HealthOut(BaseModel):
     database: CheckOut
     migration: CheckOut
     ingest: CheckOut
+    storage: CheckOut = CheckOut(ok=True)
+    telemetry_bytes: int | None = None
     # Số thiết bị online KHÔNG ảnh hưởng status: sức khoẻ thiết bị không phải sức
     # khoẻ platform. Cả hai thiết bị thật đang offline hàng tháng.
     terminals_total: int = 0

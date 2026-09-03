@@ -78,18 +78,22 @@ def _init_state(app: FastAPI) -> None:
     # Adapter có thể fail nếu thiếu credential vendor. KHÔNG để nó làm chết cả
     # API/dashboard — chỉ ingestion không dùng được cho tới khi cấu hình xong.
     try:
-        adapter, fatal_types, psns = build_adapter(settings)
-        app.state.adapter = adapter
+        built = build_adapter(settings)
+        app.state.built_adapters = built
+        app.state.adapter = built.primary
         app.state.ingestion = IngestionService(
-            adapter,
+            built.primary,
             app.state.session_factory,
             settings,
-            fatal_exc_types=fatal_types,
-            psns=psns,
+            fatal_exc_types=built.fatal_exc_types,
+            psns=built.psns,
+            ports_by_psn=built.by_psn or None,
+            alarm_port=built.alarm_port,
         )
     except Exception as exc:
         log.error("không khởi tạo được adapter/ingestion: %s", exc)
         app.state.adapter = None
+        app.state.built_adapters = None
         app.state.ingestion = None
 
     app.state._state_ready = True
@@ -121,7 +125,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if app.state.scheduler is not None:
             # wait=False: trên Windows wait=True thường xuyên làm Ctrl+C treo.
             app.state.scheduler.shutdown(wait=False)
-        if getattr(app.state, "adapter", None) is not None:
+        built = getattr(app.state, "built_adapters", None)
+        if built is not None:
+            built.close()
+        elif getattr(app.state, "adapter", None) is not None:
             app.state.adapter.close()
         if getattr(app.state, "engine", None) is not None:
             app.state.engine.dispose()

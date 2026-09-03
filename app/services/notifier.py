@@ -123,6 +123,7 @@ def collect_notices(
             t.psn,
             now - timedelta(days=settings.forecast_window_days),
             now,
+            bucket_minutes=30,
         )
         f = fc.build_forecast(
             [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows],

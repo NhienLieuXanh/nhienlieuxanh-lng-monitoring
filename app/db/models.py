@@ -296,6 +296,17 @@ class Telemetry(Base):
     signal_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
     battery_v: Mapped[Decimal | None] = mapped_column(_MEASURE)
 
+    gm_totalizer_nm3: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gm_flow_rate_nm3h: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gm_pressure_kpa: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gm_temperature_c: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    ps1_bar: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    ps2_bar: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gd1_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gd2_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    gd3_percent: Mapped[Decimal | None] = mapped_column(_MEASURE)
+    refill_counter: Mapped[int | None] = mapped_column(Integer)
+
     medium_name: Mapped[str | None] = mapped_column(String(64))
     tank_type_name: Mapped[str | None] = mapped_column(String(64))
 
@@ -394,6 +405,42 @@ class IngestRun(Base):
         CheckConstraint("trigger IN ('scheduler','cli','api')", name="trigger_valid"),
         # Truy vấn nóng duy nhất: "lần thành công gần nhất" cho health check.
         Index("ix_ingest_runs_status_finished_at", "status", "finished_at"),
+    )
+
+
+class VendorAlarm(Base):
+    """Lịch sử báo động nguồn đo. PK nhân tạo vì cùng giây có nhiều message.
+
+    UNIQUE (site_code, device_id, raised_at, message_hash): sự cố van SV3+SV4
+    lúc 28/07/2026 13:34:13 là bốn dòng cùng giây, hai device, hai message.
+    """
+
+    __tablename__ = "vendor_alarms"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    site_code: Mapped[str] = mapped_column(String(16), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    raised_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    vendor_ts_raw: Mapped[str] = mapped_column(String(64), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    message_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+    symbol: Mapped[str | None] = mapped_column(String(32))
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "site_code",
+            "device_id",
+            "raised_at",
+            "message_hash",
+            name="uq_vendor_alarms_natural",
+        ),
+        Index("ix_vendor_alarms_site_raised_at", "site_code", "raised_at"),
     )
 
 

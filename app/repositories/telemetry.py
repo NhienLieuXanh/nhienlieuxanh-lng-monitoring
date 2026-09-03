@@ -8,12 +8,12 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Select, func, literal_column, select
+from sqlalchemy import Select, func, literal_column, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import Telemetry
-from app.domain.contracts import MEASURE_FIELDS, NormalizedTelemetry
+from app.domain.contracts import ALL_MEASURE_FIELDS, NormalizedTelemetry
 
 log = logging.getLogger(__name__)
 
@@ -21,8 +21,9 @@ CHUNK = 500
 
 # Cột được phép cập nhật ở chế độ --repair. `sampled_at`/`psn` là khoá nên không có
 # ở đây; `created_at` là thời điểm ta ghi nên cũng không.
-_REPAIRABLE = (*MEASURE_FIELDS, "volume_percent_source", "medium_name",
-               "tank_type_name", "vendor_ts_raw", "raw_payload")
+# raw_payload CỐ Ý không có: '{}' không NULL nên COALESCE ghi đè payload thật.
+_REPAIRABLE = (*ALL_MEASURE_FIELDS, "volume_percent_source", "medium_name",
+               "tank_type_name", "vendor_ts_raw")
 
 
 def to_row(reading: NormalizedTelemetry, terminal_id: UUID) -> dict[str, Any]:
@@ -166,30 +167,49 @@ def series(
     start: datetime,
     end: datetime,
     *,
-    limit: int = 20_000,
+    limit: int = 50_000,
+    bucket_minutes: int | None = None,
 ) -> list[tuple[datetime, float | None, float | None]]:
     """Chuỗi (sampled_at, volume_l, pressure_mpa) tăng dần, cho tầng dự báo.
 
     Cố ý KHÔNG tái dụng ``history()``: dự báo cần hàng nghìn điểm nhưng chỉ ba
     cột, còn ``history()`` hydrate cả ORM object kèm ``raw_payload`` JSONB (~1 KB
-    mỗi dòng) và chạy thêm một ``COUNT(*)`` mà ở đây không ai dùng. Với 30 ngày x
-    48 điểm/ngày sự khác biệt là vài chục MB JSON bị đọc lên rồi bỏ đi.
+    mỗi dòng) và chạy thêm một ``COUNT(*)`` mà ở đây không ai dùng.
 
-    ``limit`` là lưới an toàn chứ không phải phân trang: 20 000 điểm ~ hơn một năm
-    ở cadence 30 phút. Cắt ở đây là cắt phần CŨ NHẤT (ORDER BY DESC rồi đảo lại)
-    vì dự báo quan tâm dữ liệu mới nhất — cắt phần mới sẽ làm dự báo dựa trên quá
-    khứ xa và không ai nhận ra.
+    ``bucket_minutes``: lấy bản đọc MỚI NHẤT trong mỗi bucket. Nguồn 1 phút phải
+    đi qua đây — pairwise trên nhịp 1 phút nằm dưới deadband dung tích.
+
+    ``limit`` cắt phần CŨ NHẤT (ORDER BY DESC rồi đảo lại).
     """
-    rows = session.execute(
-        select(Telemetry.sampled_at, Telemetry.volume_l, Telemetry.pressure_mpa)
-        .where(
-            Telemetry.psn == psn,
-            Telemetry.sampled_at >= start,
-            Telemetry.sampled_at <= end,
+    cols = (Telemetry.sampled_at, Telemetry.volume_l, Telemetry.pressure_mpa)
+    filt = (
+        Telemetry.psn == psn,
+        Telemetry.sampled_at >= start,
+        Telemetry.sampled_at <= end,
+    )
+    if bucket_minutes and bucket_minutes > 0:
+        epoch = func.floor(
+            func.extract("epoch", Telemetry.sampled_at) / (bucket_minutes * 60)
         )
-        .order_by(Telemetry.sampled_at.desc())
-        .limit(limit)
-    ).all()
+        inner = (
+            select(*cols, epoch.label("b"))
+            .where(*filt)
+            .distinct(epoch)
+            .order_by(epoch, Telemetry.sampled_at.desc())
+            .subquery()
+        )
+        rows = session.execute(
+            select(inner.c.sampled_at, inner.c.volume_l, inner.c.pressure_mpa)
+            .order_by(inner.c.sampled_at.desc())
+            .limit(limit)
+        ).all()
+    else:
+        rows = session.execute(
+            select(*cols)
+            .where(*filt)
+            .order_by(Telemetry.sampled_at.desc())
+            .limit(limit)
+        ).all()
     out = [
         (at, None if v is None else float(v), None if p is None else float(p))
         for at, v, p in rows
@@ -293,4 +313,13 @@ def max_sampled_at(session: Session, psns: list[str]) -> dict[str, datetime]:
 
 def count_all(session: Session) -> int:
     return int(session.execute(select(func.count()).select_from(Telemetry)).scalar_one())
+
+
+def relation_size_bytes(session: Session) -> int | None:
+    """Heap + index của bảng telemetry. Rẻ hơn COUNT(*). None nếu không đọc được."""
+    try:
+        n = session.execute(text("SELECT pg_total_relation_size('telemetry')")).scalar_one()
+    except Exception:
+        return None
+    return None if n is None else int(n)
 

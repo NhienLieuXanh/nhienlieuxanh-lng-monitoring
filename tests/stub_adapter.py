@@ -20,6 +20,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.domain.contracts import (
+    MEASURE_FIELDS,
     FetchResult,
     MappingReport,
     NormalizedTelemetry,
@@ -81,6 +82,7 @@ class FakeAdapter:
     """TelemetryPort tổng hợp, có công tắc điều khiển hành vi lỗi."""
 
     source = SOURCE
+    measure_fields = MEASURE_FIELDS
 
     def __init__(
         self,
@@ -106,6 +108,9 @@ class FakeAdapter:
         self._now = now or datetime.now(tz=UTC)
 
     def close(self) -> None:
+        return None
+
+    def begin_cycle(self) -> None:
         return None
 
     @property

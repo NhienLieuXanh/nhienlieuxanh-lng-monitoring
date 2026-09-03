@@ -186,6 +186,20 @@ def test_consumption_excludes_offline_gap() -> None:
     assert est.refills == 0
 
 
+def test_minute_cadence_daily_use_is_not_zero() -> None:
+    """Nhịp 1 phút, 5 m³/ngày trên bồn 60 000 L — phải đo được, không bị deadband nuốt."""
+    cap = 60_000.0
+    s = _series(
+        start_l=50_000.0,
+        per_day_l=5_000.0,
+        hours=48,
+        step=timedelta(minutes=1),
+    )
+    est = estimate_consumption(s, capacity_l=cap, tz=VN)
+    assert est.daily_use_l is not None
+    assert abs(est.daily_use_l - 5_000.0) / 5_000.0 < 0.10
+
+
 def test_consumption_deadband_rejects_sensor_noise() -> None:
     """Dao động +/-5 L quanh 5000 (dưới deadband 10.425) -> không có tiêu thụ."""
     s = [

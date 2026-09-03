@@ -42,10 +42,21 @@ def _wire(*, adapter_override: Any = None) -> tuple[Any, ...]:
     sf = make_session_factory(engine)
     if adapter_override is not None:
         adapter, fatal, psns = adapter_override, (), None
-    else:
-        adapter, fatal, psns = build_adapter(settings)
-    svc = IngestionService(adapter, sf, settings, fatal_exc_types=fatal, psns=psns)
-    return settings, engine, sf, adapter, svc
+        svc = IngestionService(
+            adapter, sf, settings, fatal_exc_types=fatal, psns=psns
+        )
+        return settings, engine, sf, adapter, svc
+    built = build_adapter(settings)
+    svc = IngestionService(
+        built.primary,
+        sf,
+        settings,
+        fatal_exc_types=built.fatal_exc_types,
+        psns=built.psns,
+        ports_by_psn=built.by_psn or None,
+        alarm_port=built.alarm_port,
+    )
+    return settings, engine, sf, built, svc
 
 
 def _print_stats(stats: IngestStats) -> None:
@@ -115,7 +126,7 @@ def discover() -> None:
     try:
         with sf() as session:
             known = term_repo.all_psns(session)
-        _, _, cfg_psns = build_adapter(get_settings())
+        cfg_psns = getattr(adapter, "psns", None)
         svc.sync_terminals(stats, cfg_psns or known)
         _print_stats(stats)
     finally:

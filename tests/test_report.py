@@ -120,7 +120,7 @@ def wired(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         rp.tel_repo,
         "series",
-        lambda s, psn, a, b: a_series if psn == "2604200016" else [],
+        lambda s, psn, a, b, **kw: a_series if psn == "2604200016" else [],
     )
     monkeypatch.setattr(
         rp.tel_repo,

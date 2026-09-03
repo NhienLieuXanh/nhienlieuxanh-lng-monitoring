@@ -1,0 +1,38 @@
+[
+  {
+    "dateTime": "01/01/2020 12:00",
+    "receivedAt": "01/01/2020 12:00",
+    "totalizer": 100000.0,
+    "flowRate": 0.0,
+    "pressure": 99.0,
+    "temperature": 30.0,
+    "tankVolume": 80.0,
+    "tankNumber": 10,
+    "tankPrecent": 48.0,
+    "pT1_Value": 3.0,
+    "pS1_Value": 0.0,
+    "pS2_Value": 0.0,
+    "tE1_Value": 30.0,
+    "gD1_Value": 1.0,
+    "gD2_Value": 0.2,
+    "gD3_Value": 0.0
+  },
+  {
+    "dateTime": "01/01/2020 11:59",
+    "receivedAt": "01/01/2020 11:59",
+    "totalizer": 100000.0,
+    "flowRate": 0.0,
+    "pressure": 99.0,
+    "temperature": 30.0,
+    "tankVolume": 80.0,
+    "tankNumber": 10,
+    "tankPrecent": 48.0,
+    "pT1_Value": 3.0,
+    "pS1_Value": 0.0,
+    "pS2_Value": 0.0,
+    "tE1_Value": 30.0,
+    "gD1_Value": 1.0,
+    "gD2_Value": 0.2,
+    "gD3_Value": 0.0
+  }
+]

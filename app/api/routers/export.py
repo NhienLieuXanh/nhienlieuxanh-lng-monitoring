@@ -114,7 +114,16 @@ def export_telemetry(
     if term_repo.get_by_psn(session, psn) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "PSN không tồn tại")
     assert q.from_ is not None and q.to is not None
-    rows = tel_repo.export_rows(session, psn, q.from_, q.to)
+    EXPORT_MAX_ROWS = 20_000
+    rows = tel_repo.export_rows(
+        session, psn, q.from_, q.to, limit=EXPORT_MAX_ROWS + 1
+    )
+    if len(rows) > EXPORT_MAX_ROWS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"khoảng này {len(rows)}+ dòng, xuất tối đa {EXPORT_MAX_ROWS} — "
+            "thu hẹp khoảng ngày",
+        )
     out = [[_ts(r[0], cfg), *[_num(v) for v in r[1:]]] for r in rows]
     header = ["thoi_diem", *tel_repo.EXPORT_COLUMNS[1:]]
     fname = f"telemetry_{psn}_{q.from_:%Y%m%d}_{q.to:%Y%m%d}.csv"
@@ -145,7 +154,7 @@ def export_refills(
     out: list[list[Any]] = []
     for t in terms:
         cap = None if t.capacity_l is None else float(t.capacity_l)
-        rows = tel_repo.series(session, t.psn, start, now)
+        rows = tel_repo.series(session, t.psn, start, now, bucket_minutes=30)
         samples = [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows]
         for e in fc.detect_refills(samples, capacity_l=cap):
             out.append(
@@ -194,7 +203,9 @@ def export_tanks(
         pres = (
             None if (lt is None or lt.pressure_mpa is None) else float(lt.pressure_mpa)
         )
-        rows = tel_repo.series(session, t.psn, now - timedelta(days=win), now)
+        rows = tel_repo.series(
+            session, t.psn, now - timedelta(days=win), now, bucket_minutes=30
+        )
         samples = [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows]
         f = fc.build_forecast(
             samples,

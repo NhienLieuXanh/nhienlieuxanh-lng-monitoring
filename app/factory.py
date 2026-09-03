@@ -8,9 +8,10 @@ bằng máy chứ không bằng kỷ luật.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 
 from app.config import Settings
-from app.domain.contracts import TelemetryPort
+from app.domain.contracts import TelemetryPort, VendorAlarmPort
 
 log = logging.getLogger(__name__)
 
@@ -71,8 +72,36 @@ def verify_vendor_credentials(username: str, password: str, settings: Settings) 
     return user
 
 
-def build_adapter(settings: Settings) -> tuple[TelemetryPort, tuple[type[BaseException], ...], list[str]]:
-    """Trả về (adapter, các exception fatal, danh sách PSN).
+@dataclass
+class BuiltAdapters:
+    """Kết quả lắp ráp. close() đóng mọi port, không chỉ primary."""
+
+    primary: TelemetryPort
+    fatal_exc_types: tuple[type[BaseException], ...]
+    psns: list[str]
+    by_psn: dict[str, TelemetryPort] = field(default_factory=dict)
+    alarm_port: VendorAlarmPort | None = None
+
+    def probe(self) -> dict:
+        fn = getattr(self.primary, "probe", None)
+        if fn is None:
+            return {}
+        return fn()
+
+    def close(self) -> None:
+        seen: set[int] = set()
+        for port in self.by_psn.values():
+            i = id(port)
+            if i in seen:
+                continue
+            seen.add(i)
+            port.close()
+        if id(self.primary) not in seen:
+            self.primary.close()
+
+
+def build_adapter(settings: Settings) -> BuiltAdapters:
+    """Lắp mọi TelemetryPort. Service nhận resolve(psn), không if-source.
 
     ``fatal_exc_types`` được TRẢ RA thay vì để IngestionService import: service
     không được biết tên module vendor. Scheduler chỉ cần biết "cái này fatal".
@@ -82,9 +111,42 @@ def build_adapter(settings: Settings) -> tuple[TelemetryPort, tuple[type[BaseExc
     from app.adapters.xingke.errors import XingkeSessionExpired
 
     xs = get_xingke_settings()
-    adapter = XingkeAdapter(xs, store_raw=settings.store_raw_payload)
-    psns = sorted(xs.allowed_psn_set)
-    log.info("adapter: live, %s PSN trong allowlist", len(psns))
-    # CHỈ SessionExpired là fatal. XingkeAuthError thường vẫn cứu được bằng re-login
-    # (client tự làm), nên nó không được làm dừng job.
-    return adapter, (XingkeSessionExpired,), psns
+    xingke = XingkeAdapter(xs, store_raw=settings.store_raw_payload)
+    by_psn: dict[str, TelemetryPort] = dict.fromkeys(
+        sorted(xs.allowed_psn_set), xingke
+    )
+    fatal: tuple[type[BaseException], ...] = (XingkeSessionExpired,)
+    alarm_port: VendorAlarmPort | None = None
+    primary: TelemetryPort = xingke
+
+    from app.adapters.yokohama.config import get_yokohama_settings
+
+    ys = get_yokohama_settings()
+    if ys.enabled:
+        from app.adapters.yokohama.adapter import YokohamaAdapter
+
+        yoko = YokohamaAdapter(ys, store_raw=False)
+        for psn in ys.psn_list:
+            if psn in by_psn:
+                raise RuntimeError(
+                    f"PSN {psn} trùng hai nguồn telemetry — không lắp được"
+                )
+            by_psn[psn] = yoko
+        alarm_port = yoko
+        if not xs.allowed_psn_set:
+            primary = yoko
+            log.warning(
+                "adapter: nguồn phút bật nhưng allowlist nguồn kia rỗng — "
+                "chỉ ingest PSN nguồn phút"
+            )
+        log.info("adapter: nguồn phút bật, psn=%s", ",".join(ys.psn_list))
+
+    psns = list(by_psn) if by_psn else sorted(xs.allowed_psn_set)
+    log.info("adapter: live, %s PSN", len(psns))
+    return BuiltAdapters(
+        primary=primary,
+        fatal_exc_types=fatal,
+        psns=psns,
+        by_psn=by_psn,
+        alarm_port=alarm_port,
+    )

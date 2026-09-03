@@ -220,6 +220,38 @@ class ConsumptionEstimate:
         return self.daily_use_l is not None and self.daily_use_l > 0
 
 
+def _downsample_if_dense(
+    pts: list[tuple[datetime, float]],
+    *,
+    bucket: timedelta = timedelta(minutes=30),
+) -> list[tuple[datetime, float]]:
+    """Gộp chuỗi dày hơn 30 phút về lưới 30 phút (giữ điểm cuối mỗi bucket).
+
+    Deadband dung tích được hiệu chỉnh cho nhịp 30 phút. Ở nhịp 1 phút mọi bước
+    tiêu thụ thật đều nằm dưới ngưỡng nên bị bỏ — downsample trước pairwise.
+    Chuỗi đã thưa (>= 15 phút) giữ nguyên.
+    """
+    if len(pts) < 3:
+        return pts
+    gaps = sorted((b[0] - a[0] for a, b in pairwise(pts)))
+    median = gaps[len(gaps) // 2]
+    if median >= bucket / 2:
+        return pts
+    out: list[tuple[datetime, float]] = []
+    bucket_end = pts[0][0] + bucket
+    last = pts[0]
+    for p in pts[1:]:
+        if p[0] < bucket_end:
+            last = p
+            continue
+        out.append(last)
+        while p[0] >= bucket_end:
+            bucket_end += bucket
+        last = p
+    out.append(last)
+    return out
+
+
 def estimate_consumption(
     samples: list[Sample],
     *,
@@ -240,12 +272,14 @@ def estimate_consumption(
       đó không được tính vào ``active_days`` (và phần sụt giảm qua khoảng trống
       cũng không được cộng — nó có thể chứa cả một lần nạp lẫn nhiều ngày rút).
     """
-    pts = _volume_points(samples)
+    raw_pts = _volume_points(samples)
+    n_samples = len(raw_pts)
+    pts = _downsample_if_dense(raw_pts)
     if len(pts) < 2:
         return ConsumptionEstimate(
             daily_use_l=None,
             daily_use_sd_l=None,
-            samples=len(pts),
+            samples=n_samples,
             window_days=0.0,
             active_days=0.0,
             coverage=0.0,

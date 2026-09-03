@@ -54,7 +54,9 @@ def _build(
 
     vol = [
         Sample(at=at, volume_l=v, pressure_mpa=p)
-        for at, v, p in tel_repo.series(session, psn, start, now)
+        for at, v, p in tel_repo.series(
+            session, psn, start, now, bucket_minutes=30
+        )
     ]
     hs = [
         an.HealthSample(at=at, battery_v=b, signal_percent=s)

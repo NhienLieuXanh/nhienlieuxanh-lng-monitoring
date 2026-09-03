@@ -17,10 +17,13 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-# Cột đo — dùng lại ở mapping, repository và test coverage. Một nguồn sự thật.
+# Cột đo lõi — dùng lại ở mapping Xingke, repository và test coverage.
+# KHÔNG thêm cột nguồn khác vào đây: assert_mapping_sane() của Xingke so tập
+# này với FieldSpec của nó lúc import, thiếu là RuntimeError và ingest Xingke tắt.
 MEASURE_FIELDS: tuple[str, ...] = (
     "level_mmwc",
     "diff_pressure_kpa",
@@ -32,6 +35,23 @@ MEASURE_FIELDS: tuple[str, ...] = (
     "signal_percent",
     "battery_v",
 )
+
+# Cột đo thêm, nullable, không nguồn nào bị buộc phải có. Tên theo chức năng,
+# không theo site. _REPAIRABLE và to_row dùng hợp với MEASURE_FIELDS.
+EXTENDED_MEASURE_FIELDS: tuple[str, ...] = (
+    "gm_totalizer_nm3",
+    "gm_flow_rate_nm3h",
+    "gm_pressure_kpa",
+    "gm_temperature_c",
+    "ps1_bar",
+    "ps2_bar",
+    "gd1_percent",
+    "gd2_percent",
+    "gd3_percent",
+    "refill_counter",
+)
+
+ALL_MEASURE_FIELDS: tuple[str, ...] = MEASURE_FIELDS + EXTENDED_MEASURE_FIELDS
 
 
 class TerminalStatus(StrEnum):
@@ -54,7 +74,7 @@ class PercentSource(StrEnum):
 class NormalizedTelemetry(BaseModel):
     """Một lần đọc đã chuẩn hoá. Tên field là của CÔNG TY, không phải của vendor."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     source: str
     psn: str
@@ -80,6 +100,20 @@ class NormalizedTelemetry(BaseModel):
     vacuum_pa: Decimal | None = None
     signal_percent: Decimal | None = None
     battery_v: Decimal | None = None
+
+    # Đo thêm của nguồn có đồng hồ khí / đầu dò analog. Nguồn không có thì để
+    # None — không được nhồi 0. refill_counter là số nguyên (bộ đếm nạp), không
+    # phải phép đo liên tục.
+    gm_totalizer_nm3: Decimal | None = None
+    gm_flow_rate_nm3h: Decimal | None = None
+    gm_pressure_kpa: Decimal | None = None
+    gm_temperature_c: Decimal | None = None
+    ps1_bar: Decimal | None = None
+    ps2_bar: Decimal | None = None
+    gd1_percent: Decimal | None = None
+    gd2_percent: Decimal | None = None
+    gd3_percent: Decimal | None = None
+    refill_counter: int | None = None
 
     medium_name: str | None = None
     tank_type_name: str | None = None
@@ -159,14 +193,19 @@ class MappingReport:
     unmapped_keys: set[str] = field(default_factory=set)
     rejected_rows: int = 0
     dropped_foreign_psn: int = 0
+    # Số lần 0 bị coi là thiếu dữ liệu (cảm biến lỗi), không phải giá trị đo.
+    zero_as_missing: int = 0
     errors: list[tuple[str, str]] = field(default_factory=list)
+    # Tập cột coverage của ĐÚNG port đang chạy. Mặc định = lõi Xingke để test
+    # coverage() == "8/9" không đổi.
+    fields: tuple[str, ...] = MEASURE_FIELDS
 
     def coverage(self) -> str:
-        mapped = sum(1 for f in MEASURE_FIELDS if self.present.get(f, 0) > 0)
-        return f"{mapped}/{len(MEASURE_FIELDS)}"
+        mapped = sum(1 for f in self.fields if self.present.get(f, 0) > 0)
+        return f"{mapped}/{len(self.fields)}"
 
     def always_null(self) -> list[str]:
-        return [f for f in MEASURE_FIELDS if self.present.get(f, 0) == 0]
+        return [f for f in self.fields if self.present.get(f, 0) == 0]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -177,6 +216,7 @@ class MappingReport:
             "unmapped_keys": sorted(self.unmapped_keys),
             "rejected_rows": self.rejected_rows,
             "dropped_foreign_psn": self.dropped_foreign_psn,
+            "zero_as_missing": self.zero_as_missing,
             "always_null": self.always_null(),
             "errors": [{"field": f, "error": e} for f, e in self.errors],
         }
@@ -195,6 +235,14 @@ class TelemetryPort(Protocol):
     """Cái mà ingestion service biết về thế giới bên ngoài. Chỉ có thế này."""
 
     source: str
+    measure_fields: tuple[str, ...]
+
+    @property
+    def vendor_tz(self) -> ZoneInfo: ...
+
+    def begin_cycle(self) -> None:
+        """Bắt đầu một cycle. Port có memo trong cycle phải xoá ở đây."""
+        ...
 
     def fetch_telemetry(self, psn: str, day: date) -> FetchResult:
         """Lấy các lần đọc của ``psn`` trong ngày ``day``.
@@ -216,3 +264,36 @@ class TelemetryPort(Protocol):
         ...
 
     def close(self) -> None: ...
+
+
+class NormalizedAlarm(BaseModel):
+    """Một dòng báo động vendor đã chuẩn hoá. Không mang tên nguồn ra API."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source: str
+    site_code: str
+    device_id: str
+    raised_at: datetime
+    vendor_ts_raw: str
+    message: str
+    symbol: str | None = None
+
+    @field_validator("raised_at")
+    @classmethod
+    def _alarm_must_be_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None or v.utcoffset() is None:
+            raise ValueError("raised_at phải tz-aware")
+        return v
+
+
+@runtime_checkable
+class VendorAlarmPort(Protocol):
+    """Nguồn có lịch sử báo động. Lắp ở factory, không phải getattr trong service."""
+
+    source: str
+
+    @property
+    def vendor_tz(self) -> ZoneInfo: ...
+
+    def fetch_alarms(self, day: date) -> list[NormalizedAlarm]: ...

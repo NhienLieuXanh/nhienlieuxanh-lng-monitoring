@@ -1,0 +1,38 @@
+[
+  {
+    "deviceId": "LT1",
+    "createAt": "01/01/2020 10:00:00",
+    "message": "Mức bồn LT1: dưới ngưỡng dự trữ (mẫu tổng hợp)",
+    "symbol": "danger"
+  },
+  {
+    "deviceId": "PS1",
+    "createAt": "01/01/2020 10:00:00",
+    "message": "Áp suất PS1: dưới ngưỡng L (mẫu tổng hợp)",
+    "symbol": "danger"
+  },
+  {
+    "deviceId": "SV4",
+    "createAt": "01/01/2020 13:00:00",
+    "message": "Van SV4: đang bị lock (mẫu tổng hợp)",
+    "symbol": "danger"
+  },
+  {
+    "deviceId": "SV4",
+    "createAt": "01/01/2020 13:00:00",
+    "message": "Van SV4: lỗi đóng van (mẫu tổng hợp)",
+    "symbol": "danger"
+  },
+  {
+    "deviceId": "SV3",
+    "createAt": "01/01/2020 13:00:00",
+    "message": "Van SV3: đang bị lock (mẫu tổng hợp)",
+    "symbol": "danger"
+  },
+  {
+    "deviceId": "SV3",
+    "createAt": "01/01/2020 13:00:00",
+    "message": "Van SV3: lỗi đóng van (mẫu tổng hợp)",
+    "symbol": "danger"
+  }
+]

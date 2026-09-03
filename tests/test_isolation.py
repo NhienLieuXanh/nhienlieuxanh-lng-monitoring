@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,9 @@ APP = ROOT / "app"
 # Những tầng KHÔNG được biết vendor tồn tại. app/factory.py được miễn: nó CHÍNH LÀ
 # nơi lắp ráp, và việc chỉ có đúng một file được miễn là điều làm biên này có nghĩa.
 PURE_DIRS = ("domain", "services", "repositories", "api", "db")
-VENDOR_MARKER = re.compile(r"adapters\.xingke|adapters/xingke", re.I)
+# Mọi package con của adapters/, không chỉ xingke — package mới phải bị canh
+# từ commit đầu, nếu không luật biên im lặng trong suốt quá trình thêm nguồn.
+VENDOR_MARKER = re.compile(r"adapters\.[a-z_]+|adapters/[a-z_]+", re.I)
 
 
 def _py_files(rel: str) -> list[Path]:
@@ -65,8 +68,18 @@ def test_only_factory_selects_concrete_adapter():
         rel = f.relative_to(APP).as_posix()
         if rel.startswith("adapters/"):
             continue
-        src = f.read_text(encoding="utf-8")
-        if "XingkeAdapter" in src or "adapters.xingke" in src:
+        tree = ast.parse(f.read_text(encoding="utf-8"))
+        hit = False
+        for node in ast.walk(tree):
+            mod = None
+            if isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+            elif isinstance(node, ast.Import):
+                mod = ",".join(a.name for a in node.names)
+            if mod and VENDOR_MARKER.search(mod):
+                hit = True
+                break
+        if hit:
             importers.append(rel)
     assert importers == ["factory.py"], (
         f"chỉ factory.py được chọn adapter cụ thể, nhưng thấy: {importers}"
@@ -104,7 +117,10 @@ def test_dashboard_has_no_vendor_name_and_no_mock():
     if not static.exists():
         pytest.skip("dashboard chưa được copy vào app/static/")
     src = static.read_text(encoding="utf-8")
-    for banned in ("xingke", "Xingke", "xk-iot", "mockTanks", "mockHistory"):
+    for banned in (
+        "xingke", "Xingke", "xk-iot", "yokohama", "Yokohama",
+        "mockTanks", "mockHistory",
+    ):
         assert banned not in src, f"dashboard còn chứa {banned!r}"
 
 
@@ -137,5 +153,31 @@ def test_openapi_metadata_has_no_vendor_name():
 
     spec = create_app().openapi()
     blob = str(spec).lower()
-    for banned in ("xingke", "xk-iot"):
+    for banned in ("xingke", "xk-iot", "yokohama"):
         assert banned not in blob, f"OpenAPI schema chứa {banned!r}"
+
+
+def test_tree_to_commit_has_no_internal_plant_host():
+    """Repo public: hostname cổng nguồn không xác thực không được nằm trong tree sẽ commit."""
+    listed = subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        text=True,
+    ).splitlines()
+    # Ghép regex để chính file test không chứa chuỗi hostname đầy đủ.
+    pat = re.compile(r"\." + "nhienlieuxanh" + r"\.com")
+    offenders = []
+    for rel in listed:
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if pat.search(text):
+            offenders.append(rel)
+    assert offenders == [], f"hostname nội bộ còn trong file sẽ commit: {offenders}"
+    from app.adapters.yokohama.config import YokohamaSettings
+
+    assert YokohamaSettings.model_fields["base_url"].default == ""
