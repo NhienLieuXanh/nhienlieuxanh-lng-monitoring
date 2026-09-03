@@ -1,0 +1,125 @@
+# Áp migration lên DB production. BẤM TAY, không có lịch.
+#
+# Vì sao cần đường này, khi đã có POST /api/admin/db/sync:
+#
+#   1. Máy trong mạng công ty mở được TCP 5432 tới Neon nhưng handshake wire
+#      protocol bị firewall reset, nên `alembic upgrade head` không chạy được từ
+#      local. Runner của GitHub không nằm sau firewall đó.
+#   2. Endpoint admin có đường dự phòng `create_all`, và đường đó KHÔNG thêm được
+#      cột vào bảng đã có. Với migration có ALTER (như 10 cột đo mới trên
+#      telemetry) nó tạo ra đúng trạng thái nửa vời: bảng mới có, cột mới không,
+#      và mọi truy vấn telemetry trả UndefinedColumn. Ở đây là alembic thật.
+#   3. Nó cho phép áp migration TRƯỚC khi deploy code, nên không còn khoảng sập.
+#      Thêm cột nullable là tương thích ngược: code cũ đang chạy chỉ SELECT những
+#      cột nó biết. Chạy workflow này trên một nhánh có migration mới, xác nhận
+#      xong rồi mới merge vào main.
+#
+# Chỉ tiến, không lùi. Không có ô nhập revision, không có downgrade: một lệnh
+# downgrade bấm nhầm trên production là mất dữ liệu, và lợi ích của việc để nó ở
+# đây không đáng.
+#
+# Ai bấm được: người có quyền write trên repo. Đó cũng đúng tập người đang có
+# ADMIN_TOKEN, nên không mở rộng bề mặt tấn công. Secret không bao giờ được in:
+# GitHub tự che, và không có lệnh nào echo nó.
+
+name: migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Gõ "ap-migration" để xác nhận áp lên DB production'
+        required: true
+        default: ''
+
+concurrency:
+  group: migrate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chặn bấm nhầm
+        if: ${{ github.event.inputs.confirm != 'ap-migration' }}
+        run: |
+          echo "::error::phải gõ đúng 'ap-migration' để xác nhận"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cài đúng phần cần để chạy alembic
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          # Không cài toàn bộ requirements.txt: alembic chỉ cần engine + models,
+          # còn fastapi/uvicorn/httpx là của tầng web. Ít package thì ít thứ có
+          # thể hỏng ở một bước chạm production.
+          pip install \
+            "alembic==1.19.1" \
+            "SQLAlchemy==2.0.52" \
+            "psycopg[binary]==3.3.4" \
+            "pydantic==2.13.4" \
+            "pydantic-settings==2.15.0" \
+            "python-dateutil==2.9.0.post0" \
+            "tzdata==2025.2"
+
+      - name: Trạng thái TRƯỚC khi áp
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::thiếu secret DATABASE_URL trên repo"
+            exit 1
+          fi
+          echo "head mà code này mong đợi:"
+          python -m alembic heads
+          echo "revision DB đang ở:"
+          python -m alembic current
+
+      - name: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          python -m alembic upgrade head
+
+      - name: Trạng thái SAU khi áp, và đối chiếu model
+        # continue-on-error: đây là bước ĐỌC. Migration đã chạy xong ở bước trên,
+        # nên một lỗi ở đây không được làm job đỏ — job đỏ sau khi DB đã đổi là
+        # tín hiệu tệ nhất có thể: người đọc sẽ tưởng migration thất bại và chạy
+        # lại, hoặc tệ hơn, tưởng DB còn nguyên.
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -uo pipefail
+          echo "revision DB sau khi áp:"
+          python -m alembic current
+          # Kiểm mạnh nhất và rẻ nhất: autogenerate trên DB đã ở head phải KHÔNG
+          # sinh add_column/create_table/alter_column nào. Nếu có thì model và
+          # migration đã lệch. Chỉ CẢNH BÁO chứ không fail: repo đang có 12
+          # constraint bị lặp tiền tố tên từ các migration cũ
+          # (ck_terminals_ck_terminals_...), nên autogenerate vốn đã nhiễu —
+          # xem commit 2a299fd. Ta đọc bằng mắt phần quan trọng.
+          python -m alembic revision --autogenerate -m parity_check_tam \
+            --rev-id parity_tam 2>&1 | tail -5
+          f=$(ls migrations/versions/*parity_tam* 2>/dev/null | head -1)
+          if [ -n "${f}" ]; then
+            if grep -qE "op\.(add_column|create_table|alter_column|drop_column)" "${f}"; then
+              echo "::warning::autogenerate còn thấy thay đổi schema — model và migration có thể lệch:"
+              grep -E "op\.(add_column|create_table|alter_column|drop_column)" "${f}" || true
+            else
+              echo "parity ok: không có add_column/create_table/alter_column nào"
+            fi
+            rm -f "${f}"
+          fi
