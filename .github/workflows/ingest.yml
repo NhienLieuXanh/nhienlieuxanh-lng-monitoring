@@ -67,3 +67,12 @@ jobs:
             echo "::error::cron ingest trả ${code}"
             exit 1
           fi
+          # HTTP 200 KHÔNG có nghĩa là ingest chạy được. Endpoint bắt mọi
+          # exception của run_cycle và trả 200 kèm {"ok":false,...} — cố ý, để
+          # một lỗi vendor không biến thành 5xx của platform. Nhưng workflow này
+          # trước đây chỉ kiểm mã HTTP, nên nó báo xanh suốt 53 giờ khi phiên
+          # vendor hết hạn và mọi cycle trả FatalIngestError. Kiểm cả thân.
+          if ! jq -e '.ok == true' body.json > /dev/null 2>&1; then
+            echo "::error::cron ingest trả 200 nhưng KHÔNG thành công: $(head -c 300 body.json)"
+            exit 1
+          fi

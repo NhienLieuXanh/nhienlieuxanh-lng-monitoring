@@ -54,6 +54,22 @@ class Settings(BaseSettings):
     ingest_on_startup: bool = False
     ingest_max_consecutive_failures: int = Field(10, ge=1)
     store_raw_payload: bool = True
+    # Bao lâu không có lần ingest THÀNH CÔNG thì /api/health chuyển degraded.
+    #
+    # CỐ Ý tách rời ingest_interval_minutes. Trước đây health lấy interval × 3
+    # làm ngưỡng, mà trên serverless interval là con số VÔ NGHĨA:
+    # SCHEDULER_ENABLED=false nên APScheduler không chạy, nhịp thật do một
+    # poller BÊN NGOÀI quyết định và app không biết gì về nó. Hệ quả có thật:
+    # INGEST_INTERVAL_MINUTES bị đặt 1440 hồi chỉ có cron ngày của Vercel,
+    # ngưỡng thành 72 giờ, và một lần ingest chết 53 giờ vẫn hiện "ok".
+    #
+    # 720 phút chọn từ số đo, không phải đoán: nhịp cron GitHub thực tế có
+    # khoảng cách min 121 / trung vị 242 / max 440 phút (30 lần chạy gần nhất).
+    # Ngưỡng phải trên hẳn max để không báo động oan, nhưng dưới hẳn một ngày.
+    #
+    # Env-only, KHÔNG nằm trong OVERRIDABLE: /api/health không được phụ thuộc
+    # việc đọc được app_settings — bảng đó hỏng chính là thứ health phải báo.
+    ingest_stale_after_minutes: int = Field(720, ge=1)
 
     # ---- status / alert ----
     # 90 phút = 3 sample bị mất. Cadence vendor đo từ dữ liệu thật là 30 phút,

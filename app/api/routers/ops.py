@@ -74,6 +74,35 @@ def _snapshots(
     return outs, snaps, now
 
 
+def ingest_freshness(age_seconds: float | None, stale_after_minutes: int) -> CheckOut:
+    """Lần ingest thành công gần nhất có còn đủ mới không.
+
+    Hàm thuần, tách khỏi ``health()`` để test được KHÔNG cần DB. Quan trọng vì
+    test cần DB tự skip khi thiếu ``TEST_DATABASE_URL``, tức trên CI chúng không
+    chạy — và đây đúng là chỗ đã để lọt một sự cố thật.
+
+    ``age_seconds is None`` nghĩa là CHƯA TỪNG có lần ingest thành công, khác hẳn
+    "có nhưng cũ": một cái nói chưa bao giờ chạy được, cái kia nói đã ngừng chạy.
+
+    Ngưỡng lấy từ ``ingest_stale_after_minutes``, CỐ Ý không phải
+    ``ingest_interval_minutes``. Xem chú thích ở ``app/config.py``: gắn vào
+    interval đã làm health báo "ok" trong khi ingest chết 53 giờ, vì trên
+    serverless interval là con số không liên quan tới nhịp thật.
+    """
+    if age_seconds is None:
+        return CheckOut(ok=False, detail="chưa có lần ingest thành công nào")
+    budget = stale_after_minutes * 60
+    if age_seconds > budget:
+        return CheckOut(
+            ok=False,
+            detail=(
+                f"lần ingest cuối cách đây {age_seconds / 60:.0f} phút "
+                f"(ngưỡng {budget / 60:.0f} phút)"
+            ),
+        )
+    return CheckOut(ok=True)
+
+
 def storage_status(nbytes: int | None, warn_mb: float) -> CheckOut:
     """Tín hiệu dung lượng telemetry. None = không đọc được, không phải lỗi nền."""
     if nbytes is None:
@@ -133,22 +162,12 @@ def health(
     if db.ok:
         try:
             run = runs_repo.last_success(session)
-            if run is None or run.finished_at is None:
-                ing = CheckOut(ok=False, detail="chưa có lần ingest thành công nào")
-                overall = "degraded" if overall == "ok" else overall
-            else:
+            if run is not None and run.finished_at is not None:
                 last_at = run.finished_at
                 age = (now - last_at).total_seconds()
-                budget = settings.ingest_interval_minutes * 60 * 3
-                if age > budget:
-                    ing = CheckOut(
-                        ok=False,
-                        detail=(
-                            f"lần ingest cuối cách đây {age / 60:.0f} phút "
-                            f"(ngưỡng {budget / 60:.0f} phút)"
-                        ),
-                    )
-                    overall = "degraded" if overall == "ok" else overall
+            ing = ingest_freshness(age, settings.ingest_stale_after_minutes)
+            if not ing.ok:
+                overall = "degraded" if overall == "ok" else overall
         except Exception as exc:
             ing = CheckOut(ok=False, detail=f"không đọc được ingest_runs: {exc}")
             overall = "degraded" if overall == "ok" else overall
