@@ -4,11 +4,15 @@ Hai hằng số ở hai file khác nhau, không ai nối chúng lại, nên chú
 thầm — và hậu quả chỉ lộ ra trên production dưới dạng function bị kill giữa cycle
 hoặc nguồn mới không bao giờ nạp được dòng nào. Nối bằng test.
 
-Nhịp thu thật (đọc từ ``.github/workflows/ingest.yml``): mỗi 30 phút, tức 48 cycle
-mỗi ngày. Nguồn đo phút bỏ qua bộ lọc ngày nên MỖI cycle stream lại từ bản ghi mới
-nhất lùi về 00:00 của ngày cũ nhất trong cửa sổ — với ``ingest_days_back=1`` là
-24…48 h dữ liệu, khoảng 1,9…3,8 MB một lần, ~182 MB/ngày. Đó là giá phải trả có ý
-thức, không phải bug; test dưới đây chỉ giữ cho nó nằm trong ngân sách.
+Nguồn đo phút bỏ qua bộ lọc ngày nên MỖI cycle stream lại từ bản ghi mới nhất lùi
+về 00:00 của ngày cũ nhất trong cửa sổ — với ``ingest_days_back=1`` là 24…48 h dữ
+liệu, khoảng 1,9…3,8 MB một lần.
+
+``.github/workflows/ingest.yml`` XIN nhịp 30 phút, nhưng đó không phải nhịp nhận
+được: GitHub siết lịch cron. Đo trên 30 lần chạy gần nhất, khoảng cách min 121 /
+trung vị 242 / max 440 phút — khoảng 6 cycle/ngày, không phải 48. Chi phí thực
+~11…23 MB/ngày. Ghi lại đây vì con số 48 là cái bẫy: nó nằm ngay trong file
+workflow và trông như sự thật.
 """
 
 from __future__ import annotations

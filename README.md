@@ -28,9 +28,14 @@ ingest của nguồn kia. Gọp giờ + xoá phút cũ là **quyết định ho�
 ≈ 130 MB/năm trên Neon 512 MB — làm khi `/api/health` báo dung lượng `degraded`.
 
 Vì cổng đó bỏ qua bộ lọc ngày, **mỗi** cycle stream lại từ bản ghi mới nhất lùi về
-00:00 của ngày cũ nhất trong cửa sổ. Với nhịp 30 phút của
-`.github/workflows/ingest.yml` và `INGEST_DAYS_BACK=1`, đó là 24…48 h dữ liệu mỗi
-lần (~1,9…3,8 MB), khoảng **182 MB/ngày** kéo từ cổng nguồn. Cũng vì thế
+00:00 của ngày cũ nhất trong cửa sổ. Với `INGEST_DAYS_BACK=1` đó là 24…48 h dữ
+liệu mỗi lần, khoảng 1,9…3,8 MB.
+
+Nhịp thật **không** phải 30 phút như `.github/workflows/ingest.yml` yêu cầu.
+GitHub siết lịch cron: đo trên 30 lần chạy gần nhất, khoảng cách min 121 / trung vị
+**242** / max 440 phút, tức khoảng **6 cycle/ngày**, không phải 48. Nên chi phí
+thực là ~11…23 MB/ngày. Đừng thiết kế dựa trên `*/30` trong file workflow — nó là
+mong muốn, không phải nhịp. Cũng vì thế
 `YOKOHAMA_MAX_STREAM_SECONDS` là **một nửa** `maxDuration` trong `vercel.json`,
 không phải bằng nó: một cycle còn phải fetch nguồn kia, lấy báo động và ghi DB, nên
 trần stream bằng cả ngân sách sẽ làm function bị kill giữa cycle và mất luôn dữ
