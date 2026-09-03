@@ -456,3 +456,32 @@ def test_ngay_mo_ho_hai_thu_tu_ra_hai_ket_qua_khac_nhau() -> None:
     b = parse_vendor_ts("03/09/2026 10:00", VN, order="mdy")
     assert a.astimezone(VN).date() == date(2026, 9, 3)
     assert b.astimezone(VN).date() == date(2026, 3, 9)
+
+
+# ------------------- no_data phải nói về CẢ cycle, không phải một ngày -------------------
+
+
+def test_no_data_khong_ke_ten_psn_da_dua_ve_du_lieu() -> None:
+    """Ca thật, run 215: YKH đưa về 1038 dòng nhưng vẫn bị đếm là "không dữ liệu".
+
+    Cửa sổ fetch gồm nhiều ngày. Nguồn phút chỉ có bản ghi hôm nay, nên lần gọi
+    cho hôm qua trả rỗng và PSN vào psns_no_data trước khi lần gọi cho hôm nay
+    thành công.
+    """
+    from app.services.ingestion import IngestStats
+
+    st = IngestStats()
+    st.psns_no_data.append("YKH-TANK-01")   # ngày hôm qua: rỗng
+    st.psns_with_data.append("YKH-TANK-01")  # ngày hôm nay: 1038 dòng
+    st.psns_no_data.append("2604200016")     # thiết bị chết thật
+    assert st.no_data_psns() == ["2604200016"]
+    assert "no_data=1" in st.summary()
+
+
+def test_psn_chet_that_van_bi_ke_ten() -> None:
+    from app.services.ingestion import IngestStats
+
+    st = IngestStats()
+    st.psns_no_data.extend(["2604200016", "2605090007"])
+    assert st.no_data_psns() == ["2604200016", "2605090007"]
+    assert "no_data=2" in st.summary()

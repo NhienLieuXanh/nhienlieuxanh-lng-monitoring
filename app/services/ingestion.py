@@ -42,11 +42,22 @@ class IngestStats:
     # bị thật đang offline hàng tháng nên MỌI cycle sẽ hợp lệ trả 0 row; nếu tính
     # đó là lỗi thì health đỏ vĩnh viễn và circuit breaker trip ngay cycle đầu.
     psns_no_data: list[str] = field(default_factory=list)
+    # PSN đã đưa về ít nhất một dòng trong cycle này. Cần thiết vì cửa sổ fetch
+    # gồm NHIỀU ngày: nguồn phút chỉ có bản ghi của hôm nay, nên lần gọi cho hôm
+    # qua trả rỗng và PSN bị ghi vào psns_no_data, rồi không bao giờ rút ra — dù
+    # cùng cycle đó nó đưa về 1038 dòng (đo được, run 215). Một tín hiệu giám sát
+    # nói "không có dữ liệu" về nguồn đang chạy tốt nhất là tín hiệu không dùng
+    # được, và đó đúng là lớp lỗi cả phiên này đi dọn.
+    psns_with_data: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     days_processed: int = 0
     mapping: dict[str, Any] = field(default_factory=dict)
     alarms_inserted: int = 0
     alarms_duplicates: int = 0
+
+    def no_data_psns(self) -> list[str]:
+        """PSN KHÔNG có dữ liệu nào trong CẢ cycle, không phải trong một ngày."""
+        return [p for p in self.psns_no_data if p not in self.psns_with_data]
 
     @property
     def status(self) -> str:
@@ -62,7 +73,7 @@ class IngestStats:
             f"duplicates={self.duplicates} terminals_created={self.terminals_created} "
             f"alarms_inserted={self.alarms_inserted} "
             f"alarms_duplicates={self.alarms_duplicates} "
-            f"no_data={len(self.psns_no_data)} errors={len(self.errors)}"
+            f"no_data={len(self.no_data_psns())} errors={len(self.errors)}"
         )
 
 
@@ -178,6 +189,8 @@ class IngestionService:
             if psn not in stats.psns_no_data:
                 stats.psns_no_data.append(psn)
             return
+        if psn not in stats.psns_with_data:
+            stats.psns_with_data.append(psn)
 
         if dry_run:
             return

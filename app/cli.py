@@ -61,10 +61,10 @@ def _wire(*, adapter_override: Any = None) -> tuple[Any, ...]:
 
 def _print_stats(stats: IngestStats) -> None:
     typer.echo(f"  {stats.summary()}")
-    if stats.psns_no_data:
+    if stats.no_data_psns():
         # In riêng, KHÔNG lẫn với errors: cả hai thiết bị thật đang offline hàng
         # tháng nên 0 dòng là kết quả bình thường, không phải sự cố.
-        typer.echo(f"  không có dữ liệu: {', '.join(stats.psns_no_data)}")
+        typer.echo(f"  không có dữ liệu: {', '.join(stats.no_data_psns())}")
     for e in stats.errors[:10]:
         typer.echo(f"  LỖI: {e}", err=True)
     unmapped = stats.mapping.get("unmapped_keys") or []
