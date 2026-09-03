@@ -96,6 +96,20 @@ class TerminalOut(BaseModel):
     vacuum_pa: Decimal | None = None
     sampled_at: datetime | None = None
 
+    # Đo thêm của bồn có đồng hồ khí / đầu dò analog. NULL ở bồn không có cảm
+    # biến — dashboard dựa vào đó để ẩn hẳn khối, thay vì hiện một hàng "--" làm
+    # người đọc tưởng cảm biến đang hỏng. Tên theo CHỨC NĂNG, không theo site.
+    gm_totalizer_nm3: Decimal | None = None
+    gm_flow_rate_nm3h: Decimal | None = None
+    gm_pressure_kpa: Decimal | None = None
+    gm_temperature_c: Decimal | None = None
+    ps1_bar: Decimal | None = None
+    ps2_bar: Decimal | None = None
+    gd1_percent: Decimal | None = None
+    gd2_percent: Decimal | None = None
+    gd3_percent: Decimal | None = None
+    refill_counter: int | None = None
+
 
 class TerminalUpdateIn(BaseModel):
     """Field do người vận hành sở hữu. Ingest KHÔNG ghi đè các cột này.

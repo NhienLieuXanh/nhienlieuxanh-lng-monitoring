@@ -16,6 +16,7 @@ from app.api.schemas import TerminalDetailOut, TerminalOut
 from app.config import Settings, get_settings
 from app.db.models import Telemetry, Terminal
 from app.domain.alerts import fill_percent
+from app.domain.contracts import EXTENDED_MEASURE_FIELDS
 from app.domain.status import derive_status
 
 UTC = ZoneInfo("UTC")
@@ -176,6 +177,13 @@ def to_terminal_out(
         "vacuum_pa": latest.vacuum_pa if latest else None,
         "sampled_at": latest.sampled_at if latest else None,
     }
+    # Đo thêm (đồng hồ khí, công tắc áp, đầu dò khí) map bằng VÒNG LẶP trên
+    # EXTENDED_MEASURE_FIELDS, không phải mười dòng gõ tay: thêm một cột đo về
+    # sau chỉ phải khai ở MỘT chỗ, và không có cách nào để danh sách ở đây lệch
+    # với danh sách ở contracts. Bồn không có cảm biến thì NULL — cố ý không
+    # điền 0, vì "không có cảm biến" khác "đo được 0".
+    for _f in EXTENDED_MEASURE_FIELDS:
+        payload[_f] = getattr(latest, _f) if latest else None
     if not detail:
         return TerminalOut(**payload)  # type: ignore[arg-type]
     return TerminalDetailOut(

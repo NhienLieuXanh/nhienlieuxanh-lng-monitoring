@@ -452,6 +452,24 @@
     .meta-grid .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-body); min-width: 0; }
     .meta-grid dt { color: var(--muted); font-weight: 500; flex: 0 0 auto; }
     .meta-grid dd { margin: 0; text-align: right; font-weight: 700; color: var(--fg); font-family: var(--mono); font-size: var(--fs-body); min-width: 0; overflow-wrap: anywhere; }
+
+    /* Nhóm đo thêm (đồng hồ khí, đầu dò). Khối này CHỈ hiện ở bồn được lắp các
+       cảm biến đó, nên nó cần tiêu đề riêng — nếu không, người mở một bồn khác sẽ
+       không hiểu vì sao mình thấy ít hàng hơn và tưởng dữ liệu bị thiếu. */
+    .spec-group {
+      margin: 18px 0 2px; padding-top: 12px; border-top: 1px solid var(--line-soft);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .spec-group h3 { margin: 0; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
+    .spec-group .note { font-size: var(--fs-sm); color: var(--muted); }
+    /* Hai biến thể pill còn thiếu, dùng lại đúng .st của trạng thái trực tuyến để
+       cả sản phẩm chỉ có MỘT hình dạng "nhãn trạng thái". */
+    .st.mid { color: var(--warn); background: var(--warn-bg); }
+    .st.na { color: var(--muted); background: var(--surface-3); }
+    /* Câu giải thích phán quyết đối chứng. Ghi bằng CHỮ, không chỉ bằng màu pill:
+       màu nói "có vấn đề", chữ nói vấn đề gì và nên nghi cái nào. */
+    .xcheck { margin: 8px 2px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
     .rename { display: grid; gap: 7px; }
     .rename label { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
     .rename-row { display: flex; gap: 8px; }
@@ -1350,6 +1368,42 @@
             </div>
             <div id="trip-list"></div>
           </div>
+
+          <!-- Báo động do THIẾT BỊ TẠI NHÀ MÁY phát, khác hẳn khối cảnh báo ở
+               trang Giám sát (thứ platform tự suy từ số đo). Đặt ở trang Báo cáo
+               vì đây là nhật ký để tra lại, không phải thứ cần nhìn liên tục. -->
+          <div class="rep-card" id="va-card" hidden>
+            <h2>Báo động của nhà máy</h2>
+            <p class="hint">
+              Nguồn phát lại cùng một dòng mỗi lần quét trong khi điều kiện còn đúng, nên
+              số dòng thô KHÔNG phải số việc. Bảng dưới đã gộp các dòng giống nhau thành
+              một việc, kèm số lần và khoảng thời gian. Nguồn gắn cùng một mức "nguy hiểm"
+              cho mọi dòng, nên hệ thống <b>không</b> tự xếp mức nặng nhẹ ở đây.
+            </p>
+            <div class="rep-row">
+              <label>Khoảng thời gian
+                <select id="va-win" class="field">
+                  <option value="1">24 giờ</option>
+                  <option value="7" selected>7 ngày</option>
+                  <option value="30">30 ngày</option>
+                  <option value="90">90 ngày</option>
+                </select>
+              </label>
+            </div>
+            <p class="hint" id="va-note" style="margin:8px 0 0"></p>
+            <div class="mini-wrap">
+              <table class="mini">
+                <thead><tr>
+                  <th scope="col">Thiết bị</th>
+                  <th scope="col">Việc</th>
+                  <th scope="col" class="r">Số lần</th>
+                  <th scope="col">Lần đầu</th>
+                  <th scope="col">Lần cuối</th>
+                </tr></thead>
+                <tbody id="va-body"><tr><td colspan="5" class="empty">Đang tải…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2043,6 +2097,77 @@
       return `<div class="row"><dt>${esc(label)}</dt><dd class="${extra || ""}">${val}</dd></div>`;
     }
 
+    /* ---------- ĐO THÊM: đồng hồ khí & đầu dò ---------- */
+
+    // Chỉ bồn được lắp đồng hồ khí mới có các cột này; bồn không có để NULL hết.
+    // Ẩn HẲN khối thay vì hiện mười hàng "--": một hàng "--" nói "cảm biến có mà
+    // lần này không đọc được", còn không có cảm biến là chuyện khác hẳn.
+    const GAS_FIELDS = [
+      ["gm_totalizer_nm3",  "Đồng hồ khí (tích luỹ)",      "Nm³"],
+      ["gm_flow_rate_nm3h", "Lưu lượng khí",               "Nm³/h"],
+      ["gm_pressure_kpa",   "Áp suất đồng hồ khí",         "kPa"],
+      ["gm_temperature_c",  "Nhiệt độ đồng hồ khí",        "°C"],
+      ["ps1_bar",           "Công tắc áp PS1",             "bar"],
+      ["ps2_bar",           "Công tắc áp PS2",             "bar"],
+      ["gd1_percent",       "Đầu dò khí GD1",              "%"],
+      ["gd2_percent",       "Đầu dò khí GD2",              "%"],
+      ["gd3_percent",       "Đầu dò khí GD3",              "%"],
+      // Nhãn nói rõ nó tự reset: bộ đếm này KHÔNG đơn điệu tăng (đã thấy về 0
+      // trong dữ liệu thật), nên hiện nó trơ sẽ mời người đọc tin một con số
+      // không đáng tin. Số lần nạp thật do detect_refills suy ra từ mức.
+      ["refill_counter",    "Bộ đếm nạp của nguồn (tự reset)", ""],
+    ];
+
+    function hasGas(d) {
+      return GAS_FIELDS.some(([k]) => d[k] !== null && d[k] !== undefined);
+    }
+
+    const XCHECK = {
+      match:        { cls: "on",  txt: "Khớp" },
+      disagree:     { cls: "off", txt: "Lệch" },
+      insufficient: { cls: "na",  txt: "Chưa đủ dữ liệu" },
+    };
+
+    // Đối chứng tiêu thụ: mức lỏng so với đồng hồ khí. Hai phép đo ĐỘC LẬP của hai
+    // đại lượng khác nhau (m³ lỏng, Nm³ khí) qua hai cảm biến khác nhau; tỉ lệ hoá
+    // khí giữa chúng không phải hằng số nên KHÔNG quy đổi cho nhau — tỉ số chỉ dùng
+    // để phát hiện sai lệch thô. Dữ liệu lấy từ /api/forecast đã fetch sẵn ở
+    // fcByPsn, nên khối này không thêm một request nào.
+    function xcheckBlock(psn) {
+      const g = (fcByPsn[psn] || {}).gas;
+      if (!g) return "";
+      const v = XCHECK[g.verdict] || XCHECK.insufficient;
+      const n = (x, digits) => x === null || x === undefined ? "--" : Number(x).toFixed(digits);
+      const band = `${n(g.reference_ratio_nm3_per_m3, 0)} (dải ${n(g.band_lo_nm3_per_m3, 0)}…${n(g.band_hi_nm3_per_m3, 0)})`;
+      return `
+        <div class="spec-group">
+          <h3>Đối chứng tiêu thụ</h3>
+          <span class="st ${v.cls}">${esc(v.txt)}</span>
+        </div>
+        <div class="meta-grid">
+          ${row("Rút từ mức lỏng", esc(`${g.liquid_net_l == null ? "--" : (Number(g.liquid_net_l) / 1000).toFixed(2)} m³`))}
+          ${row("Đếm ở đồng hồ khí", esc(`${n(g.gas_nm3, 0)} Nm³`))}
+          ${row("Tỉ lệ hoá khí", esc(`${n(g.ratio_nm3_per_m3, 0)} Nm³/m³`))}
+          ${row("Mốc đối chứng", esc(band))}
+          ${row("Số đoạn dùng được", esc(`${g.segments} · ${Number(g.active_days).toFixed(2)} ngày`))}
+          ${row("Bộ đếm bị reset", esc(String(g.counter_resets)))}
+        </div>
+        <p class="xcheck">${esc(g.detail)}</p>`;
+    }
+
+    function gasBlock(detail) {
+      if (!hasGas(detail)) return "";
+      return `
+        <div class="spec-group">
+          <h3>Đồng hồ khí &amp; đầu dò</h3>
+          <span class="note">chỉ có ở bồn được lắp các cảm biến này</span>
+        </div>
+        <div class="meta-grid">
+          ${GAS_FIELDS.map(([k, label, unit]) => row(label, esc(fmtNum(detail[k], unit)))).join("")}
+        </div>
+        ${xcheckBlock(detail.psn)}`;
+    }
+
     /* ---------- DỰ BÁO: hiển thị ---------- */
 
     // Cột "Còn lại" ở danh sách bồn. Ngưỡng màu khớp ngưỡng cảnh báo phía server
@@ -2172,6 +2297,7 @@
           ${row("Số SIM", esc(detail.sim_iccid ?? "--"))}
           ${row("Lần đo cuối", esc(fmtTime(detail.last_seen_at)))}
         </div>
+        ${gasBlock(detail)}
         <form class="rename" onsubmit="saveTerminal(event)">
           <label for="name-edit">Tên bồn</label>
           <div class="rename-row">
@@ -3187,6 +3313,53 @@
       return Math.min(365, 90 + Math.max(0, age));
     }
 
+    /* ---------- BÁO ĐỘNG CỦA NHÀ MÁY ---------- */
+
+    // Thẻ này TỰ ẨN khi không có dòng nào trong cả cửa sổ dài nhất: hai bồn hiện tại
+    // không phát báo động kiểu này, và một thẻ trống thường trực chỉ dạy người dùng
+    // bỏ qua khu vực đó. Có dữ liệu thì nó xuất hiện.
+    async function loadVendorAlarms() {
+      const card = document.getElementById("va-card");
+      const body = document.getElementById("va-body");
+      const note = document.getElementById("va-note");
+      if (!card || !body) return;
+      const days = Number(document.getElementById("va-win").value || 7);
+      const to = new Date();
+      const from = new Date(to.getTime() - days * 86400000);
+      try {
+        const out = await api(
+          `/api/alarms/vendor/summary?from=${encodeURIComponent(from.toISOString())}` +
+          `&to=${encodeURIComponent(to.toISOString())}`
+        );
+        if (!out.raw_total) {
+          // Cửa sổ ngắn rỗng chưa nói được gì; chỉ ẩn thẻ khi cửa sổ DÀI NHẤT cũng rỗng.
+          card.hidden = days >= 90;
+          body.innerHTML = `<tr><td colspan="5" class="empty">Không có báo động nào trong ${days} ngày gần nhất.</td></tr>`;
+          if (note) note.textContent = "";
+          return;
+        }
+        card.hidden = false;
+        // Nói cả hai con số: gộp bao nhiêu dòng thành bao nhiêu việc. Chỉ nói tỉ lệ
+        // phần trăm thì không ai kiểm được, mà con số này chính là thứ cần kiểm.
+        if (note) {
+          note.textContent =
+            `${out.raw_total} dòng thô → ${out.episodes_total} việc ` +
+            `(gộp ${Number(out.reduction_percent).toFixed(1)}%)`;
+        }
+        body.innerHTML = out.items.map(e => `<tr>
+          <td>${esc(e.device_id)}</td>
+          <td>${esc(e.message)}</td>
+          <td class="num">${esc(String(e.count))}</td>
+          <td>${esc(fmtWhen(e.first_raised_at))}</td>
+          <td>${esc(fmtWhen(e.last_raised_at))}</td></tr>`).join("");
+      } catch (e) {
+        if (e.name === "AuthError") return;
+        card.hidden = false;
+        body.innerHTML = `<tr><td colspan="5" class="empty">${esc(e.message)}</td></tr>`;
+        if (note) note.textContent = "";
+      }
+    }
+
     async function loadRefills() {
       const body = document.getElementById("refill-body");
       if (!body) return;
@@ -3876,7 +4049,7 @@
       document.querySelector(".page-title").textContent = VIEWS[name].title;
       if (name === "map") openMap();
       if (name === "planner") { renderPlanTankOptions(); updateMeasuredBtn(); renderPlanAssist(); loadPlanReadings(); }
-      if (name === "reports") { renderRepTankOptions(); loadRefills(); }
+      if (name === "reports") { renderRepTankOptions(); loadRefills(); loadVendorAlarms(); }
       // Tải MỖI LẦN mở: khác trang Cài đặt (nơi người dùng có thể đang gõ nửa dở),
       // ở đây không có gì để mất và số liệu cũ trên một trang chẩn đoán còn tệ hơn
       // một khoảnh khắc chờ.
@@ -3994,6 +4167,7 @@
 
       // Báo cáo
       document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); });
+      document.getElementById("va-win").addEventListener("change", loadVendorAlarms);
       document.getElementById("rp-scope").addEventListener("change", applyRpNote);
       document.getElementById("rp-open").addEventListener("click", openReport);
       document.getElementById("an-window").addEventListener("change", loadAnalytics);
