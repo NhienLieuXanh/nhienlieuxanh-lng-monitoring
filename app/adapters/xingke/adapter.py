@@ -125,6 +125,11 @@ class XingkeAdapter:
                 break
 
             for row in rows:
+                # ĐẾM TRƯỚC allowlist: source_rows là "nguồn gửi bao nhiêu", còn
+                # n_rows là "ta giữ bao nhiêu". Chênh lệch chính là
+                # dropped_foreign_psn — cổng này từng rò 3543 thiết bị của khách
+                # khác, nên khoảng cách đó là một con số cần thấy, không phải ẩn.
+                report.source_rows += 1
                 row_psn = str(row.get("psn") or psn).strip()
                 if not self._permitted(row_psn, report):
                     continue

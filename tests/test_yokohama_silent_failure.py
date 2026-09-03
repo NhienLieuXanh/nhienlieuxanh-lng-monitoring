@@ -19,7 +19,8 @@ một bản sửa biến ngày rỗng thật thành lỗi sẽ tệ hơn cái n�
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -224,3 +225,100 @@ def test_summary_chi_dem_khong_nha_text_loi() -> None:
     assert "10.20.30.40" not in out
     assert "GetRecordData" not in out
     assert "302" not in out
+
+
+# ------------------------- "logger chết" khác "đường ống hỏng" -------------------------
+
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+PSN = "YKH-TANK-01"
+
+
+def _rec(dt: datetime) -> dict:
+    return {
+        "dateTime": dt.strftime("%d/%m/%Y %H:%M"),
+        "receivedAt": dt.strftime("%d/%m/%Y %H:%M"),
+        "totalizer": 100000.0,
+        "flowRate": 0.0,
+        "pressure": 300.0,
+        "temperature": 25.0,
+        "tankVolume": 80.0,
+        "tankNumber": 10,
+        "tankPrecent": 48.0,
+        "pT1_Value": 3.0,
+        "pS1_Value": 3.0,
+        "pS2_Value": 2.0,
+        "tE1_Value": 25.0,
+        "gD1_Value": 1.0,
+        "gD2_Value": 0.2,
+        "gD3_Value": 0.0,
+    }
+
+
+class _MemClient:
+    def __init__(self, rows: list[dict]) -> None:
+        self.rows = rows
+
+    def iter_record_objects(self, params: dict):
+        yield from list(self.rows)
+
+    def get_json(self, path: str, params: dict | None = None) -> list:
+        return []
+
+    def close(self) -> None:
+        return None
+
+
+def _tel_adapter(rows: list[dict]) -> YokohamaAdapter:
+    settings = YokohamaSettings(enabled=False, psn=PSN)
+    return YokohamaAdapter(settings, client=_MemClient(rows))  # type: ignore[arg-type]
+
+
+def test_nguon_gui_rong_thi_source_rows_bang_0() -> None:
+    """Đường ống hỏng hoặc cổng không có gì: nguồn không gửi object nào."""
+    res = _tel_adapter([]).fetch_telemetry(PSN, datetime.now(tz=VN).date())
+    assert res.report.n_rows == 0
+    assert res.report.source_rows == 0
+    assert res.report.newest_source_at is None
+
+
+def test_nguon_gui_du_lieu_cu_thi_source_rows_lon_hon_0() -> None:
+    """Logger nhà máy đã chết nhưng đường ống BÌNH THƯỜNG.
+
+    Đây là bài phân biệt. Cả hai ca đều cho ``n_rows=0`` và đi vào
+    ``psns_no_data``, nên trước khi có ``source_rows`` chúng không thể tách ra —
+    mà một ca cần thay thiết bị, ca kia cần sửa mạng hoặc URL.
+    """
+    old = datetime.now(tz=VN) - timedelta(days=40)
+    res = _tel_adapter([_rec(old), _rec(old - timedelta(minutes=1))]).fetch_telemetry(
+        PSN, datetime.now(tz=VN).date()
+    )
+    assert res.report.n_rows == 0, "dòng cũ không được giữ cho ngày hôm nay"
+    assert res.report.source_rows >= 1, "nhưng nguồn CÓ gửi dữ liệu"
+    assert res.report.newest_source_at is not None
+    # Mốc phải là UTC ISO để so sánh chuỗi ra đúng thứ tự khi gộp.
+    assert res.report.newest_source_at.endswith("+00:00")
+    assert res.report.newest_source_at < datetime.now(tz=VN).astimezone(
+        ZoneInfo("UTC")
+    ).isoformat()
+
+
+def test_report_cua_stream_khong_bi_bo_di() -> None:
+    """``_ensure_cache`` từng tạo report cục bộ rồi bỏ — nên mọi số của nguồn này
+    trong ``ingest_runs`` luôn bằng 0 bất kể thực tế."""
+    now = datetime.now(tz=VN)
+    res = _tel_adapter([_rec(now)]).fetch_telemetry(PSN, now.date())
+    assert res.report.n_rows == 1
+    assert res.report.source_rows == 1
+    # provenance đến từ report của stream, không phải từ result.report rỗng
+    assert res.report.resolved_from, "resolved_from phải được mang sang"
+
+
+def test_stream_report_chi_gan_mot_lan_moi_cycle() -> None:
+    """Stream chạy một lần cho mọi ngày; cộng nó vào từng ngày là đếm trùng."""
+    now = datetime.now(tz=VN)
+    yesterday = now - timedelta(days=1)
+    ad = _tel_adapter([_rec(now), _rec(yesterday)])
+    first = ad.fetch_telemetry(PSN, yesterday.date())
+    second = ad.fetch_telemetry(PSN, now.date())
+    assert first.report.source_rows + second.report.source_rows == 2
+    assert 0 in (first.report.source_rows, second.report.source_rows)

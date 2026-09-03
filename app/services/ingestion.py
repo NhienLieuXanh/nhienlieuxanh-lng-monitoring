@@ -450,6 +450,7 @@ def _merge_mapping(
     """Gộp MappingReport. Top-level giữ cho CLI; by_source tránh ghi đè provenance."""
     acc: dict[str, Any] = stats.mapping
     acc["n_rows"] = int(acc.get("n_rows", 0)) + report.n_rows
+    acc["source_rows"] = int(acc.get("source_rows", 0)) + report.source_rows
     present = cast(dict[str, int], acc.setdefault("present", {}))
     for name, n in report.present.items():
         present[name] = present.get(name, 0) + n
@@ -469,4 +470,13 @@ def _merge_mapping(
     by = acc.setdefault("by_source", {})
     bucket: dict[str, Any] = by.setdefault(source, {})
     bucket["n_rows"] = bucket.get("n_rows", 0) + report.n_rows
+    bucket["source_rows"] = bucket.get("source_rows", 0) + report.source_rows
+    # GIỮ mốc mới nhất, không cộng: chuỗi ISO ở UTC nên max() ra đúng thứ tự.
+    if report.newest_source_at is not None:
+        prev = bucket.get("newest_source_at")
+        bucket["newest_source_at"] = (
+            report.newest_source_at
+            if prev is None
+            else max(prev, report.newest_source_at)
+        )
     bucket.setdefault("resolved_from", {}).update(report.resolved_from)

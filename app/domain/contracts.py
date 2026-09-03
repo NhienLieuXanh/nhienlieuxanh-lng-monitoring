@@ -188,6 +188,17 @@ class MappingReport:
     """
 
     n_rows: int = 0
+    # Số object NGUỒN thực sự gửi, trước mọi bộ lọc của ta. ``n_rows`` là số dòng
+    # GIỮ LẠI, nên hai con số bằng 0 cùng lúc có hai nghĩa hoàn toàn khác nhau mà
+    # trước đây không phân biệt được: nguồn gửi rỗng (đường ống hỏng, hoặc cổng
+    # không có gì) so với nguồn gửi đầy nhưng toàn bộ cũ hơn cửa sổ (logger nhà
+    # máy đã chết, đường ống BÌNH THƯỜNG). Đo được trên production 2026-09-03:
+    # ``no_data`` một mình không nói được bên nào.
+    source_rows: int = 0
+    # Mốc thời gian MỚI NHẤT nguồn gửi, ISO 8601 ở UTC (so sánh chuỗi ra đúng thứ
+    # tự). Đây là câu trả lời trực tiếp cho "thiết bị còn báo không", độc lập với
+    # việc ta có giữ dòng nào lại hay không.
+    newest_source_at: str | None = None
     present: dict[str, int] = field(default_factory=dict)
     resolved_from: dict[str, str] = field(default_factory=dict)
     unmapped_keys: set[str] = field(default_factory=set)
@@ -210,6 +221,8 @@ class MappingReport:
     def as_dict(self) -> dict[str, Any]:
         return {
             "n_rows": self.n_rows,
+            "source_rows": self.source_rows,
+            "newest_source_at": self.newest_source_at,
             "coverage": self.coverage(),
             "present": self.present,
             "resolved_from": self.resolved_from,

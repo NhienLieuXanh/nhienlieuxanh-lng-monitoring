@@ -26,6 +26,8 @@ from app.domain.contracts import (
 
 log = logging.getLogger(__name__)
 
+UTC = ZoneInfo("UTC")
+
 RECORDS_PATH = "/Data/GetRecordData"
 ALARMS_PATH = "/Alarm/GetAlarmData"
 # Đo được: 12 bản ghi = 16 KB → 1440 bản ghi/ngày ≈ 1,9 MB.
@@ -51,6 +53,12 @@ class YokohamaAdapter:
         self._day_cache: dict[date, list] = {}
         self._seen: set[tuple[date, datetime]] = set()
         self._cache_loaded_from: date | None = None
+        # Report của LẦN STREAM (một lần mỗi cycle), chờ gắn vào FetchResult đầu
+        # tiên. Trước đây ``_ensure_cache`` tạo report cục bộ rồi bỏ đi, nên
+        # rejected_rows / zero_as_missing / resolved_from / unmapped_keys của nguồn
+        # này LUÔN bằng 0 trong ``ingest_runs`` bất kể thực tế — một con số 0 không
+        # có nghĩa còn tệ hơn không có con số nào.
+        self._stream_report: MappingReport | None = None
 
     @property
     def vendor_tz(self) -> ZoneInfo:
@@ -64,6 +72,7 @@ class YokohamaAdapter:
         self._day_cache.clear()
         self._seen.clear()
         self._cache_loaded_from = None
+        self._stream_report = None
 
     def _permitted(self, psn: str, report: MappingReport) -> bool:
         if psn in self._allowed:
@@ -83,6 +92,19 @@ class YokohamaAdapter:
         result.total = len(readings)
         result.pages_fetched = 1 if self._cache_loaded_from is not None else 0
         result.report.n_rows = len(readings)
+        # Gắn report của lần stream vào ĐÚNG MỘT FetchResult mỗi cycle: stream là
+        # việc của cả cycle (một lần cho mọi ngày), nên cộng nó vào từng ngày sẽ
+        # đếm trùng.
+        pending = self._stream_report
+        if pending is not None:
+            self._stream_report = None
+            result.report.source_rows = pending.source_rows
+            result.report.newest_source_at = pending.newest_source_at
+            result.report.rejected_rows += pending.rejected_rows
+            result.report.zero_as_missing += pending.zero_as_missing
+            result.report.resolved_from.update(pending.resolved_from)
+            result.report.unmapped_keys |= pending.unmapped_keys
+            result.report.errors.extend(pending.errors)
         for r in readings:
             for f in self.measure_fields:
                 if getattr(r, f, None) is not None:
@@ -112,6 +134,7 @@ class YokohamaAdapter:
         report = MappingReport(fields=self.measure_fields)
         cutoff = datetime.combine(day, time.min, tzinfo=tz)
         n = 0
+        newest: datetime | None = None
         for obj in self._client.iter_record_objects(
             {
                 "device": "all",
@@ -130,6 +153,12 @@ class YokohamaAdapter:
             )
             if reading is None:
                 continue
+            # Ghi mốc mới nhất TRƯỚC khi xét cutoff: stream là newest-first, nên
+            # nếu bản ghi đầu tiên đã cũ hơn cửa sổ thì vòng lặp break ngay và đây
+            # là chỗ DUY NHẤT còn thấy được "nguồn báo lần cuối lúc nào". Không có
+            # nó, "logger nhà máy đã chết" và "đường ống hỏng" trông giống nhau.
+            if newest is None:
+                newest = reading.sampled_at
             local_day = reading.sampled_at.astimezone(tz).date()
             if datetime.combine(local_day, time.min, tzinfo=tz) < cutoff:
                 break
@@ -138,6 +167,11 @@ class YokohamaAdapter:
                 continue
             self._seen.add(key)
             self._day_cache.setdefault(local_day, []).append(reading)
+        report.source_rows = n
+        report.newest_source_at = (
+            None if newest is None else newest.astimezone(UTC).isoformat()
+        )
+        self._stream_report = report
         self._cache_loaded_from = day
         log.info(
             "ykh: stream %s object, cache %s ngày, report zero_as_missing=%s",
