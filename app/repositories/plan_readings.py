@@ -63,6 +63,13 @@ def upsert(
             set_={"volume_l": volume_l, "entered_by": by, "updated_at": func.now()},
         )
         .returning(PlanReading)
+        # populate_existing là BẮT BUỘC, không phải tối ưu. Không có nó, khi
+        # ``(psn, reading_date)`` đã nằm trong identity map của session thì ORM
+        # trả về object CŨ và bỏ qua giá trị RETURNING vừa ghi — hàm này báo
+        # thành công kèm số cũ. Mỗi request HTTP một session mới nên đường web
+        # không lộ, nhưng hai lần upsert trong CÙNG một session (nhập theo lô,
+        # import, hay test) thì lộ ngay.
+        .execution_options(populate_existing=True)
     )
     return session.execute(stmt).scalar_one()
 
@@ -116,5 +123,8 @@ def save_settings(
         .values(**values)
         .on_conflict_do_update(index_elements=["psn"], set_=set_)
         .returning(PlanSetting)
+        # Cùng lý do như ``upsert``: không có cờ này thì lần lưu thứ hai trong
+        # cùng một session trả về thông số CŨ.
+        .execution_options(populate_existing=True)
     )
     return session.execute(stmt).scalar_one()
