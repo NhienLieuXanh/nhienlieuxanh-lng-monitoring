@@ -163,10 +163,31 @@ TELEMETRY_FIELDS: tuple[FieldSpec, ...] = (
 MEASURE_TARGETS: tuple[str, ...] = tuple(s.target for s in TELEMETRY_FIELDS)
 
 TIMESTAMP_ALIASES: tuple[str, ...] = ("dateTime", "receivedAt")
-TIMESTAMP_FORMATS: tuple[str, ...] = (
+# Thứ tự ngày/tháng là CẤU HÌNH, không phải suy đoán. Cùng một cổng đã được đo
+# trả cả hai: capture qua browser cuối tháng 8 là dd/mm ("27/08/2026", 27 không
+# thể là tháng), còn client trên Vercel ngày 2026-09-03 nhận mm/dd ("09/03/2026"
+# cho ngày 3 tháng 9). Ghim ``Accept-Language: vi-VN`` KHÔNG đổi được điều đó —
+# đã thử trên production. Nguyên nhân phía cổng vẫn chưa biết.
+#
+# Chỉ MỘT thứ tự được thử, không bao giờ cả hai: thử cả hai nghĩa là với ngày mơ
+# hồ như "03/09" ta sẽ chọn bừa một cách đọc, và một lần chọn sai ghi vào lịch sử
+# thì không phát hiện được nữa. ``_check_day_month_swap`` trong adapter là tripwire
+# cho cả hai chiều, và ngày có thành phần > 12 thì thứ tự sai fail luôn ở strptime
+# (hiện ra qua ``rejected_rows``), nên không có chiều nào im lặng.
+TIMESTAMP_FORMATS_DMY: tuple[str, ...] = (
     "%d/%m/%Y %H:%M:%S",
     "%d/%m/%Y %H:%M",
 )
+TIMESTAMP_FORMATS_MDY: tuple[str, ...] = (
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M",
+)
+TIMESTAMP_ORDERS: dict[str, tuple[str, ...]] = {
+    "dmy": TIMESTAMP_FORMATS_DMY,
+    "mdy": TIMESTAMP_FORMATS_MDY,
+}
+# Giữ tên cũ cho code/test đã tham chiếu.
+TIMESTAMP_FORMATS: tuple[str, ...] = TIMESTAMP_FORMATS_DMY
 
 IGNORED_KEYS: frozenset[str] = frozenset(
     norm_key(k) for k in ("receivedAt", "tankNumber")
@@ -177,11 +198,16 @@ class TimestampParseError(ValueError):
     """Không parse được timestamp. Dòng bị loại, không đoán giờ."""
 
 
-def parse_vendor_ts(raw: Any, tz: ZoneInfo) -> datetime:
+def parse_vendor_ts(raw: Any, tz: ZoneInfo, *, order: str = "dmy") -> datetime:
     if raw is None or raw == "":
         raise TimestampParseError("timestamp rỗng")
+    formats = TIMESTAMP_ORDERS.get(order)
+    if formats is None:
+        raise TimestampParseError(
+            f"thứ tự ngày {order!r} không hợp lệ; chọn {sorted(TIMESTAMP_ORDERS)}"
+        )
     s = str(raw).strip()
-    for fmt in TIMESTAMP_FORMATS:
+    for fmt in formats:
         try:
             naive = datetime.strptime(s, fmt)
         except ValueError:

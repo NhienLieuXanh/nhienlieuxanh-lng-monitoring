@@ -397,3 +397,62 @@ def test_ngay_mo_ho_nhung_cach_doc_kia_cung_ngoai_cua_so_thi_im() -> None:
     res = _tel_adapter([_rec(old)]).fetch_telemetry(PSN, datetime.now(tz=VN).date())
     assert res.report.n_rows == 0
     assert res.report.source_rows == 1
+
+
+# ------------------------- thứ tự ngày là cấu hình -------------------------
+
+
+def _tel_adapter_order(rows: list[dict], order: str) -> YokohamaAdapter:
+    settings = YokohamaSettings(enabled=False, psn=PSN, timestamp_order=order)  # type: ignore[arg-type]
+    return YokohamaAdapter(settings, client=_MemClient(rows))  # type: ignore[arg-type]
+
+
+def test_mdy_doc_dung_ngay_cong_dang_gui() -> None:
+    """Ca production: cổng gửi mm/dd. Đặt đúng thứ tự thì dữ liệu VÀO ĐƯỢC."""
+    now = datetime.now(tz=VN).replace(second=0, microsecond=0)
+    rec = _rec(now)
+    mdy = f"{now.month:02d}/{now.day:02d}/{now.year} {now:%H:%M}"
+    rec["dateTime"] = mdy
+    rec["receivedAt"] = mdy
+
+    # dmy: hoặc bị guard chặn (ngày mơ hồ), hoặc bị loại (thành phần > 12).
+    res_dmy_ok = True
+    try:
+        r = _tel_adapter_order([rec], "dmy").fetch_telemetry(PSN, now.date())
+        res_dmy_ok = r.report.n_rows > 0
+    except YokohamaSchemaError:
+        res_dmy_ok = False
+    assert res_dmy_ok is False, "đọc sai thứ tự KHÔNG được âm thầm nhận"
+
+    # mdy: đúng thứ tự -> dòng vào được, và mốc là bây giờ.
+    res = _tel_adapter_order([rec], "mdy").fetch_telemetry(PSN, now.date())
+    assert res.report.n_rows == 1
+    assert res.readings[0].sampled_at.astimezone(VN).date() == now.date()
+
+
+def test_thu_tu_khong_hop_le_bi_tu_choi() -> None:
+    from app.adapters.yokohama.mapping import TimestampParseError, parse_vendor_ts
+
+    with pytest.raises(TimestampParseError, match="không hợp lệ"):
+        parse_vendor_ts("27/08/2026 12:00", VN, order="ymd")
+
+
+def test_chi_thu_MOT_thu_tu_khong_bao_gio_ca_hai() -> None:
+    """Thử cả hai nghĩa là chọn bừa với ngày mơ hồ — một lần sai là hỏng lịch sử."""
+    from app.adapters.yokohama.mapping import TimestampParseError, parse_vendor_ts
+
+    # 27 không thể là tháng: dưới mdy phải THẤT BẠI, không được lặng lẽ lùi về dmy.
+    with pytest.raises(TimestampParseError):
+        parse_vendor_ts("27/08/2026 12:00", VN, order="mdy")
+    # và ngược lại
+    with pytest.raises(TimestampParseError):
+        parse_vendor_ts("08/27/2026 12:00", VN, order="dmy")
+
+
+def test_ngay_mo_ho_hai_thu_tu_ra_hai_ket_qua_khac_nhau() -> None:
+    from app.adapters.yokohama.mapping import parse_vendor_ts
+
+    a = parse_vendor_ts("03/09/2026 10:00", VN, order="dmy")
+    b = parse_vendor_ts("03/09/2026 10:00", VN, order="mdy")
+    assert a.astimezone(VN).date() == date(2026, 9, 3)
+    assert b.astimezone(VN).date() == date(2026, 3, 9)

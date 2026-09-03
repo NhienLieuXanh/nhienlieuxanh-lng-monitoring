@@ -150,6 +150,7 @@ class YokohamaAdapter:
                 vendor_tz=tz,
                 report=report,
                 store_raw=self._store_raw,
+                ts_order=self._settings.timestamp_order,
             )
             if reading is None:
                 continue
@@ -167,7 +168,9 @@ class YokohamaAdapter:
                 continue
             self._seen.add(key)
             self._day_cache.setdefault(local_day, []).append(reading)
-        self._check_day_month_swap(day, newest, cutoff, now_local, tz)
+        self._check_day_month_swap(
+            newest, cutoff, now_local, tz, self._settings.timestamp_order
+        )
         report.source_rows = n
         report.newest_source_at = (
             None if newest is None else newest.astimezone(UTC).isoformat()
@@ -183,11 +186,11 @@ class YokohamaAdapter:
 
     @staticmethod
     def _check_day_month_swap(
-        day: date,
         newest: datetime | None,
         cutoff: datetime,
         now_local: datetime,
         tz: ZoneInfo,
+        order: str,
     ) -> None:
         """Bắt ngày bị đọc đảo tháng, thay vì âm thầm loại sạch dữ liệu.
 
@@ -219,14 +222,14 @@ class YokohamaAdapter:
         if not (cutoff <= swapped <= now_local + timedelta(hours=1)):
             return
         raise YokohamaSchemaError(
-            f"ngày mơ hồ: nguồn gửi ngày {nl.day:02d}/{nl.month:02d} cho cửa sổ "
-            f"xin từ {cutoff.date().isoformat()}. Đọc dd/mm ra "
-            f"{nl.date().isoformat()} (ngoài cửa sổ, bị loại sạch); đọc mm/dd ra "
-            f"{swapped.date().isoformat()} (trong cửa sổ). Giờ khớp "
-            f"{nl.strftime('%H:%M')} nên dữ liệu là SỐNG, không phải cũ.",
+            f"ngày mơ hồ: đang đọc theo {order!r} ra {nl.date().isoformat()} "
+            f"(ngoài cửa sổ xin từ {cutoff.date().isoformat()}, nên bị loại "
+            f"sạch), còn cách đọc đảo ngày/tháng ra {swapped.date().isoformat()} "
+            f"(trong cửa sổ). Giờ khớp {nl.strftime('%H:%M')} nên dữ liệu là "
+            f"SỐNG, không phải cũ.",
             remediation=(
-                "cổng render ngày theo CultureInfo.CurrentCulture; đặt "
-                "YOKOHAMA_ACCEPT_LANGUAGE cho đúng culture dd/mm rồi chạy lại"
+                "đặt YOKOHAMA_TIMESTAMP_ORDER cho đúng thứ tự cổng đang gửi "
+                "(dmy hoặc mdy) rồi chạy lại một cycle"
             ),
         )
 
@@ -266,6 +269,7 @@ class YokohamaAdapter:
                 row,
                 site_code=self._settings.site_code,
                 vendor_tz=self.vendor_tz,
+                ts_order=self._settings.timestamp_order,
             )
             if alarm is not None:
                 out.append(alarm)

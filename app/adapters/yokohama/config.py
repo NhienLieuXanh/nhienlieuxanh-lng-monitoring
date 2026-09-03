@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import Field, model_validator
@@ -35,6 +36,11 @@ class YokohamaSettings(BaseSettings):
     # "09/03/2026" cho ngày 3 tháng 9, còn capture qua browser là "27/08/2026".
     # Ghim header để định dạng trên đường truyền là XÁC ĐỊNH, không phải đoán.
     accept_language: str = "vi-VN,vi;q=0.9"
+    # Thứ tự ngày/tháng cổng thực sự gửi. Mặc định ``dmy`` vì đó là những gì
+    # capture discovery ghi được; production ngày 2026-09-03 đo được ``mdy``, nên
+    # môi trường nào thấy mm/dd phải đặt YOKOHAMA_TIMESTAMP_ORDER=mdy. Không tự
+    # đoán: xem ghi chú ở mapping.TIMESTAMP_ORDERS.
+    timestamp_order: Literal["dmy", "mdy"] = "dmy"
     timeout_seconds: float = 30.0
     connect_timeout_seconds: float = 10.0
     max_stream_bytes: int = Field(8 * 1024 * 1024, ge=64)

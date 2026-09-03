@@ -27,13 +27,14 @@ def normalize_reading(
     vendor_tz: ZoneInfo,
     report: MappingReport,
     store_raw: bool = False,
+    ts_order: str = "dmy",
 ) -> NormalizedTelemetry | None:
     index = M.build_index(row)
     M.record_unmapped(index, report)
 
     raw_ts = M.find_timestamp(index)
     try:
-        sampled_at = M.parse_vendor_ts(raw_ts, vendor_tz)
+        sampled_at = M.parse_vendor_ts(raw_ts, vendor_tz, order=ts_order)
     except M.TimestampParseError as exc:
         report.rejected_rows += 1
         report.errors.append(("sampled_at", str(exc)))
@@ -79,10 +80,11 @@ def normalize_alarm(
     *,
     site_code: str,
     vendor_tz: ZoneInfo,
+    ts_order: str = "dmy",
 ) -> NormalizedAlarm | None:
     raw_ts = row.get("createAt") or row.get("create_at")
     try:
-        raised_at = M.parse_vendor_ts(raw_ts, vendor_tz)
+        raised_at = M.parse_vendor_ts(raw_ts, vendor_tz, order=ts_order)
     except M.TimestampParseError:
         log.warning("ykh: loại báo động vì timestamp %r", raw_ts)
         return None
