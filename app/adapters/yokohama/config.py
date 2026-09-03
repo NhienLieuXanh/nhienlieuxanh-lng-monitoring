@@ -30,8 +30,16 @@ class YokohamaSettings(BaseSettings):
     timeout_seconds: float = 30.0
     connect_timeout_seconds: float = 10.0
     max_stream_bytes: int = Field(8 * 1024 * 1024, ge=64)
-    # 20 s chưa đo với stream cả ngày (~1,9 MB). Trần byte mới là chốt thật.
-    max_stream_seconds: float = Field(60.0, gt=0)
+    # Trần này phải NHỎ HƠN HẲN ngân sách của cả function, không bằng nó.
+    # ``vercel.json`` cho ``app/main.py`` 60 s cho TOÀN BỘ một cycle: fetch nguồn
+    # kia, stream nguồn này, lấy báo động, rồi ghi DB. Đặt trần stream bằng đúng
+    # 60 s nghĩa là riêng nó có thể ăn hết ngân sách và function bị kill giữa
+    # cycle — mất luôn dữ liệu nguồn kia, thứ đang chạy được.
+    # Chọn một nửa. Nếu 25 s không đủ cho cửa sổ đang cấu hình thì stream bị cắt
+    # và báo lỗi schema, mà lỗi đó KHÔNG fatal — nguồn này ngừng, nguồn kia vẫn
+    # nạp. Đó là chiều hỏng đúng.
+    # ``tests/test_deploy_budget.py`` giữ quan hệ này khỏi lệch âm thầm.
+    max_stream_seconds: float = Field(25.0, gt=0)
 
     @model_validator(mode="after")
     def _enabled_needs_url(self) -> YokohamaSettings:

@@ -27,6 +27,15 @@ ngày trên lịch sử phút và chỉ stream từ bản ghi mới nhất, nên
 ingest của nguồn kia. Gọp giờ + xoá phút cũ là **quyết định hoãn**: ~1,9 MB/ngày
 ≈ 130 MB/năm trên Neon 512 MB — làm khi `/api/health` báo dung lượng `degraded`.
 
+Vì cổng đó bỏ qua bộ lọc ngày, **mỗi** cycle stream lại từ bản ghi mới nhất lùi về
+00:00 của ngày cũ nhất trong cửa sổ. Với nhịp 30 phút của
+`.github/workflows/ingest.yml` và `INGEST_DAYS_BACK=1`, đó là 24…48 h dữ liệu mỗi
+lần (~1,9…3,8 MB), khoảng **182 MB/ngày** kéo từ cổng nguồn. Cũng vì thế
+`YOKOHAMA_MAX_STREAM_SECONDS` là **một nửa** `maxDuration` trong `vercel.json`,
+không phải bằng nó: một cycle còn phải fetch nguồn kia, lấy báo động và ghi DB, nên
+trần stream bằng cả ngân sách sẽ làm function bị kill giữa cycle và mất luôn dữ
+liệu nguồn đang chạy được. `tests/test_deploy_budget.py` giữ hai quan hệ này.
+
 ## Đăng nhập
 
 Dashboard yêu cầu đăng nhập bằng **chính tài khoản cổng telemetry**; app không lưu
