@@ -95,6 +95,10 @@ class Sample:
     at: datetime
     volume_l: float | None = None
     pressure_mpa: float | None = None
+    #: Đồng hồ khí TÍCH LUỸ, Nm³. Chỉ nguồn có đồng hồ khí mới điền; nguồn không
+    #: có để None. Đây là đại lượng ĐỘC LẬP với ``volume_l`` — không quy đổi cho
+    #: nhau được (xem ``estimate_dual_consumption``).
+    totalizer_nm3: float | None = None
 
 
 def noise_floor_l(capacity_l: float | None) -> float:
@@ -376,6 +380,189 @@ def _confidence(*, active_days: float, coverage: float, full_days: int) -> Confi
     if active_days >= 0.5:
         return "low"
     return "none"
+
+
+# --------------------------------------------------------------------------- #
+# Tiêu thụ đo bằng HAI đường độc lập: mức lỏng và đồng hồ khí
+# --------------------------------------------------------------------------- #
+
+#: Tỉ lệ hoá khí đo được trên chính nhà máy: 61 đoạn, tổng 513,9 Nm³ khí cho mỗi
+#: m³ lỏng. KHÔNG dùng để quy đổi. Biên độ TỪNG ĐOẠN là 382…1249 — quá rộng để
+#: đổi một đại lượng sang đại lượng kia, nhưng tổng trên cửa sổ dài thì ổn định,
+#: nên nó dùng được làm ĐỐI CHỨNG.
+VAPORIZATION_NM3_PER_M3 = 514.0
+
+#: Dải chấp nhận cho tỉ số TỔNG. Rộng có chủ ý (0,5x…2x): mục tiêu là bắt sai
+#: lệch THÔ — đồng hồ khí đứng, sai đơn vị 1000 lần, hoặc một lần nạp không được
+#: ghi — chứ không phải bắt lệch hiệu chuẩn. Dải hẹp hơn sẽ báo động oan vì biên
+#: độ từng đoạn vốn đã 382…1249.
+RATIO_LO = VAPORIZATION_NM3_PER_M3 * 0.5
+RATIO_HI = VAPORIZATION_NM3_PER_M3 * 2.0
+
+#: Dưới mức này thì không phát tỉ số. Một cửa sổ ngắn có thể ra bất cứ số nào.
+MIN_RATIO_SEGMENTS = 20
+MIN_RATIO_ACTIVE_DAYS = 1.0
+
+DualVerdict = Literal["match", "disagree", "insufficient"]
+
+
+@dataclass(frozen=True, slots=True)
+class DualConsumption:
+    """Tiêu thụ đo hai lần, hai đường, trên CÙNG một tập đoạn.
+
+    Vì sao phát cả hai chứ không chọn một: mức lỏng và đồng hồ khí là hai phép đo
+    của hai đại lượng khác nhau (m³ lỏng và Nm³ khí), qua hai cảm biến khác nhau,
+    và tỉ lệ hoá khí giữa chúng KHÔNG phải hằng số (đo được 382…1249 trên từng
+    đoạn). Chọn một là bỏ mất một phép đo độc lập; quy đổi một cái sang cái kia là
+    bịa ra độ chính xác không tồn tại. Giữ cả hai thì chúng đối chứng lẫn nhau —
+    cùng cơ chế với ``volume_percent`` (vendor) so với ``fill_percent`` (server
+    tính) ở tầng cảnh báo.
+
+    ``liquid_net_l`` CỐ Ý không chặn nhiễu, khác ``ConsumptionEstimate.drawdown_l``.
+    Chặn nhiễu là đúng cho con số "dùng bao nhiêu lít một ngày": nó bỏ dao động
+    cảm biến thay vì cộng dồn chúng. Nhưng nó chặn MỘT CHIỀU — bỏ mọi bước tụt
+    nhỏ, giữ mọi bước tăng nhỏ — nên với một TỈ SỐ nó tạo lệch có hệ thống theo
+    một hướng. Tổng có dấu thì nhiễu lên và nhiễu xuống triệt tiêu nhau.
+    """
+
+    liquid_net_l: float | None
+    gas_nm3: float | None
+    ratio_nm3_per_m3: float | None
+    counter_resets: int
+    refills_skipped: int
+    segments: int
+    active_days: float
+    verdict: DualVerdict
+    detail: str
+    #: Mốc và dải đi KÈM kết quả, không để người dùng số này phải tự tra. Một
+    #: client hard-code 514 rồi hôm nào ta hiệu chỉnh lại mốc là nó lệch âm thầm.
+    reference_ratio_nm3_per_m3: float = VAPORIZATION_NM3_PER_M3
+    band_lo_nm3_per_m3: float = RATIO_LO
+    band_hi_nm3_per_m3: float = RATIO_HI
+
+
+def estimate_dual_consumption(
+    samples: list[Sample],
+    *,
+    capacity_l: float | None,
+) -> DualConsumption:
+    """Đo tiêu thụ bằng cả mức lỏng và đồng hồ khí, rồi đối chứng.
+
+    Chỉ dùng đoạn có ĐỦ hai phép đo ở cả hai đầu. Loại trừ giống hệt
+    ``estimate_consumption`` — khoảng trống dài và đoạn chứa lần nạp — vì hai con
+    số chỉ so được với nhau khi chúng đo trên cùng một tập đoạn. Nếu tính khí
+    trên mọi đoạn nhưng lỏng thì bỏ đoạn nạp, tỉ số sẽ lệch mà không ai thấy vì
+    sai lệch đó nằm trong định nghĩa, không nằm trong dữ liệu.
+    """
+    pts = [
+        (s.at, float(s.volume_l), float(s.totalizer_nm3))
+        for s in samples
+        if s.volume_l is not None and s.totalizer_nm3 is not None
+    ]
+    pts.sort(key=lambda p: p[0])
+
+    refill = refill_floor_l(capacity_l)
+    liquid_net = 0.0
+    gas = 0.0
+    resets = 0
+    refills = 0
+    segments = 0
+    active_s = 0.0
+
+    for (t0, v0, g0), (t1, v1, g1) in pairwise(pts):
+        gap = t1 - t0
+        if gap > MAX_GAP:
+            continue
+        dv = v1 - v0
+        if dv >= refill:
+            refills += 1
+            continue
+        dg = g1 - g0
+        if dg < 0:
+            # Bộ đếm bị reset (đã quan sát: totalizer về 0). Không có cách nào
+            # biết nó đã đếm tới đâu trước khi reset, nên đoạn này không dùng
+            # được cho CẢ hai số — bỏ, và đếm lại để người đọc biết.
+            resets += 1
+            continue
+        segments += 1
+        active_s += gap.total_seconds()
+        liquid_net += -dv
+        gas += dg
+
+    active_days = active_s / 86400.0
+
+    if segments < MIN_RATIO_SEGMENTS or active_days < MIN_RATIO_ACTIVE_DAYS:
+        return DualConsumption(
+            liquid_net_l=liquid_net if segments else None,
+            gas_nm3=gas if segments else None,
+            ratio_nm3_per_m3=None,
+            counter_resets=resets,
+            refills_skipped=refills,
+            segments=segments,
+            active_days=active_days,
+            verdict="insufficient",
+            detail=(
+                f"cần ≥{MIN_RATIO_SEGMENTS} đoạn và ≥{MIN_RATIO_ACTIVE_DAYS:g} ngày "
+                f"có dữ liệu, hiện có {segments} đoạn / {active_days:.2f} ngày"
+            ),
+        )
+
+    if liquid_net <= 0:
+        return DualConsumption(
+            liquid_net_l=liquid_net,
+            gas_nm3=gas,
+            ratio_nm3_per_m3=None,
+            counter_resets=resets,
+            refills_skipped=refills,
+            segments=segments,
+            active_days=active_days,
+            verdict="insufficient",
+            detail=(
+                "mức lỏng không giảm trên cửa sổ này nên không lập được tỉ số "
+                f"(net {liquid_net:+.1f} L)"
+            ),
+        )
+
+    ratio = gas / (liquid_net / 1000.0)
+    if RATIO_LO <= ratio <= RATIO_HI:
+        return DualConsumption(
+            liquid_net_l=liquid_net,
+            gas_nm3=gas,
+            ratio_nm3_per_m3=ratio,
+            counter_resets=resets,
+            refills_skipped=refills,
+            segments=segments,
+            active_days=active_days,
+            verdict="match",
+            detail=(
+                f"{ratio:.0f} Nm³/m³, trong dải {RATIO_LO:.0f}…{RATIO_HI:.0f} "
+                f"quanh mốc đo được {VAPORIZATION_NM3_PER_M3:.0f}"
+            ),
+        )
+
+    if ratio < RATIO_LO:
+        why = (
+            "khí đếm được quá ít so với lượng lỏng đã rút — nghi đồng hồ khí "
+            "đứng hoặc đếm thiếu"
+        )
+    else:
+        why = (
+            "khí đếm được quá nhiều so với lượng lỏng đã rút — nghi có lần nạp "
+            "không được ghi (mức dâng lên che mất phần đã rút), hoặc cảm biến mức sai"
+        )
+    return DualConsumption(
+        liquid_net_l=liquid_net,
+        gas_nm3=gas,
+        ratio_nm3_per_m3=ratio,
+        counter_resets=resets,
+        refills_skipped=refills,
+        segments=segments,
+        active_days=active_days,
+        verdict="disagree",
+        detail=(
+            f"{ratio:.0f} Nm³/m³ ngoài dải {RATIO_LO:.0f}…{RATIO_HI:.0f} — {why}"
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -933,6 +1120,10 @@ class Forecast:
     #: như lúc đó". Cảnh báo bị chặn khi cờ này bật (xem forecast_alerts).
     stale: bool = False
     alerts: list[ForecastAlert] = field(default_factory=list)
+    #: Đối chứng tiêu thụ bằng đồng hồ khí. ``None`` nghĩa là bồn này KHÔNG CÓ
+    #: đồng hồ khí — khác hẳn ``verdict="insufficient"`` (có đồng hồ nhưng chưa
+    #: đủ dữ liệu). Trộn hai ý đó vào một giá trị là mất mất thông tin.
+    gas: DualConsumption | None = None
 
 
 def build_forecast(
@@ -994,6 +1185,14 @@ def build_forecast(
     # reading_at là None -> coi là stale: không có lần đọc nào thì không có cơ sở
     # nào để nói về tương lai. Mặc định an toàn là im lặng, không phải cảnh báo.
     stale = age is None or age > max_reading_age_days
+    # Chỉ tính đối chứng khí khi bồn THỰC SỰ có đồng hồ khí. Không có thì để None
+    # thay vì phát một khối "insufficient" — bồn không có cảm biến và bồn có cảm
+    # biến nhưng thiếu dữ liệu là hai chuyện khác nhau, và UI phải nói khác nhau.
+    gas = (
+        estimate_dual_consumption(samples, capacity_l=capacity_l)
+        if any(s.totalizer_nm3 is not None for s in samples)
+        else None
+    )
     f = Forecast(
         psn=psn,
         volume_l=volume_l,
@@ -1010,6 +1209,7 @@ def build_forecast(
         reading_at=reading_at,
         reading_age_days=age,
         stale=stale,
+        gas=gas,
     )
     # Cảnh báo phải nằm TRONG payload dự báo, không tính lại ở tầng trên: nếu
     # dashboard và notifier mỗi bên tự suy thì chúng sẽ lệch nhau đúng vào lúc

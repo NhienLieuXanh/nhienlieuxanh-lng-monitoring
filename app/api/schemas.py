@@ -45,6 +45,20 @@ class TelemetryOut(BaseModel):
     vacuum_pa: Decimal | None = None
     signal_percent: Decimal | None = None
     battery_v: Decimal | None = None
+    # Đo thêm, chỉ nguồn có đồng hồ khí / đầu dò analog mới điền. Bồn không có
+    # thì NULL — cố ý không điền 0: "không có cảm biến" khác "đo được 0".
+    # Tên theo CHỨC NĂNG, không theo site: gm_ = gas meter, ps = pressure switch,
+    # gd = gas detector.
+    gm_totalizer_nm3: Decimal | None = None
+    gm_flow_rate_nm3h: Decimal | None = None
+    gm_pressure_kpa: Decimal | None = None
+    gm_temperature_c: Decimal | None = None
+    ps1_bar: Decimal | None = None
+    ps2_bar: Decimal | None = None
+    gd1_percent: Decimal | None = None
+    gd2_percent: Decimal | None = None
+    gd3_percent: Decimal | None = None
+    refill_counter: int | None = None
     medium_name: str | None = None
     tank_type_name: str | None = None
 
@@ -294,6 +308,34 @@ class IdleTrendOut(BaseModel):
     method: Literal["measured", "reference", "insufficient"] = "insufficient"
 
 
+class GasCrossCheckOut(BaseModel):
+    """Tiêu thụ đo bằng HAI đường độc lập, và phán quyết đối chứng.
+
+    Phát cả hai con số chứ không chọn một, và KHÔNG quy đổi cái nào sang cái nào:
+    mức lỏng (m³) và đồng hồ khí (Nm³) là hai phép đo của hai đại lượng khác nhau
+    qua hai cảm biến khác nhau, và tỉ lệ hoá khí giữa chúng không phải hằng số —
+    đo được 382…1249 trên từng đoạn. Cùng cơ chế với ``volume_percent`` (vendor)
+    so với ``fill_percent`` (server tính).
+
+    ``reference_ratio``/``band_*`` đi kèm để client không phải hard-code ngưỡng.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    liquid_net_l: OptNum = None
+    gas_nm3: OptNum = None
+    ratio_nm3_per_m3: OptNum = None
+    reference_ratio_nm3_per_m3: Num = 0.0
+    band_lo_nm3_per_m3: Num = 0.0
+    band_hi_nm3_per_m3: Num = 0.0
+    counter_resets: int = 0
+    refills_skipped: int = 0
+    segments: int = 0
+    active_days: Num = 0.0
+    verdict: Literal["match", "disagree", "insufficient"] = "insufficient"
+    detail: str = ""
+
+
 class RunoutOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -357,6 +399,9 @@ class ForecastOut(BaseModel):
     runout: RunoutOut
     hold: HoldTimeOut
     suggestion: SuggestionOut
+    # None = bồn KHÔNG CÓ đồng hồ khí. Khác hẳn verdict="insufficient" (có đồng
+    # hồ nhưng chưa đủ dữ liệu) — UI phải nói hai chuyện đó khác nhau.
+    gas: GasCrossCheckOut | None = None
     refills: list[RefillOut] = Field(default_factory=list)
     # Tuổi của lần đọc mà mọi con số 'hiện tại' dựa vào, và cờ nói rằng nó đã
     # quá cũ để chiếu về tương lai. Phát ra ngoài để UI nói thẳng điều đó thay

@@ -29,6 +29,7 @@ from app.api.schemas import (
     DeliveryStopOut,
     DeliveryTripOut,
     ForecastOut,
+    GasCrossCheckOut,
     HoldTimeOut,
     IdleTrendOut,
     RefillOut,
@@ -111,10 +112,13 @@ ParamsDep = Annotated[ForecastParams, Depends(forecast_params)]
 def _samples(
     session: SessionDep, psn: str, *, now: datetime, window_days: int
 ) -> list[fc.Sample]:
-    rows = tel_repo.series(
+    rows = tel_repo.series_with_gas(
         session, psn, now - timedelta(days=window_days), now, bucket_minutes=30
     )
-    return [fc.Sample(at=at, volume_l=v, pressure_mpa=p) for at, v, p in rows]
+    return [
+        fc.Sample(at=at, volume_l=v, pressure_mpa=p, totalizer_nm3=g)
+        for at, v, p, g in rows
+    ]
 
 
 def _build(
@@ -174,6 +178,9 @@ def _to_out(
         runout=RunoutOut.model_validate(f.runout),
         hold=HoldTimeOut.model_validate(f.hold),
         suggestion=SuggestionOut.model_validate(f.suggestion),
+        # None ở đây nghĩa là bồn KHÔNG CÓ đồng hồ khí, khác hẳn một khối gas với
+        # verdict="insufficient" (có đồng hồ nhưng chưa đủ dữ liệu để đối chứng).
+        gas=None if f.gas is None else GasCrossCheckOut.model_validate(f.gas),
         # Mới nhất lên đầu: đây là nhật ký, người đọc quan tâm lần nạp vừa rồi.
         reading_age_days=f.reading_age_days,
         stale=f.stale,

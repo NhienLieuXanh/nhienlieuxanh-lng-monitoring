@@ -181,7 +181,65 @@ def series(
 
     ``limit`` cắt phần CŨ NHẤT (ORDER BY DESC rồi đảo lại).
     """
-    cols = (Telemetry.sampled_at, Telemetry.volume_l, Telemetry.pressure_mpa)
+    rows = _series_rows(
+        session,
+        psn,
+        start,
+        end,
+        ("volume_l", "pressure_mpa"),
+        limit=limit,
+        bucket_minutes=bucket_minutes,
+    )
+    return [(at, v, p) for at, v, p in rows]
+
+
+def series_with_gas(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int = 50_000,
+    bucket_minutes: int | None = None,
+) -> list[tuple[datetime, float | None, float | None, float | None]]:
+    """Như ``series`` nhưng kèm ``gm_totalizer_nm3``.
+
+    Tách thành hàm riêng thay vì nới ``series`` thành 4 cột: 6 chỗ đang gọi
+    ``series`` không cần số khí, và đổi độ rộng tuple sẽ bắt cả 6 phải sửa vô ích.
+    Cả hai dùng chung ``_series_rows`` nên không có truy vấn nào bị nhân đôi —
+    thứ duy nhất khác nhau là tập cột được chiếu ra.
+
+    Bồn không có đồng hồ khí thì cột này NULL ở mọi dòng, và tầng domain
+    (``estimate_dual_consumption``) im lặng thay vì phát số bịa.
+    """
+    return _series_rows(
+        session,
+        psn,
+        start,
+        end,
+        ("volume_l", "pressure_mpa", "gm_totalizer_nm3"),
+        limit=limit,
+        bucket_minutes=bucket_minutes,
+    )
+
+
+def _series_rows(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    measure_cols: tuple[str, ...],
+    *,
+    limit: int,
+    bucket_minutes: int | None,
+) -> list[tuple[Any, ...]]:
+    """Dựng truy vấn chuỗi cho một tập cột bất kỳ. Trả về tăng dần theo thời gian.
+
+    ``Decimal`` được đổi sang ``float`` NGAY ở đây, không để lọt lên domain: tầng
+    dự báo chia và nhân các số này với nhau, và trộn ``Decimal`` với ``float``
+    trong một biểu thức là ``TypeError`` lúc chạy.
+    """
+    cols = (Telemetry.sampled_at, *(getattr(Telemetry, c) for c in measure_cols))
     filt = (
         Telemetry.psn == psn,
         Telemetry.sampled_at >= start,
@@ -198,10 +256,9 @@ def series(
             .order_by(epoch, Telemetry.sampled_at.desc())
             .subquery()
         )
+        outer_cols = (inner.c.sampled_at, *(inner.c[c] for c in measure_cols))
         rows = session.execute(
-            select(inner.c.sampled_at, inner.c.volume_l, inner.c.pressure_mpa)
-            .order_by(inner.c.sampled_at.desc())
-            .limit(limit)
+            select(*outer_cols).order_by(inner.c.sampled_at.desc()).limit(limit)
         ).all()
     else:
         rows = session.execute(
@@ -210,9 +267,8 @@ def series(
             .order_by(Telemetry.sampled_at.desc())
             .limit(limit)
         ).all()
-    out = [
-        (at, None if v is None else float(v), None if p is None else float(p))
-        for at, v, p in rows
+    out: list[tuple[Any, ...]] = [
+        (r[0], *(None if x is None else float(x) for x in r[1:])) for r in rows
     ]
     out.reverse()
     return out
