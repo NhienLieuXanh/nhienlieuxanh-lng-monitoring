@@ -13,6 +13,7 @@ from app.api.routers import (
     settings,
     telemetry,
     terminals,
+    vendor_alarms,
 )
 
 api_router = APIRouter()
@@ -26,5 +27,6 @@ api_router.include_router(analytics.router)
 api_router.include_router(export.router)
 api_router.include_router(report.router)
 api_router.include_router(settings.router)
+api_router.include_router(vendor_alarms.router)
 
 __all__ = ["api_router"]

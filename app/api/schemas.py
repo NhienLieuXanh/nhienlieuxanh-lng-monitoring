@@ -308,6 +308,51 @@ class IdleTrendOut(BaseModel):
     method: Literal["measured", "reference", "insufficient"] = "insufficient"
 
 
+class VendorAlarmOut(BaseModel):
+    """Một dòng báo động thô của nguồn.
+
+    KHÔNG phát ``message_hash`` (chi tiết nội bộ của khoá trùng) và KHÔNG phát
+    ``source`` (tên nguồn không ra khỏi adapter). ``site_code`` là định danh công
+    khai — "YKH", "XK" — vì nó nói ĐỊA ĐIỂM, không nói nhà cung cấp.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    site_code: str
+    device_id: str
+    raised_at: datetime
+    message: str
+    symbol: str | None = None
+
+
+class AlarmEpisodeOut(BaseModel):
+    """Nhiều dòng giống nhau gộp thành MỘT việc, kèm số lần và khoảng thời gian."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    site_code: str
+    device_id: str
+    message: str
+    count: int
+    first_raised_at: datetime
+    last_raised_at: datetime
+
+
+class AlarmSummaryOut(BaseModel):
+    """Báo động đã gộp, kèm số ĐO ĐƯỢC của phép gộp.
+
+    ``raw_total``/``episodes_total``/``reduction_percent`` phát ra để tỉ lệ gộp là
+    một con số kiểm được, không phải một tuyên bố. Trước đây "716 -> 52" chỉ tồn
+    tại trong tài liệu và không ai đối chiếu được với dữ liệu.
+    """
+
+    items: list[AlarmEpisodeOut] = Field(default_factory=list)
+    raw_total: int = 0
+    episodes_total: int = 0
+    reduction_percent: Num = 0.0
+    generated_at: datetime
+
+
 class GasCrossCheckOut(BaseModel):
     """Tiêu thụ đo bằng HAI đường độc lập, và phán quyết đối chứng.
 

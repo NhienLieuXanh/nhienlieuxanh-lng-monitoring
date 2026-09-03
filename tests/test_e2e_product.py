@@ -52,6 +52,10 @@ PUBLIC = frozenset({"/api/health", "/api/auth/login", "/api/auth/logout"})
 SESSION_GET = frozenset({
     "/api/auth/me",
     "/api/alerts",
+    # Báo động do NGUỒN phát (khác /api/alerts là cảnh báo platform tự suy).
+    # Cùng nhóm bảo vệ: chúng là nhật ký sự cố của nhà máy, không công khai.
+    "/api/alarms/vendor",
+    "/api/alarms/vendor/summary",
     "/api/stats/summary",
     "/api/terminals",
     "/api/terminals/{psn}",
