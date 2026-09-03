@@ -52,6 +52,8 @@ class YokohamaClient:
                 f"GET {path} status={resp.status_code}",
                 remediation="kiểm tra URL nguồn đo",
             )
+        _check_not_redirect(path, resp.status_code)
+        _check_not_html(path, resp.status_code, resp.headers.get("content-type", ""))
         try:
             return resp.json()
         except json.JSONDecodeError as exc:
@@ -76,7 +78,12 @@ class YokohamaClient:
                     raise YokohamaSchemaError(
                         f"stream {path} status={resp.status_code}"
                     )
+                _check_not_redirect(path, resp.status_code)
+                ctype = resp.headers.get("content-type", "")
+                _check_not_html(path, resp.status_code, ctype)
                 buf = ""
+                n_objects = 0
+                saw_bracket = False
                 for chunk in resp.iter_text():
                     n_bytes += len(chunk.encode("utf-8", errors="replace"))
                     if n_bytes > max_b:
@@ -90,14 +97,71 @@ class YokohamaClient:
                             remediation="nguồn trả chậm; thử lại sau",
                         )
                     buf += chunk
+                    if not saw_bracket and ("[" in chunk or "{" in chunk):
+                        saw_bracket = True
                     objs, buf = _split_objects(buf)
+                    n_objects += len(objs)
                     yield from objs
                 objs, rest = _split_objects(buf, flush=True)
+                n_objects += len(objs)
                 yield from objs
                 if rest.strip() not in ("", "]", ","):
                     log.debug("ykh: stream remainder=%r", rest[:80])
+                # "Nguồn không có bản ghi nào" và "nguồn trả về một thứ không phải
+                # dữ liệu" là HAI trạng thái, và trước đây chúng trông giống nhau:
+                # ``_split_objects`` bỏ qua mọi byte không phải "{", nên một trang
+                # HTML không chứa dấu ngoặc nhọn, hay một body rỗng, cho ra 0 object
+                # và 0 lỗi — không tầng giám sát nào thấy được. Một mảng rỗng THẬT
+                # vẫn chứa "[", nên mốc đó tách được hai bên mà không báo oan cho
+                # ngày mà nguồn thực sự không có gì.
+                if n_objects == 0 and not saw_bracket:
+                    raise YokohamaSchemaError(
+                        f"stream {path} status={resp.status_code} "
+                        f"content-type={ctype!r} bytes={n_bytes}: không có mảng "
+                        f"JSON nào trong body",
+                        remediation=(
+                            "cổng trả về một thứ khác dữ liệu (trang đăng nhập, "
+                            "lỗi proxy?); kiểm YOKOHAMA_BASE_URL có tới được từ "
+                            "môi trường đang chạy"
+                        ),
+                    )
         except httpx.HTTPError as exc:
             raise YokohamaTransientError(None, str(exc)) from exc
+
+
+def _check_not_redirect(path: str, status: int) -> None:
+    """3xx KHÔNG phải thành công.
+
+    ``follow_redirects=False`` là quyết định đúng (không đi theo cổng lạ), nhưng
+    client chỉ kiểm ``>= 500``, ``== 429``, ``>= 400`` — nên một 302 tới trang
+    đăng nhập đi thẳng xuống phần đọc body. Ở ``get_json`` nó hiện ra dưới dạng
+    JSONDecodeError mơ hồ; ở stream thì không hiện ra gì cả.
+
+    KHÔNG đưa header ``Location`` vào message: nó có thể chứa địa chỉ nội bộ.
+    """
+    if 300 <= status < 400:
+        raise YokohamaSchemaError(
+            f"GET {path} status={status}: redirect, không theo",
+            remediation=(
+                "cổng chuyển hướng (đăng nhập hoặc proxy?); kiểm "
+                "YOKOHAMA_BASE_URL có đúng và có tới được từ môi trường đang chạy"
+            ),
+        )
+
+
+def _check_not_html(path: str, status: int, ctype: str) -> None:
+    """HTML không bao giờ là dữ liệu nguồn.
+
+    Chỉ chặn ``html`` chứ không đòi ``json``: cổng này gửi
+    ``Accept: application/json, text/plain, */*`` nên ``text/plain`` là câu trả
+    lời hợp lệ và đòi đúng ``json`` sẽ báo oan.
+    """
+    if "html" in ctype.lower():
+        raise YokohamaSchemaError(
+            f"GET {path} status={status} content-type={ctype!r}: HTML, không "
+            f"phải dữ liệu",
+            remediation="cổng trả trang web thay vì JSON; kiểm URL và đường mạng",
+        )
 
 
 def _split_objects(buf: str, *, flush: bool = False) -> tuple[list[dict[str, Any]], str]:

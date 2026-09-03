@@ -165,7 +165,15 @@ class YokohamaAdapter:
             ALARMS_PATH,
             params={"Keywords": "", "FromDate": iso, "ToDate": iso},
         )
-        rows = payload if isinstance(payload, list) else []
+        # Hợp đồng là MẢNG ở mức ngoài cùng — đo trên capture thật (716 phần tử).
+        # ``else []`` trước đây biến một JSON object lạ, ví dụ {"error": ...} do
+        # proxy trả về, thành "hôm nay không có báo động nào", im lặng.
+        if not isinstance(payload, list):
+            raise YokohamaSchemaError(
+                f"{ALARMS_PATH} trả {type(payload).__name__}, không phải mảng",
+                remediation="cổng trả sai hình dạng; kiểm URL và đường mạng",
+            )
+        rows = payload
         out: list[NormalizedAlarm] = []
         for row in rows:
             if not isinstance(row, dict):
