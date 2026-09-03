@@ -26,13 +26,17 @@ class YokohamaClient:
         client: httpx.Client | None = None,
     ) -> None:
         self._settings = settings
+        # Gửi theo TỪNG REQUEST, không chỉ lúc dựng client: ``Accept-Language`` là
+        # hợp đồng dữ liệu (nó quyết định dd/mm hay mm/dd), nên nó không được biến
+        # mất chỉ vì ai đó inject một httpx.Client sẵn — test đã bắt đúng ca đó.
+        self._headers = _headers(settings)
         self._owns_client = client is None
         self._client = client or httpx.Client(
             base_url=settings.base_url,
             timeout=httpx.Timeout(
                 settings.timeout_seconds, connect=settings.connect_timeout_seconds
             ),
-            headers={"Accept": "application/json, text/plain, */*"},
+            headers=self._headers,
             follow_redirects=False,
         )
 
@@ -42,7 +46,7 @@ class YokohamaClient:
 
     def get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
-            resp = self._client.get(path, params=params)
+            resp = self._client.get(path, params=params, headers=self._headers)
         except httpx.HTTPError as exc:
             raise YokohamaTransientError(None, str(exc)) from exc
         if resp.status_code >= 500 or resp.status_code == 429:
@@ -71,7 +75,9 @@ class YokohamaClient:
         max_b = self._settings.max_stream_bytes
         max_s = self._settings.max_stream_seconds
         try:
-            with self._client.stream("GET", path, params=params) as resp:
+            with self._client.stream(
+                "GET", path, params=params, headers=self._headers
+            ) as resp:
                 if resp.status_code >= 500 or resp.status_code == 429:
                     raise YokohamaTransientError(resp.status_code, "stream")
                 if resp.status_code >= 400:
@@ -127,6 +133,16 @@ class YokohamaClient:
                     )
         except httpx.HTTPError as exc:
             raise YokohamaTransientError(None, str(exc)) from exc
+
+
+def _headers(settings: YokohamaSettings) -> dict[str, str]:
+    """``Accept-Language`` là một phần của HỢP ĐỒNG DỮ LIỆU với cổng này, không
+    phải tuỳ chọn lịch sự: nó quyết định cổng trả dd/mm hay mm/dd."""
+    h = {"Accept": "application/json, text/plain, */*"}
+    lang = settings.accept_language.strip()
+    if lang:
+        h["Accept-Language"] = lang
+    return h
 
 
 def _check_not_redirect(path: str, status: int) -> None:

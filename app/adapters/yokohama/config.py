@@ -27,6 +27,14 @@ class YokohamaSettings(BaseSettings):
     site_code: str = "YKH"
     # Đo trực tiếp: LAST UPDATE lệch +6,99 h so với UTC.
     vendor_tz: str = "Asia/Ho_Chi_Minh"
+    # Cổng là ASP.NET và render ngày bằng ``DateTime.ToString()``, tức
+    # ``CultureInfo.CurrentCulture`` — mà request localization lấy culture từ
+    # ``Accept-Language``. Client không gửi header đó thì cổng dùng culture mặc
+    # định của nó và trả mm/dd, trong khi browser lúc discovery gửi tiếng Việt và
+    # nhận dd/mm. Đo được trên production 2026-09-03: cùng một endpoint trả
+    # "09/03/2026" cho ngày 3 tháng 9, còn capture qua browser là "27/08/2026".
+    # Ghim header để định dạng trên đường truyền là XÁC ĐỊNH, không phải đoán.
+    accept_language: str = "vi-VN,vi;q=0.9"
     timeout_seconds: float = 30.0
     connect_timeout_seconds: float = 10.0
     max_stream_bytes: int = Field(8 * 1024 * 1024, ge=64)

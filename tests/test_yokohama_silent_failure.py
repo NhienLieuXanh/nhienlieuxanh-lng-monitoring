@@ -322,3 +322,78 @@ def test_stream_report_chi_gan_mot_lan_moi_cycle() -> None:
     second = ad.fetch_telemetry(PSN, now.date())
     assert first.report.source_rows + second.report.source_rows == 2
     assert 0 in (first.report.source_rows, second.report.source_rows)
+
+
+# ------------------------- ngày đọc đảo tháng -------------------------
+
+
+def test_accept_language_la_hop_dong_du_lieu() -> None:
+    """Header này quyết định cổng trả dd/mm hay mm/dd — nó phải được gửi."""
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(request.headers)
+        return httpx.Response(200, text="[]")
+
+    _stream(handler)
+    assert "vi" in seen.get("accept-language", "")
+
+
+def test_accept_language_rong_thi_khong_gui_header() -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(request.headers)
+        return httpx.Response(200, text="[]")
+
+    settings = YokohamaSettings(
+        enabled=True, base_url="https://example.test/", accept_language=""
+    )
+    http = httpx.Client(
+        transport=httpx.MockTransport(handler), base_url=settings.base_url
+    )
+    list(YokohamaClient(settings, client=http).iter_record_objects({"device": "all"}))
+    assert "accept-language" not in seen
+
+
+def test_ngay_doc_dao_thang_bi_bat_khong_im_lang() -> None:
+    """Ca thật đo được trên production: cổng gửi "09/03/2026 16:53" cho 3 tháng 9.
+
+    Dựng lại bằng cách lấy hôm nay và viết nó ở dạng mm/dd. Chỉ chạy khi hôm nay
+    là ngày mơ hồ (ngày <= 12); ngày khác thì mm/dd không parse được và lỗi đã
+    hiện ra qua rejected_rows, không cần guard.
+    """
+    now = datetime.now(tz=VN)
+    if now.day > 12:
+        pytest.skip("hôm nay ngày > 12: mm/dd không parse được, lỗi đã tự hiện")
+    swapped = f"{now.month:02d}/{now.day:02d}/{now.year} {now:%H:%M}"
+    rec = _rec(now)
+    rec["dateTime"] = swapped
+    rec["receivedAt"] = swapped
+    with pytest.raises(YokohamaSchemaError, match="ngày mơ hồ") as ei:
+        _tel_adapter([rec]).fetch_telemetry(PSN, now.date())
+    msg = str(ei.value)
+    assert "SỐNG" in msg, "phải nói rõ dữ liệu là sống, không phải cũ"
+    assert now.strftime("%H:%M") in msg, "giờ khớp là bằng chứng chính"
+
+
+def test_bon_cu_that_khong_bi_bao_oan() -> None:
+    """Ranh giới của guard: một bồn im lặng thật KHÔNG được biến thành lỗi.
+
+    Ngày 25 của tháng không mơ hồ (25 > 12) nên chỉ có một cách đọc, và guard
+    phải im. Đây là bài giữ cho bản sửa không đoán bừa: nếu nhà máy thật sự dừng
+    báo, đó là chuyện thay thiết bị, không phải lỗi schema.
+    """
+    old = (datetime.now(tz=VN) - timedelta(days=200)).replace(day=25)
+    res = _tel_adapter([_rec(old)]).fetch_telemetry(PSN, datetime.now(tz=VN).date())
+    assert res.report.n_rows == 0
+    assert res.report.source_rows == 1
+    assert res.report.newest_source_at is not None
+
+
+def test_ngay_mo_ho_nhung_cach_doc_kia_cung_ngoai_cua_so_thi_im() -> None:
+    """Mơ hồ mà đảo lại vẫn ngoài cửa sổ: không có bằng chứng gì, đừng báo."""
+    old = (datetime.now(tz=VN) - timedelta(days=400)).replace(day=5, month=4)
+    res = _tel_adapter([_rec(old)]).fetch_telemetry(PSN, datetime.now(tz=VN).date())
+    assert res.report.n_rows == 0
+    assert res.report.source_rows == 1

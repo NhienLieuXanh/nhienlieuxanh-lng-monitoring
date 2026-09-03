@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -167,6 +167,7 @@ class YokohamaAdapter:
                 continue
             self._seen.add(key)
             self._day_cache.setdefault(local_day, []).append(reading)
+        self._check_day_month_swap(day, newest, cutoff, now_local, tz)
         report.source_rows = n
         report.newest_source_at = (
             None if newest is None else newest.astimezone(UTC).isoformat()
@@ -178,6 +179,55 @@ class YokohamaAdapter:
             n,
             len(self._day_cache),
             report.zero_as_missing,
+        )
+
+    @staticmethod
+    def _check_day_month_swap(
+        day: date,
+        newest: datetime | None,
+        cutoff: datetime,
+        now_local: datetime,
+        tz: ZoneInfo,
+    ) -> None:
+        """Bắt ngày bị đọc đảo tháng, thay vì âm thầm loại sạch dữ liệu.
+
+        Đo trên production 2026-09-03: cổng trả "09/03/2026 16:53" cho ngày 3
+        tháng 9. Parser chỉ nhận ``%d/%m/%Y`` nên nó ra 9 THÁNG 3 — 178 ngày trước
+        — rơi ra ngoài cửa sổ và bị loại hết. Hai cycle cách nhau 3 phút cho thấy
+        GIỜ tiến đúng 3 phút trong khi NGÀY đứng im: dữ liệu sống, chỉ đọc sai.
+
+        Trước guard này, triệu chứng duy nhất là ``no_data`` — không phân biệt
+        được với một bồn im lặng thật.
+
+        KHÔNG tự đảo lại: "03/09" là ngày mơ hồ thật sự, và nếu nhà máy đúng là
+        có bản ghi cuối từ 9 tháng 3 với giờ trùng khớp, đảo lại sẽ ghi sai lịch
+        sử. Bằng chứng đủ để một người quyết định, nên nêu bằng chứng.
+        """
+        if newest is None:
+            return
+        nl = newest.astimezone(tz)
+        if nl >= cutoff:
+            return  # trong cửa sổ, không có gì phải nghi
+        if nl.day > 12 or nl.month > 12:
+            return  # không mơ hồ: chỉ một cách đọc hợp lệ
+        try:
+            swapped = nl.replace(day=nl.month, month=nl.day)
+        except ValueError:
+            return
+        # Chỉ báo khi cách đọc kia rơi ĐÚNG vào cửa sổ đang xin. Slack 1 giờ cho
+        # lệch đồng hồ giữa cổng và ta.
+        if not (cutoff <= swapped <= now_local + timedelta(hours=1)):
+            return
+        raise YokohamaSchemaError(
+            f"ngày mơ hồ: nguồn gửi ngày {nl.day:02d}/{nl.month:02d} cho cửa sổ "
+            f"xin từ {cutoff.date().isoformat()}. Đọc dd/mm ra "
+            f"{nl.date().isoformat()} (ngoài cửa sổ, bị loại sạch); đọc mm/dd ra "
+            f"{swapped.date().isoformat()} (trong cửa sổ). Giờ khớp "
+            f"{nl.strftime('%H:%M')} nên dữ liệu là SỐNG, không phải cũ.",
+            remediation=(
+                "cổng render ngày theo CultureInfo.CurrentCulture; đặt "
+                "YOKOHAMA_ACCEPT_LANGUAGE cho đúng culture dd/mm rồi chạy lại"
+            ),
         )
 
     def fetch_devices(self, psns: list[str]) -> list[NormalizedTerminal]:
