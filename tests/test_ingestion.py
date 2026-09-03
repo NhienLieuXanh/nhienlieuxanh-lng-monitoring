@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -15,6 +15,18 @@ from app.repositories import terminals as term_repo
 from app.services.ingestion import IngestionService, IngestStats
 
 UTC = ZoneInfo("UTC")
+
+
+def _newest_demo_day(fake: FakeAdapter, psn: str) -> date:
+    """Ngày MỚI NHẤT của một PSN — ngày duy nhất có toạ độ.
+
+    ``_synthesize`` của fake cố ý chỉ gắn toạ độ vào bản đọc mới nhất của CẢ
+    chuỗi, còn ``fetch_telemetry`` lọc theo ngày lịch giờ vendor. Nên một ngày cũ
+    hơn vẫn hợp lệ mà KHÔNG có toạ độ nào. Test nào nói về GPS mà lấy
+    ``demo_days()[0]`` là đang chọn đúng ngày không có GPS: hoặc đỏ oan, hoặc —
+    tệ hơn — xanh rỗng vì chẳng có gì để ghi đè.
+    """
+    return max(d for p, d in fake.demo_days() if p == psn)
 
 
 @pytest.mark.db
@@ -75,8 +87,8 @@ def test_vendor_gps_dien_vao_o_dang_trong(session, session_factory, settings):
     now = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
     fake = FakeAdapter(days=1, fresh=True, now=now)
     svc = IngestionService(fake, session_factory, settings, psns=list(DEMO_PSNS))
-    psn, day = fake.demo_days()[0]
-    svc.ingest_psn_day(psn, day, IngestStats())
+    psn = DEMO_PSNS[0]
+    svc.ingest_psn_day(psn, _newest_demo_day(fake, psn), IngestStats())
 
     term = term_repo.get_by_psn(session, psn)
     assert term is not None
@@ -95,7 +107,11 @@ def test_ghim_tay_song_sot_qua_ingest(session, session_factory, settings):
     now = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
     fake = FakeAdapter(days=1, fresh=True, now=now)
     svc = IngestionService(fake, session_factory, settings, psns=list(DEMO_PSNS))
-    psn, day = fake.demo_days()[0]
+    # Ngày MỚI NHẤT, không phải ngày cũ nhất: vòng ingest thứ hai phải THẬT SỰ
+    # mang toạ độ về, nếu không thì luật COALESCE chẳng bị thử và bài này xanh
+    # rỗng — nó sẽ pass y nguyên kể cả khi ai đó bỏ COALESCE và ghi đè vô điều kiện.
+    psn = DEMO_PSNS[0]
+    day = _newest_demo_day(fake, psn)
     svc.ingest_psn_day(psn, day, IngestStats())
 
     pinned = (Decimal("10.800000"), Decimal("106.600000"))
