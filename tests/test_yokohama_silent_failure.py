@@ -485,3 +485,110 @@ def test_psn_chet_that_van_bi_ke_ten() -> None:
     st.psns_no_data.extend(["2604200016", "2605090007"])
     assert st.no_data_psns() == ["2604200016", "2605090007"]
     assert "no_data=2" in st.summary()
+
+
+# ============ do truc tiep tren cong song 2026-09-04 ============
+
+
+def test_bao_dong_phai_hoi_khoang_khong_phai_mot_ngay() -> None:
+    """``FromDate == ToDate`` LUÔN trả 0 — biên trên của cổng là loại trừ.
+
+    Đo trên cổng sống, cả ba định dạng ngày, ba ngày liên tiếp:
+        From == To    ->   0    0    0
+        From .. To+1  ->  85  194  192
+    Đó là lý do bảng "Báo động của nhà máy" rỗng suốt, không phải định dạng ngày.
+    """
+    seen: dict[str, str] = {}
+
+    class _Cap:
+        def get_json(self, path: str, params: dict | None = None) -> list:
+            seen.update(params or {})
+            return []
+
+        def close(self) -> None:
+            return None
+
+    settings = YokohamaSettings(enabled=False, psn=PSN)
+    ad = YokohamaAdapter(settings, client=_Cap())  # type: ignore[arg-type]
+    ad.fetch_alarms(date(2026, 9, 3))
+    assert seen["FromDate"] == "2026-09-03"
+    assert seen["ToDate"] == "2026-09-04", "phải hỏi tới ngày KẾ TIẾP"
+
+
+def test_thu_tu_ngay_bao_dong_tach_khoi_ban_ghi() -> None:
+    """Cùng cổng, cùng lúc, hai endpoint hai định dạng — nên hai cấu hình.
+
+    Nếu báo động dùng chung ``timestamp_order`` của bản ghi (đang là mdy trên
+    production), thì "03/09/2026" thành 9 THÁNG 3 và mọi báo động lệch nửa năm.
+    """
+    s = YokohamaSettings(enabled=False, psn=PSN, timestamp_order="mdy")
+    assert s.alarm_timestamp_order == "dmy", "mặc định phải KHÁC, không phải bản sao"
+
+    rows = [{
+        "deviceId": "SV4",
+        "createAt": "28/08/2026 02:48:26",  # 28 không thể là tháng -> dd/mm
+        "message": "Van SV4: dang bi lock",
+        "symbol": "danger",
+    }]
+
+    class _C:
+        def get_json(self, path: str, params: dict | None = None) -> list:
+            return rows
+
+        def close(self) -> None:
+            return None
+
+    ad = YokohamaAdapter(s, client=_C())  # type: ignore[arg-type]
+    out = ad.fetch_alarms(date(2026, 8, 28))
+    assert len(out) == 1, "đọc dd/mm nên dòng vào được dù bản ghi đang đọc mdy"
+    assert out[0].raised_at.astimezone(VN).date() == date(2026, 8, 28)
+
+
+def test_hai_tanknumber_trong_mot_stream_bi_chan() -> None:
+    """Trộn hai bồn vào một PSN là hỏng lịch sử, không phải chuyện nhỏ."""
+    now = datetime.now(tz=VN)
+    a, b = _rec(now), _rec(now - timedelta(minutes=1))
+    a["tankNumber"] = 38
+    b["tankNumber"] = 70
+    with pytest.raises(YokohamaSchemaError, match="tankNumber khác nhau"):
+        _tel_adapter([a, b]).fetch_telemetry(PSN, now.date())
+
+
+def test_tanknumber_khac_cau_hinh_bi_chan() -> None:
+    """Ghim số bồn rồi thì cổng đổi chuỗi trả về là LỖI, không phải dữ liệu mới.
+
+    Đo được: định dạng ngày trong request chọn bộ dữ liệu (dd/mm -> tank 38,
+    mm/dd -> tank 70), và tham số ``device`` bị cổng bỏ qua hoàn toàn. Nên ghim
+    là cách duy nhất chứng minh ta vẫn đọc đúng bồn.
+    """
+    now = datetime.now(tz=VN)
+    rec = _rec(now)
+    rec["tankNumber"] = 70
+    s = YokohamaSettings(enabled=False, psn=PSN, tank_number=38)
+    ad = YokohamaAdapter(s, client=_MemClient([rec]))  # type: ignore[arg-type]
+    with pytest.raises(YokohamaSchemaError, match="chờ 38"):
+        ad.fetch_telemetry(PSN, now.date())
+
+
+def test_tanknumber_duoc_ghi_vao_report() -> None:
+    """Không ghim thì vẫn phải GHI NHẬN — im lặng là thứ tạo ra lỗ này."""
+    now = datetime.now(tz=VN)
+    rec = _rec(now)
+    rec["tankNumber"] = 38
+    res = _tel_adapter([rec]).fetch_telemetry(PSN, now.date())
+    assert res.report.source_device == "38"
+
+
+def test_readings_tra_ve_tang_dan() -> None:
+    """Hợp đồng ``FetchResult.readings`` là TĂNG DẦN.
+
+    Nguồn stream newest-first rồi append, nên nếu không sắp lại thì danh sách ra
+    giảm dần — và ingestion đọc ``reversed()`` kèm chú thích "lấy cặp gần nhất",
+    tức nó sẽ lấy bản đọc CŨ NHẤT để ghim toạ độ.
+    """
+    now = datetime.now(tz=VN).replace(second=0, microsecond=0)
+    rows = [_rec(now - timedelta(minutes=i)) for i in range(5)]  # newest-first
+    res = _tel_adapter(rows).fetch_telemetry(PSN, now.date())
+    ats = [r.sampled_at for r in res.readings]
+    assert ats == sorted(ats), "phải tăng dần"
+    assert res.readings[-1].sampled_at.astimezone(VN).strftime("%H:%M") == now.strftime("%H:%M")

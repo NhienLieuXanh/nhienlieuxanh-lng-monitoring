@@ -87,7 +87,9 @@ class YokohamaAdapter:
             log.error("ykh: PSN %s không thuộc allowlist, không fetch", psn)
             return result
         self._ensure_cache(day)
-        readings = list(self._day_cache.get(day, []))
+        # Cache được lấp theo thứ tự stream (newest-first), nên phải sắp lại:
+        # ``FetchResult.readings`` là hợp đồng TĂNG DẦN.
+        readings = sorted(self._day_cache.get(day, []), key=lambda r: r.sampled_at)
         result.readings = readings
         result.total = len(readings)
         result.pages_fetched = 1 if self._cache_loaded_from is not None else 0
@@ -100,6 +102,7 @@ class YokohamaAdapter:
             self._stream_report = None
             result.report.source_rows = pending.source_rows
             result.report.newest_source_at = pending.newest_source_at
+            result.report.source_device = pending.source_device
             result.report.rejected_rows += pending.rejected_rows
             result.report.zero_as_missing += pending.zero_as_missing
             result.report.resolved_from.update(pending.resolved_from)
@@ -128,6 +131,17 @@ class YokohamaAdapter:
                 remediation=f"thu hẹp cửa sổ còn ≤ {allowed} ngày, hoặc nâng trần byte",
             )
         # Stream newest-first; dừng khi dateTime < day (đã qua ngày cần).
+        # ĐỪNG "dọn dẹp" hai dòng này cho khớp timestamp_order. Định dạng ngày
+        # trong REQUEST không chỉ là cách viết — nó CHỌN BỘ DỮ LIỆU cổng trả về.
+        # Đo trực tiếp trên cổng sống 2026-09-04, tái lập 3/3 mỗi chiều:
+        #
+        #   params dd/mm ("04/09") -> dateTime mm/dd, tankNumber=38, 45,58 m³, tot 747k
+        #   params mm/dd ("09/04") -> dateTime dd/mm, tankNumber=70, 53,19 m³, tot 1.132k
+        #
+        # Tham số ``device`` bị BỎ QUA hoàn toàn (device=all|38|70|1|2 cho kết quả
+        # y hệt), nên định dạng ngày là thứ DUY NHẤT quyết định ta đọc chuỗi nào.
+        # Mọi dữ liệu đã nạp là tankNumber=38, và dd/mm là cách giữ nguyên nó. Đổi
+        # sang mm/dd sẽ ghi số của một bồn KHÁC vào cùng một PSN.
         to_s = now_local.strftime("%d/%m/%Y %H:%M")
         from_s = datetime.combine(day, time.min).strftime("%d/%m/%Y %H:%M")
         psn = self._settings.psn
@@ -135,6 +149,10 @@ class YokohamaAdapter:
         cutoff = datetime.combine(day, time.min, tzinfo=tz)
         n = 0
         newest: datetime | None = None
+        # ``tankNumber`` từng nằm trong IGNORED_KEYS, nên KHÔNG tầng nào thấy được
+        # ta đang đọc bồn nào. Đó là lỗ đúng cỡ để một thay đổi định dạng ngày
+        # chuyển ta sang bồn khác mà mọi con số vẫn trông "hợp lý".
+        tanks: set[int] = set()
         for obj in self._client.iter_record_objects(
             {
                 "device": "all",
@@ -144,6 +162,9 @@ class YokohamaAdapter:
             }
         ):
             n += 1
+            tn = obj.get("tankNumber")
+            if isinstance(tn, (int, float)) and not isinstance(tn, bool):
+                tanks.add(int(tn))
             reading = normalize_reading(
                 obj,
                 psn=psn,
@@ -171,6 +192,22 @@ class YokohamaAdapter:
         self._check_day_month_swap(
             newest, cutoff, now_local, tz, self._settings.timestamp_order
         )
+        if len(tanks) > 1:
+            raise YokohamaSchemaError(
+                f"một stream chứa {len(tanks)} tankNumber khác nhau "
+                f"({sorted(tanks)}) — không thể ghi chung một PSN",
+                remediation="cổng đang trộn nhiều bồn; dừng nạp và đối chiếu nguồn",
+            )
+        want = self._settings.tank_number
+        if want is not None and tanks and want not in tanks:
+            raise YokohamaSchemaError(
+                f"cổng trả tankNumber={sorted(tanks)}, cấu hình chờ {want}",
+                remediation=(
+                    "định dạng ngày trong request CHỌN bộ dữ liệu; kiểm lại request, "
+                    "hoặc đổi YOKOHAMA_TANK_NUMBER nếu bồn thật đã khác"
+                ),
+            )
+        report.source_device = None if not tanks else str(sorted(tanks)[0])
         report.source_rows = n
         report.newest_source_at = (
             None if newest is None else newest.astimezone(UTC).isoformat()
@@ -247,10 +284,25 @@ class YokohamaAdapter:
         return out
 
     def fetch_alarms(self, day: date) -> list[NormalizedAlarm]:
-        iso = day.isoformat()
+        # ``FromDate == ToDate`` LUÔN trả 0 — đo trên cổng sống 2026-09-04, cả ba
+        # định dạng (ISO, dd/mm, mm/dd), ba ngày liên tiếp:
+        #
+        #   From == To    ->   0    0    0
+        #   From .. To+1  ->  85  194  192
+        #
+        # ĐÓ là lý do bảng báo động rỗng suốt, không phải định dạng ngày. Biên trên
+        # là loại trừ, nên phải hỏi tới ngày kế tiếp. Chồng lấp giữa hai ngày liền
+        # nhau vô hại: khoá tự nhiên của ``vendor_alarms`` có ``message_hash``.
+        #
+        # GIỮ ISO: nó chạy được, và định dạng ở đây cũng là tác dụng lề như bên
+        # endpoint bản ghi (params dd/mm trả một payload khác hẳn).
         payload = self._client.get_json(
             ALARMS_PATH,
-            params={"Keywords": "", "FromDate": iso, "ToDate": iso},
+            params={
+                "Keywords": "",
+                "FromDate": day.isoformat(),
+                "ToDate": (day + timedelta(days=1)).isoformat(),
+            },
         )
         # Hợp đồng là MẢNG ở mức ngoài cùng — đo trên capture thật (716 phần tử).
         # ``else []`` trước đây biến một JSON object lạ, ví dụ {"error": ...} do
@@ -269,7 +321,12 @@ class YokohamaAdapter:
                 row,
                 site_code=self._settings.site_code,
                 vendor_tz=self.vendor_tz,
-                ts_order=self._settings.timestamp_order,
+                # KHÁC ``timestamp_order`` của bản ghi, và đây không phải sơ suất.
+                # Cùng một cổng, cùng một lúc, hai endpoint trả hai định dạng: bản
+                # ghi (params dd/mm) ra mm/dd, báo động (params ISO) ra dd/mm. Đo
+                # trên 1100 báo động: thành phần đầu lên tới 31 (537 lần > 12),
+                # thành phần sau chỉ 8..9 — dd/mm, không đọc cách khác được.
+                ts_order=self._settings.alarm_timestamp_order,
             )
             if alarm is not None:
                 out.append(alarm)

@@ -41,6 +41,14 @@ class YokohamaSettings(BaseSettings):
     # môi trường nào thấy mm/dd phải đặt YOKOHAMA_TIMESTAMP_ORDER=mdy. Không tự
     # đoán: xem ghi chú ở mapping.TIMESTAMP_ORDERS.
     timestamp_order: Literal["dmy", "mdy"] = "dmy"
+    # Thứ tự ngày của endpoint BÁO ĐỘNG, tách riêng vì cùng một cổng cùng một lúc
+    # trả hai định dạng khác nhau trên hai endpoint. Đo 2026-09-04 trên 1100 báo
+    # động: dd/mm. Đây là mặc định ĐÚNG, không phải bản sao của dòng trên.
+    alarm_timestamp_order: Literal["dmy", "mdy"] = "dmy"
+    # Bồn được phép đọc, theo ``tankNumber`` nguồn tự khai. None = chỉ ghi nhận,
+    # không chặn. Đặt số thật rồi thì mọi lần cổng đổi chuỗi trả về đều bị chặn
+    # thay vì âm thầm ghi lẫn hai bồn vào một PSN.
+    tank_number: int | None = None
     timeout_seconds: float = 30.0
     connect_timeout_seconds: float = 10.0
     max_stream_bytes: int = Field(8 * 1024 * 1024, ge=64)

@@ -199,6 +199,10 @@ class MappingReport:
     # tự). Đây là câu trả lời trực tiếp cho "thiết bị còn báo không", độc lập với
     # việc ta có giữ dòng nào lại hay không.
     newest_source_at: str | None = None
+    # Định danh thiết bị/bồn mà NGUỒN tự khai trong payload. Không phải PSN của ta:
+    # nó là bằng chứng ta vẫn đang đọc đúng cái vật lý mình nghĩ. Nguồn nào không
+    # khai thì để None.
+    source_device: str | None = None
     present: dict[str, int] = field(default_factory=dict)
     resolved_from: dict[str, str] = field(default_factory=dict)
     unmapped_keys: set[str] = field(default_factory=set)
@@ -223,6 +227,7 @@ class MappingReport:
             "n_rows": self.n_rows,
             "source_rows": self.source_rows,
             "newest_source_at": self.newest_source_at,
+            "source_device": self.source_device,
             "coverage": self.coverage(),
             "present": self.present,
             "resolved_from": self.resolved_from,
@@ -237,6 +242,12 @@ class MappingReport:
 
 @dataclass(slots=True)
 class FetchResult:
+    #: TĂNG DẦN theo ``sampled_at``. Trước đây thứ tự không được khai, và hai
+    #: adapter làm hai kiểu: nguồn phút stream newest-first rồi append, nên danh
+    #: sách ra GIẢM dần — trong khi ingestion đọc ``reversed(readings)`` kèm chú
+    #: thích "lấy cặp gần nhất", tức nó lấy bản đọc CŨ NHẤT. Với dung tích hằng số
+    #: thì vô hại, nhưng toạ độ thì không: logic loại cặp 0,0 cố ý giữ cặp mới
+    #: nhất còn sót lại.
     readings: list[NormalizedTelemetry] = field(default_factory=list)
     total: int | None = None
     pages_fetched: int = 0

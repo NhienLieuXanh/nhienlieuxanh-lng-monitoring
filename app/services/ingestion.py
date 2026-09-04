@@ -198,8 +198,14 @@ class IngestionService:
         with self._sf() as session, session.begin():
             # capacity_l đến kèm mỗi lần đọc nhưng thuộc terminals — lấy từ bản
             # đọc mới nhất có giá trị.
+            # Sắp theo thời gian TẠI ĐÂY thay vì tin thứ tự adapter trả về: hợp
+            # đồng nói tăng dần, nhưng một adapter mới làm sai thì hệ quả là ghim
+            # sai toạ độ — im lặng và khó lần ra. Rẻ (≤1440 phần tử/ngày).
+            newest_first = sorted(
+                result.readings, key=lambda r: r.sampled_at, reverse=True
+            )
             capacity = next(
-                (r.capacity_l for r in reversed(result.readings) if r.capacity_l),
+                (r.capacity_l for r in newest_first if r.capacity_l),
                 None,
             )
             # Toạ độ cũng vậy, nhưng nó là dữ liệu THỈNH THOẢNG CÓ: cùng một thiết
@@ -211,7 +217,7 @@ class IngestionService:
             lat, lon = next(
                 (
                     (r.latitude, r.longitude)
-                    for r in reversed(result.readings)
+                    for r in newest_first
                     if r.latitude is not None and r.longitude is not None
                 ),
                 (None, None),
@@ -492,4 +498,6 @@ def _merge_mapping(
             if prev is None
             else max(prev, report.newest_source_at)
         )
+    if report.source_device is not None:
+        bucket["source_device"] = report.source_device
     bucket.setdefault("resolved_from", {}).update(report.resolved_from)
