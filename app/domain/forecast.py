@@ -212,7 +212,18 @@ class ConsumptionEstimate:
     active_days: float
     #: active_days / window_days. Thấp = thiết bị mất upload nhiều.
     coverage: float
+    #: Sụt giảm ĐÃ TRỪ phần dâng lại — tổng CÓ DẤU trên các đoạn không-nạp
+    #: không-trống. Đây là con số đi vào ``daily_use_l``.
     drawdown_l: float
+    #: Tổng các bước mức ĐI LÊN mà KHÔNG phải một lần nạp (dưới ``refill_floor_l``).
+    #: Đây chính là đại lượng làm số ròng thấp hơn tổng các bước đi xuống, nên nó
+    #: là số đối chứng đúng — và nó không phụ thuộc ngưỡng nào.
+    #:
+    #: Lớn so với ``drawdown_l`` -> cảm biến đang dao động quanh một lượng tử, và
+    #: cách tính cũ (cộng chỉ bước đi xuống) đã biến dao động đó thành tiêu thụ ảo.
+    #: Nhỏ nhưng khác 0 -> có bù nhỏ dưới ngưỡng nạp, nghĩa là mức dùng thật CAO
+    #: hơn con số báo ra. Hai chẩn đoán khác nhau, cùng đọc từ một con số.
+    rise_l: float
     refills: int
     refill_l: float
     #: Số ngày lịch có đủ dữ liệu để tính tổng dùng của ngày đó.
@@ -262,19 +273,44 @@ def estimate_consumption(
     capacity_l: float | None = None,
     tz: tzinfo | None = None,
 ) -> ConsumptionEstimate:
-    """Mức dùng/ngày = tổng sụt giảm / thời gian có dữ liệu.
+    """Mức dùng/ngày = sụt giảm RÒNG / thời gian có dữ liệu.
 
-    Đây là cách các nền tảng giám sát bồn tính "usage": cộng toàn bộ phần mức
-    ĐI XUỐNG và bỏ qua phần đi lên (nạp). Không hồi quy trên cả cửa sổ, vì một
-    lần nạp giữa cửa sổ sẽ làm hệ số góc hồi quy dương và ra "mức dùng âm".
+    RÒNG, không phải tổng các bước đi xuống. Đây là thay đổi ngày 2026-09-04 và
+    lý do là một phép đo, không phải một sở thích.
+
+    Cách cũ cộng toàn bộ phần mức ĐI XUỐNG và bỏ qua phần đi lên — cách các nền
+    tảng giám sát bồn thường làm, và đúng khi cảm biến mịn hơn nhiều so với một
+    bước tiêu thụ. Trên nguồn đo phút của nhà máy, cảm biến báo theo LƯỢNG TỬ
+    100 L trong khi ``noise_floor_l`` (0,1% dung tích) chỉ 60 L, nên mỗi bước dao
+    động một lượng tử đều vượt ngưỡng và được cộng vào tiêu thụ:
+
+        2160 dòng / 2 ngày, đồng hồ khí giao 0 Nm³, lưu lượng 0 ở CẢ 2160 dòng
+        thể tích 53 290 L -> 53 290 L (net 0)
+        bước -100 L: 139 lần   bước +100 L: 139 lần
+        tổng giảm 14 080 L = tổng tăng 14 080 L
+        => cách cũ ra 0,466 m³/ngày cho một bồn tiêu thụ ĐÚNG 0
+
+    Không ngưỡng nào cứu được phép cộng-từng-bước ở đây: nâng ngưỡng thì mất tiêu
+    thụ thật (một ngày rút 466 L trên bucket 30 phút chỉ là ~10 L/bước, dưới mọi
+    lượng tử), hạ ngưỡng thì nhận nhiễu. Tổng có dấu thì nhiễu tự triệt tiêu —
+    đúng lý do ``estimate_dual_consumption.liquid_net_l`` đã dùng nó từ đầu, và
+    giờ hai hàm nói cùng một thứ tiếng.
+
+    Cái mất: một lần bù nhỏ hơn ``refill_floor_l`` sẽ làm số ròng THẤP hơn thực
+    tế, và thấp hơn là chiều nguy hiểm (dự báo cạn muộn hơn). Vì thế
+    ``gross_drop_l`` giữ lại cách tính cũ làm số đối chứng: chênh lệch lớn giữa
+    hai con số là dấu hiệu có bù nhỏ, và nó hiện ra thay vì biến mất.
 
     Ba thứ bị loại khỏi tổng, mỗi thứ vì một lý do khác nhau:
 
     * bước tăng >= ``refill_floor_l``  -> lần nạp, không phải tiêu thụ ngược;
-    * ``|delta| < noise_floor_l``      -> nhiễu cảm biến, cộng vào sẽ phóng đại;
     * cặp cách nhau > ``MAX_GAP``      -> không biết giữa đó xảy ra gì, nên khoảng
       đó không được tính vào ``active_days`` (và phần sụt giảm qua khoảng trống
       cũng không được cộng — nó có thể chứa cả một lần nạp lẫn nhiều ngày rút).
+    * ``noise_floor_l`` KHÔNG còn dùng ở đây: tổng có dấu không cần deadband, và
+      một deadband trên cảm biến thô vừa nhận nhiễu vừa nuốt tiêu thụ thật — đo
+      được trên chuỗi 500 L/ngày, bước 30 phút rơi ĐÚNG BẰNG ngưỡng nên tổng cũ
+      ra 0 cho một bồn đang rút.
     """
     raw_pts = _volume_points(samples)
     n_samples = len(raw_pts)
@@ -288,17 +324,22 @@ def estimate_consumption(
             active_days=0.0,
             coverage=0.0,
             drawdown_l=0.0,
+            rise_l=0.0,
             refills=0,
             refill_l=0.0,
             full_days=0,
             confidence="none",
         )
 
-    noise = noise_floor_l(capacity_l)
+    # KHÔNG còn deadband ở đây. Tổng có dấu tự chống nhiễu (bước dâng trừ bước
+    # sụt), và một deadband trên cảm biến thô vừa nhận nhiễu vừa NUỐT tiêu thụ
+    # thật: đo được trên chuỗi 500 L/ngày, bước 30 phút rơi đúng bằng
+    # noise_floor_l(10425) nên tổng cũ ra 0 cho một bồn đang rút thật.
     refill = refill_floor_l(capacity_l)
     window_days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
 
-    drawdown = 0.0
+    net_drop = 0.0
+    rise_total = 0.0
     refill_total = 0.0
     refills = 0
     active_s = 0.0
@@ -325,11 +366,18 @@ def estimate_consumption(
         active_s += gap.total_seconds()
         key = _day_key(t1, tz)
         _bump(covered_s, key, gap.total_seconds())
-        if delta <= -noise:
-            drawdown += -delta
-            _bump(per_day, key, -delta)
+        # TỔNG CÓ DẤU: bước dâng lại trừ vào bước sụt, nên dao động quanh một
+        # lượng tử triệt tiêu chính nó thay vì cộng dồn thành tiêu thụ ảo.
+        net_drop += -delta
+        _bump(per_day, key, -delta)
+        if delta > 0:
+            rise_total += delta
 
     active_days = active_s / 86400.0
+    # Ròng âm (mức dâng ròng qua cửa sổ, không do nạp) nghĩa là KHÔNG đo được tiêu
+    # thụ. Chặn ở 0 rồi để nhánh dưới trả None — thà nói "chưa đo được" hơn trả
+    # một số âm hoặc một số bịa.
+    drawdown = max(0.0, net_drop)
     if active_days <= 0 or drawdown <= 0:
         return ConsumptionEstimate(
             daily_use_l=None,
@@ -339,6 +387,7 @@ def estimate_consumption(
             active_days=active_days,
             coverage=(active_days / window_days) if window_days > 0 else 0.0,
             drawdown_l=drawdown,
+            rise_l=rise_total,
             refills=refills,
             refill_l=refill_total,
             full_days=0,
@@ -350,7 +399,14 @@ def estimate_consumption(
     # Độ lệch chuẩn CHỈ tính trên những ngày lịch phủ >= 80% (19.2 giờ) dữ liệu.
     # Ngày phủ một nửa có tổng dùng thấp giả tạo; trộn vào sẽ thổi phồng sigma và
     # làm dự trữ an toàn to vô lý.
-    full = [per_day.get(k, 0.0) for k, s in covered_s.items() if s >= 0.8 * 86400.0]
+    # per_day giờ là tổng CÓ DẤU nên một ngày có thể ra âm (mức dâng ròng). Chặn ở
+    # 0: "dùng âm" không có nghĩa vật lý, và độ lệch chuẩn ở đây là biến động của
+    # LƯỢNG DÙNG, dùng để tính dự trữ an toàn.
+    full = [
+        max(0.0, per_day.get(k, 0.0))
+        for k, s in covered_s.items()
+        if s >= 0.8 * 86400.0
+    ]
     sd = _stdev(full) if len(full) >= 3 else None
 
     coverage = (active_days / window_days) if window_days > 0 else 0.0
@@ -364,6 +420,7 @@ def estimate_consumption(
         active_days=active_days,
         coverage=coverage,
         drawdown_l=drawdown,
+        rise_l=rise_total,
         refills=refills,
         refill_l=refill_total,
         full_days=len(full),

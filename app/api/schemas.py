@@ -299,6 +299,9 @@ class ConsumptionOut(BaseModel):
     active_days: Num = 0.0
     coverage: Num = 0.0
     drawdown_l: Num = 0.0
+    #: Tổng các bước mức đi LÊN không phải lần nạp. Số đối chứng của
+    #: ``drawdown_l`` — xem docstring ``estimate_consumption``.
+    rise_l: Num = 0.0
     refills: int = 0
     refill_l: Num = 0.0
     full_days: int = 0

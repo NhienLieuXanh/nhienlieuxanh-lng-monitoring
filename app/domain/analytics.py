@@ -201,8 +201,70 @@ class QualityReport:
     reasons: list[str] = field(default_factory=list)
 
 
-def _flatline_runs(pts: list[Sample]) -> tuple[int, float]:
-    """Đếm chuỗi giá trị đứng yên và chuỗi dài nhất (giờ)."""
+def min_step_l(pts: list[Sample]) -> float:
+    """Bước KHÁC 0 nhỏ nhất QUAN SÁT ĐƯỢC giữa hai lần đọc liền nhau.
+
+    Không suy từ dung tích: hai nguồn của dự án này thô khác nhau hai bậc. Xingke
+    báo tới lít trên bồn 10 425 L; nguồn đo phút của nhà máy báo theo lượng tử
+    100 L trên bồn 60 000 L (đo được: bước giữa hai lần đọc liền nhau chỉ nhận
+    các giá trị 0, ±90, ±100 trên 2160 dòng).
+
+    ĐÂY LÀ CHẶN TRÊN của độ phân giải thật, không phải chính nó: trên một bồn
+    đang rút nhanh, bước nhỏ nhất quan sát được là lượng RÚT mỗi mẫu chứ không
+    phải lượng tử cảm biến (đo được: chuỗi 500 L/ngày lượng tử 1 L cho bước nhỏ
+    nhất 10 L ở nhịp 30 phút). Chặn trên là chiều AN TOÀN cho việc dùng nó làm
+    ngưỡng buộc tội: ngưỡng ra lớn hơn, tức thận trọng hơn.
+    """
+    # ``float()`` tường minh: đường báo cáo dựng ``Sample.volume_l`` bằng
+    # ``Decimal`` lấy thẳng từ DB dù type hint khai ``float``, và trộn Decimal với
+    # float trong một biểu thức là TypeError lúc chạy — đúng lỗi đã bắt được ở
+    # 15 test báo cáo.
+    steps = [
+        abs(float(b.volume_l) - float(a.volume_l))
+        for a, b in pairwise(pts)
+        if a.volume_l is not None and b.volume_l is not None
+        and b.volume_l != a.volume_l
+    ]
+    return min(steps) if steps else 0.0
+
+
+def flatline_hours_needed(pts: list[Sample]) -> float:
+    """Bao nhiêu giờ đứng yên mới ĐÁNG NGHI, trên chính cảm biến này.
+
+    Ngưỡng cứng 6 giờ chỉ đúng khi cảm biến mịn hơn nhiều so với tốc độ mức đang
+    đổi. Trên nguồn đo phút: bồn bay hơi ~30 L/ngày = 1,25 L/giờ, lượng tử 100 L,
+    nên mức KHÔNG THỂ nhích trong 6 giờ — về mặt vật lý. Ngưỡng 6 giờ ở đó báo
+    "nghi cảm biến kẹt" cho một bồn đứng yên hoàn toàn bình thường, và chính
+    ``forecast.idle`` của cùng platform lại CỐ Ý nhận diện những cửa sổ đứng yên
+    đó để tính bay hơi từ chúng.
+
+    Nên ngưỡng phải là: thời gian tối thiểu để XU HƯỚNG THẬT của chuỗi tạo ra
+    được một lượng tử. Xu hướng lấy theo biến thiên RÒNG, không phải tổng tuyệt
+    đối — dao động quanh một lượng tử có tổng tuyệt đối rất lớn nhưng ròng bằng 0,
+    và nếu dùng tổng tuyệt đối thì chính nhiễu sẽ hạ ngưỡng xuống và báo oan tiếp.
+
+    Ròng ~ 0 -> không kết luận được gì từ sự đứng yên, nên trả vô cực: đứng yên
+    trên một bồn không rút là điều PHẢI xảy ra. Mất khả năng phát hiện cảm biến
+    kẹt trên một chuỗi phẳng hoàn toàn — nhưng hai ca đó không phân biệt được
+    trên cảm biến thô, và im lặng đúng hơn là buộc tội sai.
+    """
+    q = min_step_l(pts)
+    if q <= 0 or len(pts) < 2:
+        return FLATLINE_HOURS
+    hours = (pts[-1].at - pts[0].at).total_seconds() / 3600.0
+    if hours <= 0:
+        return FLATLINE_HOURS
+    v0, v1 = pts[0].volume_l, pts[-1].volume_l
+    if v0 is None or v1 is None:
+        return FLATLINE_HOURS
+    drift = abs(float(v1) - float(v0)) / hours
+    if drift <= 0:
+        return float("inf")
+    return max(FLATLINE_HOURS, q / drift)
+
+
+def _flatline_runs(pts: list[Sample], *, need_hours: float) -> tuple[int, float]:
+    """Đếm chuỗi giá trị đứng yên vượt ``need_hours``, và chuỗi dài nhất (giờ)."""
     runs, longest, i = 0, 0.0, 0
     while i < len(pts) - 1:
         j = i
@@ -210,7 +272,7 @@ def _flatline_runs(pts: list[Sample]) -> tuple[int, float]:
             j += 1
         if j > i:
             hours = (pts[j].at - pts[i].at).total_seconds() / 3600.0
-            if hours >= FLATLINE_HOURS:
+            if hours >= need_hours:
                 runs += 1
                 longest = max(longest, hours)
         i = max(j, i + 1)
@@ -269,7 +331,8 @@ def assess_quality(
 
     gap_limit = cadence * GAP_FACTOR
     big = [d for d in deltas if d > gap_limit]
-    runs, longest_flat = _flatline_runs(pts)
+    need_flat_h = flatline_hours_needed(pts)
+    runs, longest_flat = _flatline_runs(pts, need_hours=need_flat_h)
 
     reasons = [
         f"{len(pts)} lần đo, kỳ vọng {expected} cho cửa sổ {window_days:.0f} ngày "
@@ -289,9 +352,14 @@ def assess_quality(
             f"dài nhất {max(big) / 60.0:.1f} giờ."
         )
     if runs:
+        # Nói ra NGƯỠNG ĐÃ DÙNG, không phải hằng số: ngưỡng suy từ lượng tử của
+        # chính cảm biến này nên nó khác nhau giữa hai nguồn, và một lời buộc tội
+        # "cảm biến kẹt" phải kèm được mốc nó dựa vào.
         reasons.append(
-            f"{runs} lần giá trị đứng yên trên {FLATLINE_HOURS:.0f} giờ "
-            f"(dài nhất {longest_flat:.1f} giờ) — nghi cảm biến kẹt."
+            f"{runs} lần giá trị đứng yên trên {need_flat_h:.0f} giờ "
+            f"(dài nhất {longest_flat:.1f} giờ) — nghi cảm biến kẹt. Ngưỡng suy "
+            f"từ bước đo nhỏ nhất {min_step_l(pts):.0f} L và xu hướng ròng "
+            f"của chuỗi."
         )
     age_h = (now - pts[-1].at).total_seconds() / 3600.0
     if age_h > 24.0:
@@ -755,6 +823,11 @@ def detect_anomalies(
 
     # Cảm biến kẹt bắt RIÊNG: phần dư của một chuỗi kẹt lại rất NHỎ — nó khớp đường
     # thẳng gần hoàn hảo. Đây đúng là ca mà phương pháp phần dư mù hoàn toàn.
+    #
+    # Ngưỡng lấy từ ``flatline_hours_needed`` — CÙNG ngưỡng với assess_quality, chứ
+    # không phải hằng số 6 giờ. Hai chỗ dùng hai ngưỡng khác nhau cho cùng một lời
+    # buộc tội là cách chắc nhất để mất lòng tin vào cả hai.
+    need_flat_h = flatline_hours_needed(pts)
     i = 0
     while i < len(pts) - 1:
         j = i
@@ -762,7 +835,7 @@ def detect_anomalies(
             j += 1
         if j > i:
             hours = (pts[j].at - pts[i].at).total_seconds() / 3600.0
-            if hours >= FLATLINE_HOURS:
+            if hours >= need_flat_h:
                 out.append(
                     Anomaly(
                         at=pts[i].at,
@@ -773,8 +846,11 @@ def detect_anomalies(
                         z=None,
                         note=(
                             f"Giá trị không đổi suốt {hours:.1f} giờ "
-                            f"({j - i + 1} lần đo). Bồn thật luôn bay hơi nên mức phải "
-                            "nhích xuống — nghi cảm biến kẹt."
+                            f"({j - i + 1} lần đo), vượt ngưỡng {need_flat_h:.0f} giờ "
+                            f"suy từ bước đo nhỏ nhất "
+                            f"{min_step_l(pts):.0f} L. Với xu hướng ròng của "
+                            "chuỗi này, mức đã phải nhích xuống trong khoảng đó — "
+                            "nghi cảm biến kẹt."
                         ),
                     )
                 )

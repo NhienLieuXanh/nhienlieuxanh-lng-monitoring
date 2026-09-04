@@ -657,3 +657,101 @@ def test_plan_trips_includes_below_reserve_tank_without_usage_data() -> None:
     assert len(trips) == 1
     assert trips[0].stops[0].psn == "2604200016"
     assert trips[0].total_l > 9_000  # gần một xe đầy
+
+
+# --------------------------------------------------------------------------- #
+# Tổng CÓ DẤU: cảm biến lượng tử thô không được biến thành tiêu thụ ảo
+# --------------------------------------------------------------------------- #
+
+YKH_CAP = 60000.0
+
+
+def _dither(hours: float, *, base: float, quantum: float, step_min: int = 1):
+    """Cảm biến đứng yên nhưng dao động quanh MỘT lượng tử.
+
+    Dựng lại đúng chuỗi đo được trên nhà máy ngày 2026-09-04: 2160 dòng nhịp 1
+    phút, thể tích 53 290 L đầu và cuối, 139 bước -100 L và 139 bước +100 L.
+    """
+    out, t, up = [], T0, False
+    n = int(hours * 60 / step_min)
+    for i in range(n):
+        # đứng yên phần lớn thời gian, thỉnh thoảng nhảy một lượng tử rồi về
+        v = base - quantum if up else base
+        if i % 7 == 0:
+            up = not up
+        out.append(Sample(at=t, volume_l=v, pressure_mpa=0.374))
+        t += timedelta(minutes=step_min)
+    # kết thúc ở đúng giá trị đầu -> ròng bằng 0
+    out.append(Sample(at=t, volume_l=base, pressure_mpa=0.374))
+    return out
+
+
+def test_cam_bien_dao_dong_mot_luong_tu_khong_phai_tieu_thu() -> None:
+    """Ca thật: bồn tiêu thụ 0, cách cũ báo 0,466 m³/ngày.
+
+    Bằng chứng từ nguồn: đồng hồ khí giao 0 Nm³, lưu lượng 0 ở cả 2160 dòng, thể
+    tích đầu = cuối. Tổng giảm 14 080 L đúng bằng tổng tăng 14 080 L.
+    """
+    s = _dither(48.0, base=53290.0, quantum=100.0)
+    est = estimate_consumption(s, capacity_l=YKH_CAP)
+
+    assert est.daily_use_l is None, "không đo được tiêu thụ thì phải nói vậy"
+    assert est.drawdown_l == 0.0, "ròng bằng 0"
+    assert est.rise_l > 1000.0, (
+        "mức DÂNG không-phải-nạp lớn — đó là dấu hiệu cảm biến dao động, và là "
+        "lý do cách tính cũ ra một con số tiêu thụ ảo"
+    )
+    assert est.confidence == "none"
+
+
+def test_bon_rut_that_van_ra_dung_muc_dung() -> None:
+    """Ranh giới: chuỗi giảm đơn điệu phải cho CÙNG kết quả như trước.
+
+    Đây là guard chống việc bản sửa làm mất tiêu thụ thật.
+    """
+    s = _series(start_l=9000.0, per_day_l=500.0, hours=24 * 4)
+    est = estimate_consumption(s, capacity_l=CAP)
+    assert est.daily_use_l is not None
+    assert abs(est.daily_use_l - 500.0) < 25.0
+    # giảm đơn điệu -> KHÔNG có bước dâng nào
+    assert est.rise_l == 0.0
+
+
+def test_nap_giua_cua_so_khong_lam_am_muc_dung() -> None:
+    """Lần nạp bị loại khỏi CẢ tử số lẫn mẫu số, nên ròng không bị nó kéo âm."""
+    a = _series(start_l=9000.0, per_day_l=500.0, hours=24 * 2)
+    jump = a[-1].volume_l + 6000.0
+    b = _series(start_l=jump, per_day_l=500.0, hours=24 * 2)
+    b = [Sample(at=x.at + timedelta(hours=48), volume_l=x.volume_l,
+                pressure_mpa=x.pressure_mpa) for x in b]
+    est = estimate_consumption(a + b, capacity_l=CAP)
+    assert est.refills == 1
+    assert est.daily_use_l is not None and est.daily_use_l > 0
+    assert abs(est.daily_use_l - 500.0) < 40.0
+
+
+def test_bu_nho_duoi_nguong_nap_lam_rong_thap_hon_va_no_HIEN_RA() -> None:
+    """Cái giá của tổng có dấu, và lý do ``gross_drop_l`` tồn tại.
+
+    Một lần bù nhỏ hơn refill_floor (208 L trên bồn 10 425 L) không bị nhận là
+    nạp, nên nó trừ vào số ròng. Chênh lệch giữa hai con số là dấu hiệu duy nhất
+    để người xem biết điều đó đã xảy ra.
+    """
+    s = list(_series(start_l=9000.0, per_day_l=500.0, hours=24 * 3))
+    # chèn một bước dâng 150 L (dưới refill_floor 208 L) vào giữa
+    mid = len(s) // 2
+    s = s[:mid] + [
+        Sample(at=s[mid].at, volume_l=s[mid].volume_l + 150.0, pressure_mpa=0.374)
+    ] + [
+        Sample(at=x.at, volume_l=x.volume_l + 150.0, pressure_mpa=x.pressure_mpa)
+        for x in s[mid:]
+    ]
+    est = estimate_consumption(s, capacity_l=CAP)
+    assert est.refills == 0, "150 L không phải một lần nạp"
+    # 139,6 chứ không phải 150: bucket 30 phút gộp bước dâng với phần rút bình
+    # thường của chính bucket đó (150 - 10,4). Đúng hành vi, không phải sai số.
+    assert est.rise_l >= 130.0, "bước dâng phải hiện ra ở rise_l"
+    # và nó ĐÃ trừ vào số ròng: đó là cái giá của tổng có dấu, hiện ra chứ không ẩn
+    khong_bu = estimate_consumption(
+        _series(start_l=9000.0, per_day_l=500.0, hours=24 * 3), capacity_l=CAP)
+    assert khong_bu.drawdown_l - est.drawdown_l >= 140.0

@@ -483,3 +483,99 @@ def test_day_va_ngan_nhung_da_ngung_bao_van_la_khong_dung_duoc() -> None:
 
     assert q_fresh.grade == "chưa đủ lịch sử"
     assert q_stale.grade == "không dùng được", "cùng chuỗi, chỉ khác tuổi"
+
+
+# ---------- ngưỡng flatline suy từ LƯỢNG TỬ của chính cảm biến ----------
+
+
+def _quantized(hours: float, *, base: float, quantum: float, drop_per_day: float,
+               step_min: int = 30, now: datetime | None = None) -> list[Sample]:
+    """Chuỗi bị LÀM TRÒN về lượng tử — đúng cách cảm biến thô báo số."""
+    t0 = (now or datetime(2026, 9, 3, tzinfo=UTC))
+    n = int(hours * 60 / step_min)
+    out = []
+    for i in range(n + 1):
+        d = i * step_min / 1440.0
+        v = base - drop_per_day * d
+        out.append(Sample(at=t0 + timedelta(minutes=i * step_min),
+                          volume_l=round(v / quantum) * quantum, pressure_mpa=0.374))
+    return out
+
+
+def test_luong_tu_do_duoc_tu_du_lieu() -> None:
+    """Không suy từ dung tích: hai nguồn của dự án thô khác nhau hai bậc."""
+    tho = _quantized(48, base=53290.0, quantum=100.0, drop_per_day=30.0)
+    assert A.min_step_l(tho) == 100.0, "bồn đứng yên -> bước nhỏ nhất LÀ lượng tử"
+    # Trên bồn đang rút nhanh, bước nhỏ nhất quan sát được là lượng RÚT mỗi mẫu
+    # (10 L ở nhịp 30 phút), không phải lượng tử 1 L. Đó là CHẶN TRÊN, và chặn
+    # trên là chiều an toàn khi dùng nó làm ngưỡng buộc tội.
+    dang_rut = _quantized(48, base=9000.0, quantum=1.0, drop_per_day=500.0)
+    assert A.min_step_l(dang_rut) == 10.0
+    assert A.min_step_l([]) == 0.0
+
+
+def test_bon_dung_yen_tren_cam_bien_tho_KHONG_bi_goi_la_ket() -> None:
+    """Ca thật: bay hơi 1,25 L/giờ, lượng tử 100 L -> mức KHÔNG THỂ nhích trong 6h.
+
+    Ngưỡng cứng 6 giờ ở đây báo "nghi cảm biến kẹt" cho một bồn hoàn toàn bình
+    thường, trong khi ``forecast.idle`` của cùng platform CỐ Ý nhận diện những cửa
+    sổ đứng yên đó để tính bay hơi từ chúng.
+    """
+    pts = _quantized(48, base=53290.0, quantum=100.0, drop_per_day=30.0)
+    # Lượng tử 100 L trên xu hướng ròng 2,08 L/giờ -> cần ĐÚNG 48 giờ mới nhích
+    # được một bậc. Ngưỡng cứng 6 giờ nhỏ hơn 8 lần, và đó là chỗ nó buộc tội oan.
+    need = A.flatline_hours_needed(pts)
+    assert need >= 24.0, f"nguong phai lon hon han 6 gio, duoc {need}"
+    q = A.assess_quality(pts, now=pts[-1].at, window_days=7.0)
+    assert q.flatline_runs == 0
+    assert not any("cảm biến kẹt" in r for r in q.reasons)
+    assert not any(a.kind == "cảm biến kẹt" for a in A.detect_anomalies(pts))
+
+
+def test_cam_bien_ket_THAT_van_bi_bat() -> None:
+    """Ranh giới quan trọng nhất: bản sửa không được làm mù bộ phát hiện.
+
+    Bồn rút thật 500 L/ngày trên cảm biến 1 L, rồi kẹt 12 giờ giữa chừng. Xu
+    hướng ròng khác 0 nên ngưỡng hữu hạn, và chuỗi kẹt phải hiện ra.
+    """
+    a = _quantized(24, base=9000.0, quantum=1.0, drop_per_day=500.0)
+    ket = [Sample(at=a[-1].at + timedelta(minutes=30 * (i + 1)),
+                  volume_l=a[-1].volume_l, pressure_mpa=0.374) for i in range(24)]
+    b = _quantized(24, base=float(a[-1].volume_l), quantum=1.0, drop_per_day=500.0,
+                   now=ket[-1].at + timedelta(minutes=30))
+    pts = a + ket + b
+    need = A.flatline_hours_needed(pts)
+    assert need < 24.0, f"nguong phai huu han va nho, duoc {need}"
+    q = A.assess_quality(pts, now=pts[-1].at, window_days=7.0)
+    assert q.flatline_runs >= 1
+    assert any("cảm biến kẹt" in r for r in q.reasons)
+    stuck = [x for x in A.detect_anomalies(pts) if x.kind == "cảm biến kẹt"]
+    assert stuck, "phai co bat thuong 'cam bien ket'"
+    assert "bước đo nhỏ nhất" in stuck[0].note, "phai noi ro nguong dua vao dau"
+
+
+def test_khong_co_xu_huong_thi_dung_yen_khong_ket_luan_duoc_gi() -> None:
+    """Ròng đúng bằng 0: đứng yên trên một bồn không rút là điều PHẢI xảy ra.
+
+    Mất khả năng phát hiện cảm biến kẹt trên một chuỗi phẳng hoàn toàn — nhưng
+    hai ca đó không phân biệt được trên cảm biến thô, và im lặng đúng hơn là
+    buộc tội sai.
+    """
+    t0 = datetime(2026, 9, 3, tzinfo=UTC)
+    pts = [Sample(at=t0 + timedelta(minutes=30 * i), volume_l=53290.0,
+                  pressure_mpa=0.374) for i in range(97)]
+    assert A.flatline_hours_needed(pts) == A.FLATLINE_HOURS, (
+        "khong co buoc nao khac 0 -> khong do duoc buoc nho nhat -> ve hang so"
+    )
+    # va voi mot buoc duy nhat roi phang tro lai (rong = 0) thi la vo cuc
+    pts2 = list(pts)
+    pts2[1] = Sample(at=pts2[1].at, volume_l=53190.0, pressure_mpa=0.374)
+    assert A.flatline_hours_needed(pts2) == float("inf")
+
+
+def test_hai_cho_dung_CUNG_mot_nguong() -> None:
+    """assess_quality và find_anomalies không được buộc tội theo hai mốc khác nhau."""
+    pts = _quantized(48, base=53290.0, quantum=100.0, drop_per_day=30.0)
+    q = A.assess_quality(pts, now=pts[-1].at, window_days=7.0)
+    n_anom = len([x for x in A.detect_anomalies(pts) if x.kind == "cảm biến kẹt"])
+    assert q.flatline_runs == n_anom == 0
