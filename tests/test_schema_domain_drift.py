@@ -20,12 +20,25 @@ import pytest
 
 from app.api import schemas as S
 from app.domain import analytics as A
+from app.domain import forecast as F
+from app.domain.contracts import TerminalStatus
 
 # (tên field, model API, alias kiểu trong domain)
+#
+# Quét toàn bộ schemas.py sau khi sửa ca đầu tiên tìm ra SÁU chỗ nữa cùng lỗi:
+# confidence, method (2 chỗ), verdict, urgency (2 chỗ) — mỗi cái là một 500 đang
+# chờ ngày ai đó thêm một giá trị vào enum domain. Chúng đều đã đổi sang import
+# alias, và danh sách dưới đây là thứ giữ cho chúng không quay lại.
 BOUND = [
     ("grade", S.QualityOut, A.Grade),
     ("risk", S.DeviceHealthOut, A.Risk),
     ("kind", S.AnomalyOut, A.AnomalyKind),
+    ("confidence", S.ConsumptionOut, F.Confidence),
+    ("method", S.IdleTrendOut, F.Method),
+    ("method", S.HoldTimeOut, F.Method),
+    ("verdict", S.GasCrossCheckOut, F.DualVerdict),
+    ("urgency", S.SuggestionOut, F.Urgency),
+    ("urgency", S.DeliveryStopOut, F.Urgency),
 ]
 
 
@@ -72,3 +85,25 @@ def test_hang_du_lieu_moi_qua_duoc_endpoint_phan_tich() -> None:
         reasons=[],
     )
     assert q.grade == "chưa đủ lịch sử"
+
+
+# ---------------------------------------------------------------------------
+# StrEnum thì KHÔNG đổi sang import: pydantic serialize enum khác serialize str,
+# và đổi kiểu ở đây sẽ đổi JSON mà không ai yêu cầu. Nhưng tập giá trị vẫn phải
+# khớp, nên đặt tripwire thay vì đổi kiểu.
+# ---------------------------------------------------------------------------
+
+
+def test_status_literal_khop_TerminalStatus() -> None:
+    vals = typing.get_args(S.TerminalOut.model_fields["status"].annotation)
+    assert set(vals) == {m.value for m in TerminalStatus}, (
+        "Literal status trong schema lệch TerminalStatus. Thêm một trạng thái vào "
+        "enum mà quên schema là 500 trên mọi endpoint trả TerminalOut."
+    )
+
+
+def test_severity_literal_khop_Severity() -> None:
+    from app.domain.alerts import Severity
+
+    vals = typing.get_args(S.AlertOut.model_fields["severity"].annotation)
+    assert set(vals) == {m.value for m in Severity}

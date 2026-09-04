@@ -30,6 +30,7 @@ from pydantic import (
 )
 
 from app.domain.analytics import AnomalyKind, Grade, Risk
+from app.domain.forecast import Confidence, DualVerdict, Method, Urgency
 
 
 class TelemetryOut(BaseModel):
@@ -317,7 +318,7 @@ class ConsumptionOut(BaseModel):
     refills: int = 0
     refill_l: Num = 0.0
     full_days: int = 0
-    confidence: Literal["high", "medium", "low", "none"] = "none"
+    confidence: Confidence = "none"
 
 
 class IdleTrendOut(BaseModel):
@@ -334,7 +335,7 @@ class IdleTrendOut(BaseModel):
     pressure_rise_mpa_per_day: OptNum = None
     idle_windows: int = 0
     idle_hours: Num = 0.0
-    method: Literal["measured", "reference", "insufficient"] = "insufficient"
+    method: Method = "insufficient"
 
 
 class SeriesPointOut(BaseModel):
@@ -420,7 +421,7 @@ class GasCrossCheckOut(BaseModel):
     refills_skipped: int = 0
     segments: int = 0
     active_days: Num = 0.0
-    verdict: Literal["match", "disagree", "insufficient"] = "insufficient"
+    verdict: DualVerdict = "insufficient"
     detail: str = ""
 
 
@@ -442,7 +443,7 @@ class HoldTimeOut(BaseModel):
     relief_mpa: Num = 0.8
     rise_mpa_per_day: OptNum = None
     headroom_mpa: OptNum = None
-    method: Literal["measured", "reference", "insufficient"] = "insufficient"
+    method: Method = "insufficient"
 
 
 class SuggestionOut(BaseModel):
@@ -458,7 +459,7 @@ class SuggestionOut(BaseModel):
     safety_stock_l: Num = 0.0
     lead_time_days: Num = 1.0
     service_level: int = 95
-    urgency: Literal["now", "soon", "ok", "unknown"] = "unknown"
+    urgency: Urgency = "unknown"
     reasons: list[str] = Field(default_factory=list)
 
 
@@ -509,7 +510,7 @@ class DeliveryStopOut(BaseModel):
     name: str | None = None
     order_l: Num
     days_to_reserve: OptNum = None
-    urgency: Literal["now", "soon", "ok", "unknown"] = "unknown"
+    urgency: Urgency = "unknown"
 
 
 class DeliveryTripOut(BaseModel):
