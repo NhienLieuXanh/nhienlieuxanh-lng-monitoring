@@ -91,7 +91,12 @@ CP_MAX_POINTS = 200
 # đây là hệ số nhân trực tiếp vào thời gian chạy.
 CP_MAX_CANDIDATES = 80
 
-Grade = Literal["cao", "trung bình", "thấp", "không dùng được"]
+# "chưa đủ lịch sử" KHÁC "không dùng được", và hai ca đó cần hai hành động TRÁI
+# NGƯỢC: một cái là đợi thêm dữ liệu, một cái là đi sửa thiết bị. Đo được lúc bật
+# nguồn nhà máy: 35 mẫu trải 0,7 ngày trong cửa sổ 90 ngày, nhận đủ 100% mẫu kỳ
+# vọng trong khoảng đó, nhịp đều, không kẹt — độ phủ 1% nên bị dán "không dùng
+# được", trong khi dữ liệu hoàn hảo và chỉ mới có 17 giờ.
+Grade = Literal["cao", "trung bình", "thấp", "chưa đủ lịch sử", "không dùng được"]
 Risk = Literal["cao", "trung bình", "thấp", "chưa đủ dữ liệu"]
 AnomalyKind = Literal["sụt bất thường", "tăng bất thường", "cảm biến kẹt"]
 
@@ -294,14 +299,36 @@ def assess_quality(
 
     # Độ phủ là tiêu chí chính; cảm biến kẹt là phủ quyết. Một chuỗi phủ 95% mà nửa
     # số điểm là giá trị kẹt thì tệ hơn chuỗi phủ 60% trung thực.
-    if len(pts) < MIN_TREND_SAMPLES or coverage < 0.30:
+    # Độ phủ trong KHOẢNG ĐÃ CÓ, tách khỏi độ phủ trên cửa sổ: nó trả lời "nguồn có
+    # bỏ mẫu nào không", còn ``coverage`` trả lời "lịch sử đã dài chưa". Gộp hai câu
+    # đó vào một con số là lý do một nguồn hoàn hảo bị gọi là không dùng được.
+    in_span_expected = max(1.0, span_min / cadence)
+    in_span_coverage = min(1.0, len(pts) / in_span_expected)
+    if len(pts) < MIN_TREND_SAMPLES:
         grade: Grade = "không dùng được"
+    elif coverage < 0.30:
+        # Ba điều kiện, và điều kiện TUỔI là điều kiện dễ quên nhất: một chuỗi dày,
+        # liền mạch, 5 ngày nhưng mẫu cuối cách đây 25 ngày KHÔNG phải "chưa đủ lịch
+        # sử" — đó là thiết bị đã ngừng báo, và gọi nó là "đợi thêm dữ liệu" thì
+        # người vận hành sẽ đợi mãi một thiết bị đã chết.
+        grade = (
+            "chưa đủ lịch sử"
+            if in_span_coverage >= 0.85 and not runs and not big and age_h <= 24.0
+            else "không dùng được"
+        )
     elif runs or coverage < 0.60:
         grade = "thấp"
     elif coverage < 0.85 or jitter > cadence:
         grade = "trung bình"
     else:
         grade = "cao"
+
+    if grade == "chưa đủ lịch sử":
+        reasons.append(
+            f"Trong khoảng đã có, nguồn giao {in_span_coverage * 100:.0f}% số mẫu "
+            f"kỳ vọng và không có khoảng trống — dữ liệu dày và đều, chỉ chưa dài. "
+            f"Cần thêm lịch sử, KHÔNG phải sửa thiết bị."
+        )
 
     return QualityReport(
         samples=len(pts),
@@ -561,9 +588,15 @@ def _rank_risk(
     # hien "RUI RO THAP" canh "DU LIEU KHONG DUNG DUOC" la tu mau thuan, va no nghieng
     # ve phia nguy hiem: im lang ve mot thiet bi ta khong biet gi. Chi ha ket luan
     # LAC QUAN — rui ro cao/trung binh van giu, vi chung dua tren bang chung.
-    if risk == "thấp" and quality_grade == "không dùng được":
+    # "chưa đủ lịch sử" phủ quyết y như "không dùng được": 17 giờ dữ liệu hoàn hảo
+    # vẫn không đủ để kết luận một thiết bị ÍT RỦI RO. Chỉ đổi câu giải thích, vì
+    # việc cần làm khác nhau.
+    if risk == "thấp" and quality_grade in ("không dùng được", "chưa đủ lịch sử"):
         reasons.append(
-            "Không kết luận rủi ro thấp: chuỗi dữ liệu không đủ để đánh giá thiết bị."
+            "Không kết luận rủi ro thấp: lịch sử chưa đủ dài để đánh giá thiết bị."
+            if quality_grade == "chưa đủ lịch sử"
+            else "Không kết luận rủi ro thấp: chuỗi dữ liệu không đủ để đánh giá "
+            "thiết bị."
         )
         return "chưa đủ dữ liệu", cause, dtf
 

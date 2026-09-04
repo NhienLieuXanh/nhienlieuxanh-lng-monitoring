@@ -2365,29 +2365,44 @@
       const skel = document.getElementById("chart-skel");
       const note = document.getElementById("chart-note");
 
-      // Lấy chuỗi 90 ngày MỘT LẦN cho mỗi PSN rồi cache. Skeleton chỉ hiện ở lần
-      // fetch đầu; đổi khoảng 24h/7d/30d sau đó chỉ lọc trong bộ nhớ -> tức thì.
-      let all = chartCache[psn];
-      if (all === undefined) {
+      // Lấy chuỗi cho ĐÚNG cửa sổ đang chọn, gộp theo bucket, rồi cache theo cặp
+      // (psn, cửa sổ). Trước đây đây là MỘT lần lấy 90 ngày với `limit=500&order=asc`
+      // trên endpoint phân trang, nên nó trả 500 dòng CŨ NHẤT: với nguồn 30 phút,
+      // 500 điểm là 10 ngày nên không ai thấy lỗi; với nguồn 1 phút, 500 điểm là
+      // 8 giờ 20 — biểu đồ dừng ở giữa ngày và không bao giờ chạm giá trị hiện tại.
+      // `bucket` là thứ `limit` một mình không làm được: một số điểm cố định phủ
+      // HẾT cửa sổ, bất kể nhịp đo của nguồn dày tới đâu.
+      const bucketFor = (hours) => Math.max(1, Math.round(hours * 60 / 480));
+      const fetchSeries = async (hours) => {
+        const from = new Date(anchor.getTime() - hours * 3600 * 1000);
+        const q = "/api/telemetry/" + encodeURIComponent(psn) + "/series"
+          + `?from=${from.toISOString()}&to=${anchor.toISOString()}`
+          + `&limit=1000&bucket=${bucketFor(hours)}`;
+        return await api(q);
+      };
+
+      const key = psn + ":" + chartHours;
+      let items = chartCache[key];
+      let widened = chartCache[key + ":w"] || false;
+      if (items === undefined) {
         empty.classList.remove("show");
         wrap.classList.add("hidden");
         skel.classList.add("show");
-        const wideFrom = new Date(anchor.getTime() - 89 * 86400 * 1000);
-        const q = "/api/telemetry/" + encodeURIComponent(psn)
-          + `?from=${wideFrom.toISOString()}&to=${anchor.toISOString()}&limit=500&order=asc`;
         try {
-          all = (await api(q)).items;
-          chartCache[psn] = all;
+          items = await fetchSeries(chartHours);
+          // Khoảng đang chọn rỗng -> mở rộng MỘT lần ra 90 ngày. Chỉ tốn thêm một
+          // request đúng trong ca rỗng, không phải mọi lần vẽ.
+          // 89 ngày, không phải 90: history_query TRẢ 422 khi khoảng vượt
+          // max_history_span_days, và 90 là đúng trần đó.
+          if (!items.length && chartHours < 24 * 89) {
+            const wide = await fetchSeries(24 * 89);
+            if (wide.length) { items = wide; widened = true; }
+          }
+          chartCache[key] = items;
+          chartCache[key + ":w"] = widened;
         } catch (e) { skel.classList.remove("show"); if (e.name !== "AuthError") showError(e.message); return; }
         skel.classList.remove("show");
       }
-
-      // Lọc theo khoảng đang chọn; nếu rỗng nhưng PSN có dữ liệu cũ hơn -> hiện tất
-      // cả (auto-widen lấy TỪ CACHE nên không round-trip).
-      const fromMs = anchor.getTime() - chartHours * 3600 * 1000;
-      let items = all.filter(r => new Date(r.sampled_at).getTime() >= fromMs);
-      let widened = false;
-      if (!items.length && all.length) { items = all; widened = true; }
 
       if (!items.length) {
         empty.classList.add("show");
@@ -2401,8 +2416,8 @@
       // Khi khoảng đang chọn không có điểm đo (thiết bị offline lâu), ta hiện toàn
       // bộ lịch sử thật gần nhất — báo rõ để người xem không tưởng biểu đồ sai.
       if (widened) {
-        const first = new Date(items[0].sampled_at).toLocaleDateString("vi-VN");
-        const last = new Date(items[items.length - 1].sampled_at).toLocaleDateString("vi-VN");
+        const first = new Date(items[0].at).toLocaleDateString("vi-VN");
+        const last = new Date(items[items.length - 1].at).toLocaleDateString("vi-VN");
         note.textContent = `Khoảng đã chọn không có dữ liệu đo — đang hiển thị toàn bộ lịch sử gần nhất (${first} → ${last}).`;
         note.hidden = false;
       } else {
@@ -2412,8 +2427,19 @@
         ? "Khoảng đã chọn không có dữ liệu đo — đang hiển thị lịch sử 90 ngày gần nhất"
         : "";
 
-      const labels = items.map(r => new Date(r.sampled_at)
-        .toLocaleString("vi-VN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
+      // Nhãn trục: GIỜ thôi, và chỉ thêm NGÀY khi sang ngày mới. Trước đây dùng
+      // toLocaleString("vi-VN", {month,day,hour,minute}) -> "00:42 03-09" trên MỌI
+      // điểm, nên với nguồn 1 phút các nhãn dính vào nhau thành "03-0900:42" và
+      // ngày lặp lại vô nghĩa hàng trăm lần.
+      let lastDay = null;
+      const labels = items.map(r => {
+        const d = new Date(r.at);
+        const dayKey = d.toDateString();
+        const hhmm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+        if (dayKey === lastDay) return hhmm;
+        lastDay = dayKey;
+        return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hhmm}`;
+      });
       const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l) / 1000);
       const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
       const cVol = cssVar("--chart-vol"), cPres = cssVar("--chart-pres"), cGrid = cssVar("--grid"), cAxis = cssVar("--axis");
@@ -3172,7 +3198,11 @@
     // nhãn này được dùng ở ba chỗ trong thẻ và chúng phải tô màu giống nhau.
     const RISK_CLS = { "cao": "crit", "trung bình": "warn", "thấp": "ok", "chưa đủ dữ liệu": "" };
     const RISK_CARD = { "cao": "r-cao", "trung bình": "r-tb", "thấp": "r-thap", "chưa đủ dữ liệu": "r-nd" };
-    const GRADE_CLS = { "cao": "ok", "trung bình": "warn", "thấp": "crit", "không dùng được": "crit" };
+    // "chưa đủ lịch sử" là warn, KHÔNG phải crit: dữ liệu dày và đều, chỉ chưa dài.
+    // Việc cần làm là đợi, không phải đi sửa thiết bị — nên nó không được nhuộm đỏ
+    // như một chuỗi hỏng.
+    const GRADE_CLS = { "cao": "ok", "trung bình": "warn", "thấp": "crit",
+                        "chưa đủ lịch sử": "warn", "không dùng được": "crit" };
 
     function anTile(label, value, sub, cls) {
       return `<div class="an-tile">
@@ -3249,11 +3279,17 @@
           ${anTile("Độ phủ dữ liệu", esc(pct(q.coverage)),
                    `${q.samples ?? "--"} / ${q.expected_samples ?? "--"} lần đo`)}
           ${anTile("Pin", b.current_v == null ? "--" : esc(Number(b.current_v).toFixed(2)) + "<small>V</small>",
-                   b.volts_per_day == null
-                     ? "Chưa đo được xu hướng"
-                     : `${(b.volts_per_day * 1000).toFixed(1)} mV/ngày · tin cậy ${esc(b.confidence)}`)}
+                   b.current_v == null
+                     ? "Không có số đo pin"
+                     : b.volts_per_day == null
+                       ? "Chưa đo được xu hướng"
+                       : `${(b.volts_per_day * 1000).toFixed(1)} mV/ngày · tin cậy ${esc(b.confidence)}`)}
           ${anTile("Sóng", s.current_percent == null ? "--" : esc(Number(s.current_percent).toFixed(0)) + "<small>%</small>",
-                   s.below_floor_ratio ? `${pct(s.below_floor_ratio)} mẫu dưới sàn ${esc(s.floor_percent)}%` : "Trên sàn")}
+                   s.current_percent == null
+                     ? "Không có số đo sóng"
+                     : s.below_floor_ratio
+                       ? `${pct(s.below_floor_ratio)} mẫu dưới sàn ${esc(s.floor_percent)}%`
+                       : "Trên sàn")}
           ${anTile("Tỉ lệ nhận mẫu", esc(pct(h.delivery_ratio)),
                    "Trong khoảng thiết bị còn báo")}
           ${anTile("Bất thường", String((a.anomalies || []).length),

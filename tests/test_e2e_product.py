@@ -61,6 +61,8 @@ SESSION_GET = frozenset({
     "/api/terminals/{psn}",
     "/api/telemetry/{psn}",
     "/api/telemetry/{psn}/latest",
+    # Chuỗi cho biểu đồ: gộp bucket, giữ phần mới nhất. Xem docstring ở router.
+    "/api/telemetry/{psn}/series",
     "/api/forecast",
     "/api/forecast/{psn}",
     "/api/analytics",

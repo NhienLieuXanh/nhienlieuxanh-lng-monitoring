@@ -322,6 +322,20 @@ class IdleTrendOut(BaseModel):
     method: Literal["measured", "reference", "insufficient"] = "insufficient"
 
 
+class SeriesPointOut(BaseModel):
+    """Một điểm cho biểu đồ xu hướng. CỐ Ý mỏng, không phải ``TelemetryOut``.
+
+    Biểu đồ cần ba cột trên hàng nghìn điểm; ``/api/telemetry/{psn}`` hydrate cả
+    ORM object kèm ``raw_payload`` JSONB (~1 KB/dòng) và chạy thêm COUNT(*) mà
+    biểu đồ không dùng. Đúng lý do ``repositories.telemetry.series()`` tồn tại
+    tách khỏi ``history()``.
+    """
+
+    at: datetime
+    volume_l: float | None = None
+    pressure_mpa: float | None = None
+
+
 class VendorAlarmOut(BaseModel):
     """Một dòng báo động thô của nguồn.
 

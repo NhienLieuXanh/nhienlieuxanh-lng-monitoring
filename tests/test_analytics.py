@@ -158,7 +158,12 @@ class TestQuality:
         q = A.assess_quality(s, now=s[-1].at, window_days=30.0)
         assert q.expected_samples == 30 * 48  # 30 ngày ở nhịp 30 phút
         assert q.coverage == pytest.approx(5.0 / 30.0, abs=0.02)
-        assert q.grade == "không dùng được"
+        # Nhãn ĐỔI có chủ ý (2026-09-03): chuỗi này dày, liền mạch, và mẫu cuối là
+        # `now` — nên nó là "chưa đủ lịch sử", việc cần làm là ĐỢI. Gọi nó "không
+        # dùng được" là buộc tội sai một nguồn đang chạy tốt, đúng lớp lỗi đã gặp
+        # thật khi bật nguồn nhà máy. Con số độ phủ — điều test này ra đời để bảo
+        # vệ — KHÔNG đổi: vẫn 17%, vẫn đo trên cửa sổ chứ không trên khoảng dữ liệu.
+        assert q.grade == "chưa đủ lịch sử"
         assert any("chỉ trải" in r for r in q.reasons)
 
     def test_long_gap_is_counted_and_measured(self):
@@ -391,3 +396,90 @@ class TestChangePoints:
     def test_short_series_is_not_cut(self):
         s = _series(start_l=9000.0, per_day_l=500.0, hours=6)
         assert A.change_points(s) == []
+
+
+# ---------- "chưa đủ lịch sử" KHÁC "không dùng được" ----------
+
+
+def _dense_short_series(hours: float, cadence_min: float, now: datetime) -> list[Sample]:
+    """Chuỗi DÀY và ĐỀU nhưng NGẮN — nguồn mới bật, không phải nguồn hỏng."""
+    n = int(hours * 60 / cadence_min)
+    return [
+        Sample(
+            at=now - timedelta(minutes=cadence_min * (n - 1 - i)),
+            volume_l=20000.0 - i * 5.0,
+            pressure_mpa=0.374,
+        )
+        for i in range(n)
+    ]
+
+
+def test_du_lieu_day_nhung_ngan_la_chua_du_lich_su() -> None:
+    """Ca thật đo được lúc bật nguồn nhà máy, cửa sổ 90 ngày.
+
+    35 mẫu trải 0,7 ngày, nhận đủ 100% mẫu kỳ vọng trong khoảng đó, nhịp đều,
+    không kẹt. Độ phủ trên cửa sổ là 1% nên nó từng bị dán "không dùng được" —
+    một lời buộc tội sai: dữ liệu hoàn hảo, chỉ mới có 17 giờ. Hai ca đó cần hai
+    hành động trái ngược, nên chúng phải có hai cái tên.
+    """
+    now = datetime(2026, 9, 3, 17, 30, tzinfo=UTC)
+    pts = _dense_short_series(hours=17.5, cadence_min=30.0, now=now)
+    q = A.assess_quality(pts, now=now, window_days=90.0)
+
+    assert q.samples == 35
+    assert q.coverage < 0.05, "độ phủ trên cửa sổ 90 ngày đúng là rất thấp"
+    assert q.grade == "chưa đủ lịch sử"
+    joined = " ".join(q.reasons)
+    assert "chỉ chưa dài" in joined
+    assert "KHÔNG phải sửa thiết bị" in joined
+
+
+def test_du_lieu_thua_thot_van_la_khong_dung_duoc() -> None:
+    """Ranh giới: thưa thớt trong khoảng đã có thì vẫn là chuỗi không dùng được.
+
+    Cùng độ phủ cửa sổ, nhưng nguồn bỏ mẫu — đó là thiết bị cần sửa, và bản sửa
+    không được nhân từ với ca này.
+    """
+    now = datetime(2026, 9, 3, 17, 30, tzinfo=UTC)
+    dense = _dense_short_series(hours=17.5, cadence_min=30.0, now=now)
+    # Giữ 1/3 số mẫu, rải đều -> khoảng trống lớn hơn nhịp suy ra.
+    sparse = [p for i, p in enumerate(dense) if i % 3 == 0]
+    sparse += _dense_short_series(hours=1.0, cadence_min=5.0, now=now)
+    sparse.sort(key=lambda p: p.at)
+    q = A.assess_quality(sparse, now=now, window_days=90.0)
+    assert q.grade == "không dùng được"
+
+
+def test_qua_it_mau_van_la_khong_dung_duoc() -> None:
+    """Dưới MIN_TREND_SAMPLES thì không kết luận gì được, kể cả 'chưa đủ lịch sử'."""
+    now = datetime(2026, 9, 3, 17, 30, tzinfo=UTC)
+    pts = _dense_short_series(hours=2.0, cadence_min=30.0, now=now)
+    assert len(pts) < 12
+    q = A.assess_quality(pts, now=now, window_days=90.0)
+    assert q.grade == "không dùng được"
+
+
+def test_chua_du_lich_su_van_phu_quyet_ket_luan_rui_ro_thap() -> None:
+    """17 giờ dữ liệu hoàn hảo vẫn KHÔNG đủ để gọi một thiết bị là ít rủi ro."""
+    now = datetime(2026, 9, 3, 17, 30, tzinfo=UTC)
+    pts = _dense_short_series(hours=17.5, cadence_min=30.0, now=now)
+    hs = [A.HealthSample(at=p.at, battery_v=None, signal_percent=None) for p in pts]
+    h = A.assess_device_health(hs, psn="YKH-TANK-01", now=now, quality_grade="chưa đủ lịch sử")
+    assert h.risk == "chưa đủ dữ liệu"
+    assert any("lịch sử chưa đủ dài" in r for r in h.reasons)
+
+
+def test_day_va_ngan_nhung_da_ngung_bao_van_la_khong_dung_duoc() -> None:
+    """Điều kiện dễ quên nhất của bản sửa: TUỔI của mẫu cuối.
+
+    Chuỗi dày, liền mạch, 5 ngày — nhưng mẫu cuối cách đây 25 ngày. Đó không phải
+    "chưa đủ lịch sử"; đó là thiết bị đã ngừng báo. Dán nhãn "đợi thêm dữ liệu" lên
+    nó thì người vận hành sẽ đợi mãi một thiết bị đã chết.
+    """
+    last = datetime(2026, 9, 3, 17, 30, tzinfo=UTC)
+    pts = _dense_short_series(hours=24 * 5, cadence_min=30.0, now=last)
+    q_fresh = A.assess_quality(pts, now=last, window_days=90.0)
+    q_stale = A.assess_quality(pts, now=last + timedelta(days=25), window_days=90.0)
+
+    assert q_fresh.grade == "chưa đủ lịch sử"
+    assert q_stale.grade == "không dùng được", "cùng chuỗi, chỉ khác tuổi"
