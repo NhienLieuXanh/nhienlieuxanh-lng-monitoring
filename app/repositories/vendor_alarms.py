@@ -87,6 +87,11 @@ class AlarmEpisode:
     site_code: str
     device_id: str
     message: str
+    #: Khoá "cùng một việc" — chính thứ ``summarize`` group theo, và chính thứ nằm
+    #: trong khoá tự nhiên ở đường ghi. Phát ra để tầng cảnh báo dựng được mã
+    #: chặn-gửi-lại theo ĐÚNG đơn vị việc, không phải theo thiết bị (một van có
+    #: thể báo hai lỗi khác nhau, và gộp chúng làm mất đúng thông tin cần).
+    message_hash: str
     count: int
     first_raised_at: datetime
     last_raised_at: datetime
@@ -126,6 +131,7 @@ def summarize(
         select(
             VendorAlarm.site_code,
             VendorAlarm.device_id,
+            VendorAlarm.message_hash,
             func.min(VendorAlarm.message).label("message"),
             func.count().label("n"),
             func.min(VendorAlarm.raised_at).label("first_at"),
@@ -144,6 +150,7 @@ def summarize(
             site_code=r.site_code,
             device_id=r.device_id,
             message=r.message,
+            message_hash=r.message_hash,
             count=int(r.n),
             first_raised_at=r.first_at,
             last_raised_at=r.last_at,

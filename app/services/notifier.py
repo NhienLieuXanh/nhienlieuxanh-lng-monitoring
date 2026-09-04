@@ -38,6 +38,7 @@ from app.domain.smtp_errors import explain as explain_smtp
 from app.repositories import notifications as notif_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.repositories import vendor_alarms as alarm_repo
 from app.services.appconfig import ConfigLike, load_config
 
 log = logging.getLogger(__name__)
@@ -49,6 +50,17 @@ UTC = ZoneInfo("UTC")
 NOTIFY_CODES = frozenset(
     {"RUNOUT", "HOLD_TIME", "LOW_VOLUME", "OFFLINE", "BOIL_OFF_HIGH", "LOW_BATTERY"}
 )
+
+#: Tiền tố mã cho báo động do NGUỒN phát. Không nằm trong ``NOTIFY_CODES`` vì mã
+#: mang theo định danh của việc (thiết bị + hash thông điệp) — cửa chặn gửi lại
+#: khoá theo ``(psn, code)`` nên một mã dùng chung sẽ làm việc thứ hai bị chặn im
+#: lặng sau việc thứ nhất.
+VENDOR_CODE_PREFIX = "VENDOR:"
+
+#: Trần số việc đưa vào một email. Báo động của nguồn đã được gộp nên con số thật
+#: nhỏ (đo được: 289 dòng thô -> 6 việc), nhưng một nhà máy có nhiều thiết bị chập
+#: chờn thì không được biến email thành một bức tường.
+VENDOR_MAX_NOTICES = 12
 
 _SEV_ORDER = {"critical": 0, "warning": 1, "info": 2}
 _SEV_LABEL = {"critical": "NGHIÊM TRỌNG", "warning": "CẢNH BÁO", "info": "THÔNG TIN"}
@@ -150,9 +162,77 @@ def collect_notices(
         for fa in f.alerts:
             out.append(Notice(t.psn, t.name, fa.code, fa.severity, fa.message))
 
-    picked = [n for n in out if n.code in NOTIFY_CODES]
+    out.extend(_vendor_notices(session, settings, now))
+
+    picked = [
+        n
+        for n in out
+        if n.code in NOTIFY_CODES or n.code.startswith(VENDOR_CODE_PREFIX)
+    ]
     picked.sort(key=lambda n: (_SEV_ORDER.get(n.severity, 9), n.psn, n.code))
     return picked
+
+
+def _vendor_notices(
+    session: Session, settings: ConfigLike, now: datetime
+) -> list[Notice]:
+    """Báo động do NGUỒN phát, gộp thành việc, thành Notice để vào email.
+
+    Vì sao mục này tồn tại: soát ngày 2026-09-04 thấy email cảnh báo (và báo cáo
+    trình ký, và header) hoàn toàn im lặng trong khi nhà máy đang báo động 5 thiết
+    bị với 289 dòng thô. Ba chỗ đó cùng bỏ qua một nguồn sự thật.
+
+    Dùng lại ĐÚNG ``summarize`` mà dashboard và báo cáo dùng, nên email không thể
+    nói khác màn hình. Cửa sổ 24 giờ: cùng cửa sổ với chip ở header.
+
+    ``severity`` là "warning" cho mọi việc, CỐ Ý. Nguồn gắn cùng một mức
+    "nguy hiểm" cho toàn bộ dòng (đo được: 194/194 dòng đều ``danger``), nên xếp
+    mức nặng nhẹ ở đây là bịa ra một thứ tự không có trong dữ liệu. Đặt
+    "critical" cho tất cả thì mọi email thành nghiêm trọng và không còn phân biệt
+    được với một bồn thật sắp cạn.
+
+    Lỗi thì trả danh sách rỗng và ghi log: một bảng báo động không đọc được không
+    được phép làm chết vòng cảnh báo của những bồn khác.
+    """
+    psn = getattr(settings, "vendor_alarm_psn", None) or ""
+    try:
+        eps, _ = alarm_repo.summarize(
+            session, start=now - timedelta(hours=24), end=now
+        )
+    except Exception as exc:
+        log.warning("notify: không đọc được báo động nguồn: %s", exc)
+        return []
+
+    out: list[Notice] = []
+    for e in eps[:VENDOR_MAX_NOTICES]:
+        out.append(
+            Notice(
+                psn=psn or e.site_code,
+                name=None,
+                # 32 ký tự là trần của cột ``notifications.code``:
+                # "VENDOR:" + 8 + ":" + 8 = 24.
+                code=f"{VENDOR_CODE_PREFIX}{e.device_id[:8]}:{e.message_hash[:8]}",
+                severity="warning",
+                message=(
+                    f"Nhà máy báo động — {e.device_id}: {e.message} "
+                    f"({e.count} lần trong 24 giờ qua)"
+                ),
+            )
+        )
+    if len(eps) > VENDOR_MAX_NOTICES:
+        out.append(
+            Notice(
+                psn=psn or (eps[0].site_code if eps else ""),
+                name=None,
+                code=f"{VENDOR_CODE_PREFIX}OVERFLOW",
+                severity="warning",
+                message=(
+                    f"Còn {len(eps) - VENDOR_MAX_NOTICES} việc báo động nữa của nhà "
+                    f"máy không đưa vào thư này — xem trang Báo cáo."
+                ),
+            )
+        )
+    return out
 
 
 def notify(session: Session, settings: ConfigLike, now: datetime) -> NotifyStats:

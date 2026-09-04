@@ -1089,6 +1089,19 @@
         <span class="kpi ok"><b class="num" id="stat-online">--</b> trực tuyến</span>
         <span class="kpi bad"><b class="num" id="stat-offline">--</b> ngoại tuyến</span>
         <span class="kpi bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
+        <!-- Chip RIÊNG, không cộng vào "cảnh báo": đó là cảnh báo platform tự suy
+             (ngoại tuyến / sắp cạn / pin / sóng), còn đây là sự cố thiết bị tại nhà
+             máy (van, công tắc áp). Hai việc, hai người phải gọi. Gộp lại thành một
+             con số thì không ai biết gọi ai. Ẩn khi bằng 0 để không thêm nhiễu cho
+             nguồn không phát báo động.
+
+             GIÁ PHẢI TRẢ, đo được: chip này rộng 132px so với 83-96px của các chip
+             khác, nên khi nó hiện thì `.kpis` (455px khả dụng ở cửa sổ 1540px) tràn
+             60px và fitKpis bỏ thêm "bồn" + "trực tuyến". Chấp nhận: nó chỉ hiện
+             khi nhà máy ĐANG có báo động, và đúng lúc đó thì hai chip kia là thứ
+             đáng mất nhất — "bồn" suy được từ trực tuyến + ngoại tuyến, và trạng
+             thái từng bồn có ngay ở danh sách bên dưới. -->
+        <span class="kpi bad" id="kpi-vendor" hidden><b class="num" id="stat-vendor">--</b> báo động nhà máy</span>
         <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
         <span id="stat-critical" hidden></span>
       </div>
@@ -2001,6 +2014,18 @@
       const critTanks = new Set(merged.filter(a => a.severity === "critical").map(a => a.psn)).size;
       document.getElementById("stat-alert").textContent = alertTanks;
       document.getElementById("stat-critical").textContent = critTanks;
+      // Báo động của NGUỒN. Soát 2026-09-04: header hiện "0 cảnh báo" trong khi
+      // nguồn đang có 6 việc mở trên 5 thiết bị — người vận hành nhìn header sẽ
+      // kết luận nhà máy bình thường.
+      const nVendor = Number(summary.vendor_alarms || 0);
+      const vEl = document.getElementById("kpi-vendor");
+      document.getElementById("stat-vendor").textContent = nVendor;
+      vEl.hidden = nVendor === 0;
+      vEl.dataset.want = nVendor ? "1" : "0";
+      vEl.title = nVendor
+        ? `${nVendor} việc báo động do nhà máy phát trong 24 giờ qua (đã gộp các `
+          + `dòng lặp). Xem chi tiết ở trang Báo cáo.`
+        : "";
       const vol = summary.total_volume_l;
       const volEl = document.getElementById("stat-volume");
       // Tổng thể tích là tổng của các LẦN ĐỌC CUỐI, không phải số hiện tại. Khi mọi
@@ -2029,7 +2054,10 @@
     // Thứ tự BỎ chip khi thanh trên hết chỗ — bỏ dần từ đầu danh sách. "Cảnh báo" ở
     // cuối nên nó là thứ cuối cùng biến mất. "Bồn" bỏ trước vì suy được từ
     // trực tuyến + ngoại tuyến.
-    const KPI_DROP = ["stat-total", "stat-online", "stat-volume", "stat-offline", "stat-alert"];
+    // "báo động nhà máy" đứng ngay trước "cảnh báo": nó quan trọng nên bỏ muộn,
+    // nhưng vẫn bỏ trước "cảnh báo" để giữ đúng lời hứa ở đoạn trên.
+    const KPI_DROP = ["stat-total", "stat-online", "stat-volume", "stat-offline",
+                      "stat-vendor", "stat-alert"];
 
     // Vì sao phải đo bằng JS thay vì một media query. `.kpis` là phần tử co giãn duy
     // nhất ở thanh trên nên nó hứng toàn bộ chỗ thiếu, và `overflow: hidden` cắt chip
@@ -2043,7 +2071,9 @@
       const chips = KPI_DROP
         .map(id => (document.getElementById(id) || {}).parentElement)
         .filter(Boolean);
-      for (const c of chips) c.hidden = false;
+      // Bật lại theo Ý MUỐN của renderStats, không bật vô điều kiện: chip "báo
+      // động nhà máy" phải ở ẩn khi đếm bằng 0, và fitKpis chạy sau renderStats.
+      for (const c of chips) c.hidden = c.dataset.want === "0";
       for (const c of chips) {
         // Đọc lại mỗi vòng: mỗi lần ẩn là một lần dàn lại trang.
         if (box.scrollWidth <= box.clientWidth) break;

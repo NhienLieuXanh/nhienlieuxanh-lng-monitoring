@@ -208,6 +208,16 @@ class SummaryOut(BaseModel):
     offline: int
     alert: int
     critical: int = 0
+    #: Số "việc" báo động do NGUỒN phát trong 24 giờ qua (đã gộp các dòng lặp).
+    #: ĐẾM RIÊNG, không cộng vào ``alert``: hai thứ khác nhau và cần hai hành động
+    #: khác nhau. ``alert`` là cảnh báo platform tự suy (ngoại tuyến / sắp cạn /
+    #: pin / sóng) — việc của người quản lý tài sản. Đây là sự cố thiết bị tại nhà
+    #: máy (van, công tắc áp) — việc của người vận hành hiện trường. Gộp lại thành
+    #: một con số thì không ai biết phải gọi ai.
+    #:
+    #: Lý do nó tồn tại: soát ngày 2026-09-04 thấy header hiện "0 cảnh báo" trong
+    #: khi nguồn đang có 6 việc mở trên 5 thiết bị (PS1, PS2, SV2, SV3, SV4).
+    vendor_alarms: int = 0
     total_volume_l: Decimal | None = None
     generated_at: datetime
 

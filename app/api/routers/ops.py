@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.deps import AdminDep, SessionDep, SettingsDep, UserDep, to_terminal_out
 from app.api.schemas import (
@@ -29,6 +30,7 @@ from app.repositories import ingest_runs as runs_repo
 from app.repositories import notifications as notif_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.repositories import vendor_alarms as alarm_repo
 from app.services import notifier
 
 log = logging.getLogger(__name__)
@@ -217,6 +219,23 @@ def health(
     )
 
 
+def _vendor_alarm_count(session: Session, now: datetime) -> int:
+    """Số việc báo động của nguồn trong 24 giờ qua.
+
+    Dùng lại ĐÚNG ``summarize`` mà thẻ "Báo động của nhà máy" dùng, nên con số ở
+    header không thể lệch với bảng. Lỗi thì trả 0 và ghi log: một bảng báo động
+    không đọc được không được phép làm chết cả trang chủ.
+    """
+    try:
+        eps, _ = alarm_repo.summarize(
+            session, start=now - timedelta(hours=24), end=now
+        )
+        return len(eps)
+    except Exception as exc:
+        log.warning("summary: không đọc được báo động nguồn: %s", exc)
+        return 0
+
+
 @router.get("/stats/summary", response_model=SummaryOut)
 def summary(session: SessionDep, settings: SettingsDep, _: UserDep) -> SummaryOut:
     outs, snaps, now = _snapshots(session, settings)
@@ -231,6 +250,7 @@ def summary(session: SessionDep, settings: SettingsDep, _: UserDep) -> SummaryOu
         # không phải "số offline" như placeholder của prototype.
         alert=len({a.psn for a in found}),
         critical=len({a.psn for a in found if a.severity is Severity.CRITICAL}),
+        vendor_alarms=_vendor_alarm_count(session, now),
         total_volume_l=sum(volumes, Decimal(0)) if volumes else None,
         generated_at=now.astimezone(settings.tzinfo),
     )

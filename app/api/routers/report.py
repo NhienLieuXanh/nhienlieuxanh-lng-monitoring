@@ -47,6 +47,7 @@ from app.domain.alerts import fill_percent
 from app.domain.status import derive_status
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
+from app.repositories import vendor_alarms as alarm_repo
 from app.services import notifier
 from app.services.appconfig import ConfigLike, load_config
 
@@ -674,6 +675,52 @@ def export_report(
         empty="Không có cảnh báo nào đang mở.",
     )
 
+    # Báo động do NGUỒN phát. Mục này tồn tại vì soát ngày 2026-09-04: báo cáo
+    # trình ký nói "Không có cảnh báo nào đang mở" trong khi nhà máy đang báo động
+    # 5 thiết bị (PS1, PS2, SV2, SV3, SV4) với 289 dòng thô. Đây là tài liệu đem
+    # đi ký, nên một khoảng trống ở đây là một lời nói sai có chữ ký bên dưới.
+    #
+    # Dùng lại ĐÚNG ``summarize`` mà dashboard dùng, nên báo cáo không thể nói
+    # khác màn hình. Lỗi thì ra bảng rỗng kèm lý do, KHÔNG làm chết cả báo cáo.
+    va_note = ""
+    rows_va: list[str] = []
+    va_raw = 0
+    try:
+        # ``va_ep`` chứ không phải ``e``: scope hàm là phẳng nên trùng tên với
+        # vòng lặp RefillEvent phía trên làm mypy suy sai kiểu cho cả hai.
+        va_eps, va_raw = alarm_repo.summarize(
+            session, start=period_start, end=period_end
+        )
+        for va_ep in va_eps:
+            rows_va.append(
+                "<tr>"
+                f"<td>{_e(va_ep.device_id)}</td>"
+                f"<td>{_e(va_ep.message)}</td>"
+                f'<td class="n">{va_ep.count}</td>'
+                f'<td class="c">{_dt(va_ep.first_raised_at, cfg)}</td>'
+                f'<td class="c">{_dt(va_ep.last_raised_at, cfg)}</td>'
+                "</tr>"
+            )
+    except Exception as exc:  # pragma: no cover - đường phòng vệ
+        log.warning("report: không đọc được báo động nguồn: %s", exc)
+        va_note = "Không đọc được báo động của nguồn trong kỳ này."
+    tbl_va = _table(
+        [
+            ("Thiết bị", ""),
+            ("Việc", ""),
+            ("Số lần", "n"),
+            ("Lần đầu", "c"),
+            ("Lần cuối", "c"),
+        ],
+        rows_va,
+        empty=va_note or "Nguồn không phát báo động nào trong kỳ báo cáo.",
+    )
+    va_sum = (
+        f"{va_raw} dòng thô gộp thành {len(rows_va)} việc."
+        if rows_va
+        else ""
+    )
+
     body = f"""
 <div class="bar">
   <button type="button" class="pri" onclick="window.print()">In / Lưu thành PDF</button>
@@ -736,7 +783,17 @@ def export_report(
   </div>
 
   <div class="sec">
-    <h2><span class="num">7.</span>Ghi chú phương pháp</h2>
+    <h2><span class="num">7.</span>Báo động của nhà máy</h2>
+    {tbl_va}
+    <p class="note">Đây là báo động do <b>chính thiết bị tại nhà máy</b> phát, khác mục 6
+    (cảnh báo hệ thống tự suy từ mức chứa, dự báo cạn, pin và sóng). Nguồn phát lại cùng
+    một dòng mỗi lần quét trong khi điều kiện còn đúng, nên các dòng giống nhau đã được
+    gộp thành một việc kèm số lần và khoảng thời gian. {_e(va_sum)} Nguồn gắn cùng một
+    mức nguy hiểm cho mọi dòng nên hệ thống <b>không</b> tự xếp mức nặng nhẹ ở đây.</p>
+  </div>
+
+  <div class="sec">
+    <h2><span class="num">8.</span>Ghi chú phương pháp</h2>
     <div class="meth">
       <p><b>Dấu phẩy là dấu thập phân.</b> Không nhóm hàng nghìn; mọi thể tích tính bằng m³.</p>
       <p><b>Ô ghi “—”</b> nghĩa là thiết bị không gửi giá trị đó, KHÔNG phải bằng 0.</p>
