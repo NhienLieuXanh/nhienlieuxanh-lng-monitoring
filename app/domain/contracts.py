@@ -199,10 +199,6 @@ class MappingReport:
     # tự). Đây là câu trả lời trực tiếp cho "thiết bị còn báo không", độc lập với
     # việc ta có giữ dòng nào lại hay không.
     newest_source_at: str | None = None
-    # Định danh thiết bị/bồn mà NGUỒN tự khai trong payload. Không phải PSN của ta:
-    # nó là bằng chứng ta vẫn đang đọc đúng cái vật lý mình nghĩ. Nguồn nào không
-    # khai thì để None.
-    source_device: str | None = None
     present: dict[str, int] = field(default_factory=dict)
     resolved_from: dict[str, str] = field(default_factory=dict)
     unmapped_keys: set[str] = field(default_factory=set)
@@ -227,7 +223,6 @@ class MappingReport:
             "n_rows": self.n_rows,
             "source_rows": self.source_rows,
             "newest_source_at": self.newest_source_at,
-            "source_device": self.source_device,
             "coverage": self.coverage(),
             "present": self.present,
             "resolved_from": self.resolved_from,

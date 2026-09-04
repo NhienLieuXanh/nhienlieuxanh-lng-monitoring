@@ -40,15 +40,22 @@ class YokohamaSettings(BaseSettings):
     # capture discovery ghi được; production ngày 2026-09-03 đo được ``mdy``, nên
     # môi trường nào thấy mm/dd phải đặt YOKOHAMA_TIMESTAMP_ORDER=mdy. Không tự
     # đoán: xem ghi chú ở mapping.TIMESTAMP_ORDERS.
-    timestamp_order: Literal["dmy", "mdy"] = "dmy"
+    # Định dạng ngày ta GỬI LÊN. Đây là setting quan trọng nhất của cả nguồn này,
+    # vì trên cổng đó nó không phải cách viết mà là BỘ CHỌN DỮ LIỆU. Đo trực tiếp
+    # 2026-09-04, tái lập 3/3 mỗi chiều, và ``device`` bị bỏ qua hoàn toàn:
+    #
+    #   gửi mm/dd -> nhận dd/mm, Refill Count 70, 53,19 m³, tot 1.132k  <- trang Main
+    #   gửi dd/mm -> nhận mm/dd, Refill Count 38, 45,58 m³, tot   747k
+    #
+    # Mặc định ``mdy`` vì đó là chuỗi trang Main của cổng hiển thị, tức là thứ người
+    # vận hành đang nhìn. Đối chiếu ảnh trang Main 04/09/2026 11:23: Volume 53.19,
+    # Level 88.65, Pressure 4.66 bar, GM Totalizer 1132428.36, Refill Count 70.
+    request_order: Literal["dmy", "mdy"] = "mdy"
     # Thứ tự ngày của endpoint BÁO ĐỘNG, tách riêng vì cùng một cổng cùng một lúc
     # trả hai định dạng khác nhau trên hai endpoint. Đo 2026-09-04 trên 1100 báo
     # động: dd/mm. Đây là mặc định ĐÚNG, không phải bản sao của dòng trên.
     alarm_timestamp_order: Literal["dmy", "mdy"] = "dmy"
-    # Bồn được phép đọc, theo ``tankNumber`` nguồn tự khai. None = chỉ ghi nhận,
-    # không chặn. Đặt số thật rồi thì mọi lần cổng đổi chuỗi trả về đều bị chặn
-    # thay vì âm thầm ghi lẫn hai bồn vào một PSN.
-    tank_number: int | None = None
+
     timeout_seconds: float = 30.0
     connect_timeout_seconds: float = 10.0
     max_stream_bytes: int = Field(8 * 1024 * 1024, ge=64)
@@ -70,6 +77,20 @@ class YokohamaSettings(BaseSettings):
                 "đặt YOKOHAMA_BASE_URL trong .env; địa chỉ nội bộ không được ghi vào repo"
             )
         return self
+
+    @property
+    def record_order(self) -> str:
+        """Thứ tự ngày ta ĐỌC VỀ — luôn là NGHỊCH ĐẢO của thứ tự gửi lên.
+
+        Suy ra thay vì để cấu hình riêng, vì hai thứ này bị cổng ràng buộc với
+        nhau và đặt lệch nhau là một lỗi im lặng nguy hiểm: sai một nửa số ngày
+        (ngày <= 12) thì dữ liệu rơi ra ngoài cửa sổ và bị loại sạch.
+        """
+        return "dmy" if self.request_order == "mdy" else "mdy"
+
+    @property
+    def request_date_fmt(self) -> str:
+        return "%m/%d/%Y" if self.request_order == "mdy" else "%d/%m/%Y"
 
     @property
     def tzinfo(self) -> ZoneInfo:

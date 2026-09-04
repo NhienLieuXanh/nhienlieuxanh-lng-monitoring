@@ -102,7 +102,6 @@ class YokohamaAdapter:
             self._stream_report = None
             result.report.source_rows = pending.source_rows
             result.report.newest_source_at = pending.newest_source_at
-            result.report.source_device = pending.source_device
             result.report.rejected_rows += pending.rejected_rows
             result.report.zero_as_missing += pending.zero_as_missing
             result.report.resolved_from.update(pending.resolved_from)
@@ -131,28 +130,18 @@ class YokohamaAdapter:
                 remediation=f"thu hẹp cửa sổ còn ≤ {allowed} ngày, hoặc nâng trần byte",
             )
         # Stream newest-first; dừng khi dateTime < day (đã qua ngày cần).
-        # ĐỪNG "dọn dẹp" hai dòng này cho khớp timestamp_order. Định dạng ngày
-        # trong REQUEST không chỉ là cách viết — nó CHỌN BỘ DỮ LIỆU cổng trả về.
-        # Đo trực tiếp trên cổng sống 2026-09-04, tái lập 3/3 mỗi chiều:
-        #
-        #   params dd/mm ("04/09") -> dateTime mm/dd, tankNumber=38, 45,58 m³, tot 747k
-        #   params mm/dd ("09/04") -> dateTime dd/mm, tankNumber=70, 53,19 m³, tot 1.132k
-        #
-        # Tham số ``device`` bị BỎ QUA hoàn toàn (device=all|38|70|1|2 cho kết quả
-        # y hệt), nên định dạng ngày là thứ DUY NHẤT quyết định ta đọc chuỗi nào.
-        # Mọi dữ liệu đã nạp là tankNumber=38, và dd/mm là cách giữ nguyên nó. Đổi
-        # sang mm/dd sẽ ghi số của một bồn KHÁC vào cùng một PSN.
-        to_s = now_local.strftime("%d/%m/%Y %H:%M")
-        from_s = datetime.combine(day, time.min).strftime("%d/%m/%Y %H:%M")
+        # Định dạng này CHỌN BỘ DỮ LIỆU, không phải cách viết — xem
+        # ``YokohamaSettings.request_order``. Đọc về thì dùng nghịch đảo, suy ra
+        # từ cùng một setting để không thể đặt lệch nhau.
+        fmt = self._settings.request_date_fmt
+        to_s = now_local.strftime(fmt + " %H:%M")
+        from_s = datetime.combine(day, time.min).strftime(fmt + " %H:%M")
         psn = self._settings.psn
         report = MappingReport(fields=self.measure_fields)
         cutoff = datetime.combine(day, time.min, tzinfo=tz)
         n = 0
         newest: datetime | None = None
-        # ``tankNumber`` từng nằm trong IGNORED_KEYS, nên KHÔNG tầng nào thấy được
-        # ta đang đọc bồn nào. Đó là lỗ đúng cỡ để một thay đổi định dạng ngày
-        # chuyển ta sang bồn khác mà mọi con số vẫn trông "hợp lý".
-        tanks: set[int] = set()
+
         for obj in self._client.iter_record_objects(
             {
                 "device": "all",
@@ -162,16 +151,13 @@ class YokohamaAdapter:
             }
         ):
             n += 1
-            tn = obj.get("tankNumber")
-            if isinstance(tn, (int, float)) and not isinstance(tn, bool):
-                tanks.add(int(tn))
             reading = normalize_reading(
                 obj,
                 psn=psn,
                 vendor_tz=tz,
                 report=report,
                 store_raw=self._store_raw,
-                ts_order=self._settings.timestamp_order,
+                ts_order=self._settings.record_order,
             )
             if reading is None:
                 continue
@@ -190,24 +176,8 @@ class YokohamaAdapter:
             self._seen.add(key)
             self._day_cache.setdefault(local_day, []).append(reading)
         self._check_day_month_swap(
-            newest, cutoff, now_local, tz, self._settings.timestamp_order
+            newest, cutoff, now_local, tz, self._settings.record_order
         )
-        if len(tanks) > 1:
-            raise YokohamaSchemaError(
-                f"một stream chứa {len(tanks)} tankNumber khác nhau "
-                f"({sorted(tanks)}) — không thể ghi chung một PSN",
-                remediation="cổng đang trộn nhiều bồn; dừng nạp và đối chiếu nguồn",
-            )
-        want = self._settings.tank_number
-        if want is not None and tanks and want not in tanks:
-            raise YokohamaSchemaError(
-                f"cổng trả tankNumber={sorted(tanks)}, cấu hình chờ {want}",
-                remediation=(
-                    "định dạng ngày trong request CHỌN bộ dữ liệu; kiểm lại request, "
-                    "hoặc đổi YOKOHAMA_TANK_NUMBER nếu bồn thật đã khác"
-                ),
-            )
-        report.source_device = None if not tanks else str(sorted(tanks)[0])
         report.source_rows = n
         report.newest_source_at = (
             None if newest is None else newest.astimezone(UTC).isoformat()

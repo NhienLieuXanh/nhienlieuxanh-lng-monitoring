@@ -60,16 +60,34 @@ def test_swapped_names_rejected_by_volume_hi() -> None:
     assert any(f == "volume_l" for f, _ in rep.errors)
 
 
-def test_zero_pressure_is_missing_not_zero() -> None:
+def test_zero_tren_ps1_ps2_la_gia_tri_that() -> None:
+    """ĐỔI KỲ VỌNG có chủ ý (2026-09-04), dựa trên trang Main của cổng.
+
+    Trước đây test này ghim ``ps1_bar is None`` cho pS1_Value = 0. Đối chiếu cổng
+    sống cho thấy đó là sai: trang Main hiển thị "Pressure (PS1): 0.00 bar" và
+    "Pressure Value (PS2): 0.00 bar" như GIÁ TRỊ (tô cam), và danh sách báo động
+    7 ngày có PS1 25 lần + PS2 28 lần. 0,00 bar chính là điều kiện đang báo động,
+    nên coi nó là thiếu dữ liệu là che đúng cái cần thấy.
+
+    Áp suất BỒN (pT1) thì vẫn khác: LNG tự sinh áp nên 0 bar khi còn lỏng là hỏng
+    cảm biến, không phải số đo. Ranh giới đó được giữ ở đây.
+    """
     row = _load("minute.json")[0]
     assert row["pS1_Value"] == 0.0
     rep = MappingReport()
     r = normalize_reading(row, psn=PSN, vendor_tz=VN, report=rep)
     assert r is not None
-    assert r.ps1_bar is None
-    assert r.ps2_bar is None
-    assert r.gm_flow_rate_nm3h == Decimal("0.0")
-    assert rep.zero_as_missing >= 2
+    assert r.ps1_bar == Decimal("0.0"), "0 bar trên công tắc áp là số đo thật"
+    assert r.ps2_bar == Decimal("0.0")
+    assert r.gm_flow_rate_nm3h == Decimal("0.0"), "0 lưu lượng vẫn là số đo thật"
+
+    zero_tank = dict(row)
+    zero_tank["pT1_Value"] = 0.0
+    rep2 = MappingReport()
+    r2 = normalize_reading(zero_tank, psn=PSN, vendor_tz=VN, report=rep2)
+    assert r2 is not None
+    assert r2.pressure_mpa is None, "áp BỒN = 0 là hỏng cảm biến, không phải 0 bar"
+    assert rep2.zero_as_missing >= 1
 
 
 def test_capacity_ratio_60_m3() -> None:

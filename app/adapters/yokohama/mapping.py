@@ -127,7 +127,12 @@ TELEMETRY_FIELDS: tuple[FieldSpec, ...] = (
         lo=_D("0"),
         hi=_D("50"),
         unit="bar",
-        zero_is_missing=True,
+        # 0,00 bar là GIÁ TRỊ THẬT, không phải thiếu dữ liệu — và đúng là
+        # giá trị đang báo động. Trang Main của cổng hiển thị "0.00 bar"
+        # (tô cam), và danh sách báo động có PS1 25 lần + PS2 28 lần
+        # trong 7 ngày. Coi nó là thiếu dữ liệu tức là che đúng cái
+        # điều kiện nhà máy đang báo. Đo trên cổng sống 2026-09-04.
+        zero_is_missing=False,
     ),
     FieldSpec(
         "ps2_bar",
@@ -135,7 +140,12 @@ TELEMETRY_FIELDS: tuple[FieldSpec, ...] = (
         lo=_D("0"),
         hi=_D("50"),
         unit="bar",
-        zero_is_missing=True,
+        # 0,00 bar là GIÁ TRỊ THẬT, không phải thiếu dữ liệu — và đúng là
+        # giá trị đang báo động. Trang Main của cổng hiển thị "0.00 bar"
+        # (tô cam), và danh sách báo động có PS1 25 lần + PS2 28 lần
+        # trong 7 ngày. Coi nó là thiếu dữ liệu tức là che đúng cái
+        # điều kiện nhà máy đang báo. Đo trên cổng sống 2026-09-04.
+        zero_is_missing=False,
     ),
     FieldSpec(
         "gd1_percent",

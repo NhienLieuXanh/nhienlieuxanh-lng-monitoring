@@ -498,6 +498,4 @@ def _merge_mapping(
             if prev is None
             else max(prev, report.newest_source_at)
         )
-    if report.source_device is not None:
-        bucket["source_device"] = report.source_device
     bucket.setdefault("resolved_from", {}).update(report.resolved_from)

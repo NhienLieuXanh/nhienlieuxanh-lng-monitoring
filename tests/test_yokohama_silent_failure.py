@@ -403,7 +403,9 @@ def test_ngay_mo_ho_nhung_cach_doc_kia_cung_ngoai_cua_so_thi_im() -> None:
 
 
 def _tel_adapter_order(rows: list[dict], order: str) -> YokohamaAdapter:
-    settings = YokohamaSettings(enabled=False, psn=PSN, timestamp_order=order)  # type: ignore[arg-type]
+    # request_order la NGHICH DAO cua thu tu doc ve
+    req = "dmy" if order == "mdy" else "mdy"
+    settings = YokohamaSettings(enabled=False, psn=PSN, request_order=req)  # type: ignore[arg-type]
     return YokohamaAdapter(settings, client=_MemClient(rows))  # type: ignore[arg-type]
 
 
@@ -518,11 +520,12 @@ def test_bao_dong_phai_hoi_khoang_khong_phai_mot_ngay() -> None:
 def test_thu_tu_ngay_bao_dong_tach_khoi_ban_ghi() -> None:
     """Cùng cổng, cùng lúc, hai endpoint hai định dạng — nên hai cấu hình.
 
-    Nếu báo động dùng chung ``timestamp_order`` của bản ghi (đang là mdy trên
-    production), thì "03/09/2026" thành 9 THÁNG 3 và mọi báo động lệch nửa năm.
+    Nếu báo động dùng chung thứ tự đọc của bản ghi thì với cấu hình gửi dd/mm,
+    "03/09/2026" thành 9 THÁNG 3 và mọi báo động lệch nửa năm.
     """
-    s = YokohamaSettings(enabled=False, psn=PSN, timestamp_order="mdy")
-    assert s.alarm_timestamp_order == "dmy", "mặc định phải KHÁC, không phải bản sao"
+    s = YokohamaSettings(enabled=False, psn=PSN, request_order="dmy")
+    assert s.record_order == "mdy", "doc ve la nghich dao cua gui len"
+    assert s.alarm_timestamp_order == "dmy", "bao dong KHAC ban ghi, khong phai ban sao"
 
     rows = [{
         "deviceId": "SV4",
@@ -544,39 +547,7 @@ def test_thu_tu_ngay_bao_dong_tach_khoi_ban_ghi() -> None:
     assert out[0].raised_at.astimezone(VN).date() == date(2026, 8, 28)
 
 
-def test_hai_tanknumber_trong_mot_stream_bi_chan() -> None:
-    """Trộn hai bồn vào một PSN là hỏng lịch sử, không phải chuyện nhỏ."""
-    now = datetime.now(tz=VN)
-    a, b = _rec(now), _rec(now - timedelta(minutes=1))
-    a["tankNumber"] = 38
-    b["tankNumber"] = 70
-    with pytest.raises(YokohamaSchemaError, match="tankNumber khác nhau"):
-        _tel_adapter([a, b]).fetch_telemetry(PSN, now.date())
 
-
-def test_tanknumber_khac_cau_hinh_bi_chan() -> None:
-    """Ghim số bồn rồi thì cổng đổi chuỗi trả về là LỖI, không phải dữ liệu mới.
-
-    Đo được: định dạng ngày trong request chọn bộ dữ liệu (dd/mm -> tank 38,
-    mm/dd -> tank 70), và tham số ``device`` bị cổng bỏ qua hoàn toàn. Nên ghim
-    là cách duy nhất chứng minh ta vẫn đọc đúng bồn.
-    """
-    now = datetime.now(tz=VN)
-    rec = _rec(now)
-    rec["tankNumber"] = 70
-    s = YokohamaSettings(enabled=False, psn=PSN, tank_number=38)
-    ad = YokohamaAdapter(s, client=_MemClient([rec]))  # type: ignore[arg-type]
-    with pytest.raises(YokohamaSchemaError, match="chờ 38"):
-        ad.fetch_telemetry(PSN, now.date())
-
-
-def test_tanknumber_duoc_ghi_vao_report() -> None:
-    """Không ghim thì vẫn phải GHI NHẬN — im lặng là thứ tạo ra lỗ này."""
-    now = datetime.now(tz=VN)
-    rec = _rec(now)
-    rec["tankNumber"] = 38
-    res = _tel_adapter([rec]).fetch_telemetry(PSN, now.date())
-    assert res.report.source_device == "38"
 
 
 def test_readings_tra_ve_tang_dan() -> None:
@@ -592,3 +563,66 @@ def test_readings_tra_ve_tang_dan() -> None:
     ats = [r.sampled_at for r in res.readings]
     assert ats == sorted(ats), "phải tăng dần"
     assert res.readings[-1].sampled_at.astimezone(VN).strftime("%H:%M") == now.strftime("%H:%M")
+
+def test_gui_len_va_doc_ve_khong_the_dat_lech_nhau() -> None:
+    """Ràng buộc quan trọng nhất của nguồn này, và nó được SUY RA chứ không cấu hình.
+
+    Định dạng ngày gửi lên chọn bộ dữ liệu, và bộ dữ liệu đó trả về định dạng
+    NGHỊCH ĐẢO. Đo trực tiếp 2026-09-04, tái lập 3/3 mỗi chiều. Nếu hai thứ này là
+    hai setting rời thì đặt lệch nhau là chuyện sẽ xảy ra, và hậu quả im lặng: một
+    nửa số ngày (ngày <= 12) rơi ra ngoài cửa sổ và bị loại sạch.
+    """
+    for req, rec, fmt in (("mdy", "dmy", "%m/%d/%Y"), ("dmy", "mdy", "%d/%m/%Y")):
+        s = YokohamaSettings(enabled=False, psn=PSN, request_order=req)  # type: ignore[arg-type]
+        assert s.record_order == rec
+        assert s.request_date_fmt == fmt
+
+
+def test_mac_dinh_la_chuoi_trang_main_cua_cong() -> None:
+    """Mặc định phải là chuỗi NGƯỜI VẬN HÀNH đang nhìn, không phải chuỗi kia.
+
+    Đối chiếu ảnh trang Main 04/09/2026 11:23: Volume 53.19 m³, Level 88.65 %,
+    Pressure 4.66 bar, GM Totalizer 1132428.36, Tank Refill Count 70 Times.
+    Chuỗi đó lấy được bằng cách GỬI mm/dd.
+    """
+    s = YokohamaSettings(enabled=False, psn=PSN)
+    assert s.request_order == "mdy"
+    assert s.record_order == "dmy"
+
+
+def test_tanknumber_la_so_lan_nap_khong_phai_ma_bon() -> None:
+    """Trang Main ghi "Tank Refill Count: 70 Times" và payload có tankNumber=70.
+
+    Mapping cũ đã hiểu đúng từ đầu (``extract_refill_counter``). Test này ghim lại
+    để không ai — kể cả tôi — diễn giải nó thành mã thiết bị lần nữa: một guard
+    dựa trên tiền đề đó sẽ báo lỗi ngay LẦN NẠP KẾ TIẾP.
+    """
+    now = datetime.now(tz=VN)
+    rec = _rec(now)
+    rec["tankNumber"] = 70
+    res = _tel_adapter([rec]).fetch_telemetry(PSN, now.date())
+    assert res.readings[0].refill_counter == 70
+
+
+def test_ps1_ps2_bang_0_la_gia_tri_that_khong_phai_thieu_du_lieu() -> None:
+    """0,00 bar trên PS1/PS2 là ĐIỀU KIỆN ĐANG BÁO ĐỘNG, không phải cảm biến hỏng.
+
+    Trang Main của cổng hiển thị "Pressure (PS1): 0.00 bar" và "Pressure Value
+    (PS2): 0.00 bar" (tô cam), và danh sách báo động 7 ngày có PS1 25 lần, PS2 28
+    lần. Coi 0 là thiếu dữ liệu tức là che đúng cái điều kiện nhà máy đang báo.
+
+    Ba field khác GIỮ zero_is_missing=True có lý: 0 m³ trên bồn cryogenic, 0 bar
+    áp bồn (LNG tự sinh áp nên không thể bằng 0 khi còn lỏng), và 0 trên đồng hồ
+    tích luỹ — cả ba là hỏng cảm biến, và số 0 ở đồng hồ còn tạo ra một lần reset
+    giả trong đối chứng tiêu thụ.
+    """
+    now = datetime.now(tz=VN)
+    rec = _rec(now)
+    rec["pS1_Value"] = 0.0
+    rec["pS2_Value"] = 0.0
+    rec["pT1_Value"] = 0.0        # áp bồn = 0 -> vẫn phải coi là thiếu
+    res = _tel_adapter([rec]).fetch_telemetry(PSN, now.date())
+    r = res.readings[0]
+    assert r.ps1_bar == 0, "PS1 = 0 phải được GIỮ"
+    assert r.ps2_bar == 0, "PS2 = 0 phải được GIỮ"
+    assert r.pressure_mpa is None, "áp bồn = 0 vẫn là hỏng cảm biến"
