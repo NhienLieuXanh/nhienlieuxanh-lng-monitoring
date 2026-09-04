@@ -173,17 +173,29 @@ TELEMETRY_FIELDS: tuple[FieldSpec, ...] = (
 MEASURE_TARGETS: tuple[str, ...] = tuple(s.target for s in TELEMETRY_FIELDS)
 
 TIMESTAMP_ALIASES: tuple[str, ...] = ("dateTime", "receivedAt")
-# Thứ tự ngày/tháng là CẤU HÌNH, không phải suy đoán. Cùng một cổng đã được đo
-# trả cả hai: capture qua browser cuối tháng 8 là dd/mm ("27/08/2026", 27 không
-# thể là tháng), còn client trên Vercel ngày 2026-09-03 nhận mm/dd ("09/03/2026"
-# cho ngày 3 tháng 9). Ghim ``Accept-Language: vi-VN`` KHÔNG đổi được điều đó —
-# đã thử trên production. Nguyên nhân phía cổng vẫn chưa biết.
+# HAI HẰNG SỐ, không phải cấu hình, và chúng KHÁC NHAU. Cổng PARSE ngày gửi lên
+# theo mm/dd, và LUÔN XUẤT ra dd/mm. Đo trực tiếp bằng ngày không mơ hồ nên không
+# còn chỗ cho suy đoán:
 #
-# Chỉ MỘT thứ tự được thử, không bao giờ cả hai: thử cả hai nghĩa là với ngày mơ
-# hồ như "03/09" ta sẽ chọn bừa một cách đọc, và một lần chọn sai ghi vào lịch sử
-# thì không phát hiện được nữa. ``_check_day_month_swap`` trong adapter là tripwire
-# cho cả hai chiều, và ngày có thành phần > 12 thì thứ tự sai fail luôn ở strptime
-# (hiện ra qua ``rejected_rows``), nên không có chiều nào im lặng.
+#   gửi "08/20/2026" (mm/dd = 20/8)  -> trả "20/08/2026 23:58", refill 67, tot 1.132.100
+#   gửi "04/09/2026" (mm/dd = 9/4)   -> trả "09/04/2026 23:58", refill 38, tot   749.328
+#   gửi "09/04/2026" (mm/dd = 4/9)   -> trả "04/09/2026 11:54", refill 70, tot 1.132.428
+#   gửi "20/08/2026" (dd/mm)         -> cổng KHÔNG parse được -> rơi về bản mới nhất
+#
+# refill và totalizer tăng đơn điệu theo ngày, nên đây là MỘT bồn, MỘT đồng hồ.
+#
+# Vì sao điều này từng làm hỏng dữ liệu: gửi ngày kiểu dd/mm thì cổng đọc "04/09"
+# thành 9 THÁNG 4 và trả về dữ liệu tháng 4, in ra "09/04/2026"; code đọc chuỗi đó
+# theo mm/dd lại ra 4 tháng 9. Kết quả là dữ liệu tháng 4 được cất dưới mốc tháng 9,
+# lệch 5 tháng, và KHÔNG tầng nào báo lỗi vì mốc rơi đúng vào cửa sổ đang xin.
+# 2040 dòng đã bị ghi sai như vậy trước khi phát hiện.
+#
+# Chỉ MỘT thứ tự được thử khi đọc, không bao giờ cả hai: ngày mơ hồ như "03/09" thì
+# thử cả hai là chọn bừa, và một lần chọn sai ghi vào lịch sử thì không phản nghiệm
+# được nữa.
+REQUEST_DATE_FMT = "%m/%d/%Y"
+RECORD_TS_ORDER = "dmy"
+ALARM_TS_ORDER = "dmy"
 TIMESTAMP_FORMATS_DMY: tuple[str, ...] = (
     "%d/%m/%Y %H:%M:%S",
     "%d/%m/%Y %H:%M",

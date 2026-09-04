@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from app.adapters.yokohama import mapping as M
 from app.adapters.yokohama.client import YokohamaClient
 from app.adapters.yokohama.config import YokohamaSettings, get_yokohama_settings
 from app.adapters.yokohama.errors import YokohamaSchemaError
@@ -130,10 +131,9 @@ class YokohamaAdapter:
                 remediation=f"thu hẹp cửa sổ còn ≤ {allowed} ngày, hoặc nâng trần byte",
             )
         # Stream newest-first; dừng khi dateTime < day (đã qua ngày cần).
-        # Định dạng này CHỌN BỘ DỮ LIỆU, không phải cách viết — xem
-        # ``YokohamaSettings.request_order``. Đọc về thì dùng nghịch đảo, suy ra
-        # từ cùng một setting để không thể đặt lệch nhau.
-        fmt = self._settings.request_date_fmt
+        # Cổng PARSE mm/dd. Gửi dd/mm là cách làm cổng trả về dữ liệu của MỘT
+        # THÁNG KHÁC — xem bảng đo ở ``mapping.REQUEST_DATE_FMT``.
+        fmt = M.REQUEST_DATE_FMT
         to_s = now_local.strftime(fmt + " %H:%M")
         from_s = datetime.combine(day, time.min).strftime(fmt + " %H:%M")
         psn = self._settings.psn
@@ -157,7 +157,7 @@ class YokohamaAdapter:
                 vendor_tz=tz,
                 report=report,
                 store_raw=self._store_raw,
-                ts_order=self._settings.record_order,
+                ts_order=M.RECORD_TS_ORDER,
             )
             if reading is None:
                 continue
@@ -176,7 +176,7 @@ class YokohamaAdapter:
             self._seen.add(key)
             self._day_cache.setdefault(local_day, []).append(reading)
         self._check_day_month_swap(
-            newest, cutoff, now_local, tz, self._settings.record_order
+            newest, cutoff, now_local, tz, M.RECORD_TS_ORDER
         )
         report.source_rows = n
         report.newest_source_at = (
@@ -291,12 +291,10 @@ class YokohamaAdapter:
                 row,
                 site_code=self._settings.site_code,
                 vendor_tz=self.vendor_tz,
-                # KHÁC ``timestamp_order`` của bản ghi, và đây không phải sơ suất.
-                # Cùng một cổng, cùng một lúc, hai endpoint trả hai định dạng: bản
-                # ghi (params dd/mm) ra mm/dd, báo động (params ISO) ra dd/mm. Đo
-                # trên 1100 báo động: thành phần đầu lên tới 31 (537 lần > 12),
-                # thành phần sau chỉ 8..9 — dd/mm, không đọc cách khác được.
-                ts_order=self._settings.alarm_timestamp_order,
+                # Cổng luôn XUẤT dd/mm trên cả hai endpoint. Đo trên 1100 báo
+                # động: thành phần đầu lên tới 31 (537 lần > 12), thành phần sau
+                # chỉ 8..9 — không đọc cách khác được.
+                ts_order=M.ALARM_TS_ORDER,
             )
             if alarm is not None:
                 out.append(alarm)

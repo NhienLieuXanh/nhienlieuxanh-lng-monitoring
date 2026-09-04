@@ -402,34 +402,6 @@ def test_ngay_mo_ho_nhung_cach_doc_kia_cung_ngoai_cua_so_thi_im() -> None:
 # ------------------------- thứ tự ngày là cấu hình -------------------------
 
 
-def _tel_adapter_order(rows: list[dict], order: str) -> YokohamaAdapter:
-    # request_order la NGHICH DAO cua thu tu doc ve
-    req = "dmy" if order == "mdy" else "mdy"
-    settings = YokohamaSettings(enabled=False, psn=PSN, request_order=req)  # type: ignore[arg-type]
-    return YokohamaAdapter(settings, client=_MemClient(rows))  # type: ignore[arg-type]
-
-
-def test_mdy_doc_dung_ngay_cong_dang_gui() -> None:
-    """Ca production: cổng gửi mm/dd. Đặt đúng thứ tự thì dữ liệu VÀO ĐƯỢC."""
-    now = datetime.now(tz=VN).replace(second=0, microsecond=0)
-    rec = _rec(now)
-    mdy = f"{now.month:02d}/{now.day:02d}/{now.year} {now:%H:%M}"
-    rec["dateTime"] = mdy
-    rec["receivedAt"] = mdy
-
-    # dmy: hoặc bị guard chặn (ngày mơ hồ), hoặc bị loại (thành phần > 12).
-    res_dmy_ok = True
-    try:
-        r = _tel_adapter_order([rec], "dmy").fetch_telemetry(PSN, now.date())
-        res_dmy_ok = r.report.n_rows > 0
-    except YokohamaSchemaError:
-        res_dmy_ok = False
-    assert res_dmy_ok is False, "đọc sai thứ tự KHÔNG được âm thầm nhận"
-
-    # mdy: đúng thứ tự -> dòng vào được, và mốc là bây giờ.
-    res = _tel_adapter_order([rec], "mdy").fetch_telemetry(PSN, now.date())
-    assert res.report.n_rows == 1
-    assert res.readings[0].sampled_at.astimezone(VN).date() == now.date()
 
 
 def test_thu_tu_khong_hop_le_bi_tu_choi() -> None:
@@ -517,38 +489,6 @@ def test_bao_dong_phai_hoi_khoang_khong_phai_mot_ngay() -> None:
     assert seen["ToDate"] == "2026-09-04", "phải hỏi tới ngày KẾ TIẾP"
 
 
-def test_thu_tu_ngay_bao_dong_tach_khoi_ban_ghi() -> None:
-    """Cùng cổng, cùng lúc, hai endpoint hai định dạng — nên hai cấu hình.
-
-    Nếu báo động dùng chung thứ tự đọc của bản ghi thì với cấu hình gửi dd/mm,
-    "03/09/2026" thành 9 THÁNG 3 và mọi báo động lệch nửa năm.
-    """
-    s = YokohamaSettings(enabled=False, psn=PSN, request_order="dmy")
-    assert s.record_order == "mdy", "doc ve la nghich dao cua gui len"
-    assert s.alarm_timestamp_order == "dmy", "bao dong KHAC ban ghi, khong phai ban sao"
-
-    rows = [{
-        "deviceId": "SV4",
-        "createAt": "28/08/2026 02:48:26",  # 28 không thể là tháng -> dd/mm
-        "message": "Van SV4: dang bi lock",
-        "symbol": "danger",
-    }]
-
-    class _C:
-        def get_json(self, path: str, params: dict | None = None) -> list:
-            return rows
-
-        def close(self) -> None:
-            return None
-
-    ad = YokohamaAdapter(s, client=_C())  # type: ignore[arg-type]
-    out = ad.fetch_alarms(date(2026, 8, 28))
-    assert len(out) == 1, "đọc dd/mm nên dòng vào được dù bản ghi đang đọc mdy"
-    assert out[0].raised_at.astimezone(VN).date() == date(2026, 8, 28)
-
-
-
-
 
 def test_readings_tra_ve_tang_dan() -> None:
     """Hợp đồng ``FetchResult.readings`` là TĂNG DẦN.
@@ -564,30 +504,6 @@ def test_readings_tra_ve_tang_dan() -> None:
     assert ats == sorted(ats), "phải tăng dần"
     assert res.readings[-1].sampled_at.astimezone(VN).strftime("%H:%M") == now.strftime("%H:%M")
 
-def test_gui_len_va_doc_ve_khong_the_dat_lech_nhau() -> None:
-    """Ràng buộc quan trọng nhất của nguồn này, và nó được SUY RA chứ không cấu hình.
-
-    Định dạng ngày gửi lên chọn bộ dữ liệu, và bộ dữ liệu đó trả về định dạng
-    NGHỊCH ĐẢO. Đo trực tiếp 2026-09-04, tái lập 3/3 mỗi chiều. Nếu hai thứ này là
-    hai setting rời thì đặt lệch nhau là chuyện sẽ xảy ra, và hậu quả im lặng: một
-    nửa số ngày (ngày <= 12) rơi ra ngoài cửa sổ và bị loại sạch.
-    """
-    for req, rec, fmt in (("mdy", "dmy", "%m/%d/%Y"), ("dmy", "mdy", "%d/%m/%Y")):
-        s = YokohamaSettings(enabled=False, psn=PSN, request_order=req)  # type: ignore[arg-type]
-        assert s.record_order == rec
-        assert s.request_date_fmt == fmt
-
-
-def test_mac_dinh_la_chuoi_trang_main_cua_cong() -> None:
-    """Mặc định phải là chuỗi NGƯỜI VẬN HÀNH đang nhìn, không phải chuỗi kia.
-
-    Đối chiếu ảnh trang Main 04/09/2026 11:23: Volume 53.19 m³, Level 88.65 %,
-    Pressure 4.66 bar, GM Totalizer 1132428.36, Tank Refill Count 70 Times.
-    Chuỗi đó lấy được bằng cách GỬI mm/dd.
-    """
-    s = YokohamaSettings(enabled=False, psn=PSN)
-    assert s.request_order == "mdy"
-    assert s.record_order == "dmy"
 
 
 def test_tanknumber_la_so_lan_nap_khong_phai_ma_bon() -> None:
@@ -626,3 +542,47 @@ def test_ps1_ps2_bang_0_la_gia_tri_that_khong_phai_thieu_du_lieu() -> None:
     assert r.ps1_bar == 0, "PS1 = 0 phải được GIỮ"
     assert r.ps2_bar == 0, "PS2 = 0 phải được GIỮ"
     assert r.pressure_mpa is None, "áp bồn = 0 vẫn là hỏng cảm biến"
+
+def test_dinh_dang_ngay_la_hai_hang_so_khac_nhau() -> None:
+    """Cổng PARSE mm/dd và LUÔN XUẤT dd/mm. Hai chiều khác nhau, cả hai là hằng số.
+
+    Đo bằng ngày KHÔNG mơ hồ nên không còn chỗ suy đoán:
+      gửi "08/20/2026" (mm/dd = 20/8) -> trả "20/08/2026", refill 67, tot 1.132.100
+      gửi "04/09/2026" (mm/dd = 9/4)  -> trả "09/04/2026", refill 38, tot   749.328
+      gửi "09/04/2026" (mm/dd = 4/9)  -> trả "04/09/2026", refill 70, tot 1.132.428
+    refill và totalizer tăng đơn điệu theo ngày -> MỘT bồn, MỘT đồng hồ.
+
+    Test này tồn tại vì gửi sai chiều làm cổng trả dữ liệu của MỘT THÁNG KHÁC, và
+    đọc sai chiều cất nó dưới mốc hôm nay — 2040 dòng đã bị ghi lệch 5 tháng như
+    vậy, không tầng nào báo lỗi.
+    """
+    from app.adapters.yokohama import mapping as M
+
+    assert M.REQUEST_DATE_FMT == "%m/%d/%Y", "cổng parse mm/dd"
+    assert M.RECORD_TS_ORDER == "dmy", "cổng xuất dd/mm"
+    assert M.ALARM_TS_ORDER == "dmy"
+    # Chúng KHÁC chiều nhau; nếu ai đó làm chúng giống nhau thì một trong hai sai.
+    assert M.REQUEST_DATE_FMT.index("%m") < M.REQUEST_DATE_FMT.index("%d")
+    assert M.RECORD_TS_ORDER == "dmy"
+
+
+def test_request_gui_dung_mm_dd() -> None:
+    """Nghiệm thu trên đường dây thật: tham số fromDate/toDate phải là mm/dd."""
+    seen: dict[str, str] = {}
+
+    class _Cap:
+        def iter_record_objects(self, params: dict):
+            seen.update(params)
+            return iter(())
+
+        def get_json(self, path: str, params: dict | None = None) -> list:
+            return []
+
+        def close(self) -> None:
+            return None
+
+    settings = YokohamaSettings(enabled=False, psn=PSN)
+    ad = YokohamaAdapter(settings, client=_Cap())  # type: ignore[arg-type]
+    ad.fetch_telemetry(PSN, date(2026, 9, 4))
+    # 4 thang 9 duoi mm/dd la "09/04"
+    assert seen["fromDate"].startswith("09/04/2026"), seen["fromDate"]
