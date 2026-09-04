@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -354,6 +354,40 @@ def export_rows(
             .limit(limit)
         ).all()
     )
+
+
+def daily_counts(
+    session: Session,
+    psn: str,
+    start: datetime,
+    end: datetime,
+    *,
+    tz_name: str,
+) -> list[tuple[date, int]]:
+    """Số lần đo theo NGÀY LỊCH giờ địa phương, tăng dần.
+
+    Gom trong SQL chứ không kéo hàng nghìn dòng lên Python để đếm: một cửa sổ 90
+    ngày ở nhịp 1 phút là ~130 000 dòng, và tất cả những gì cần là 90 con số.
+
+    Gom theo giờ ĐỊA PHƯƠNG, không phải UTC. "Ngày 3/9 có bao nhiêu lần đo" là câu
+    hỏi của người vận hành ở Việt Nam; gom theo UTC thì mỗi cột lệch 7 giờ và hai
+    ngày đầu/cuối luôn trông thiếu dữ liệu một cách vô cớ.
+
+    Chỉ trả về NGÀY CÓ dữ liệu. Ngày trống là ngày không xuất hiện — người gọi tự
+    điền 0, vì chỉ họ biết cửa sổ mong đợi là bao nhiêu ngày.
+    """
+    day = func.date(func.timezone(tz_name, Telemetry.sampled_at)).label("d")
+    rows = session.execute(
+        select(day, func.count().label("n"))
+        .where(
+            Telemetry.psn == psn,
+            Telemetry.sampled_at >= start,
+            Telemetry.sampled_at <= end,
+        )
+        .group_by(day)
+        .order_by(day)
+    ).all()
+    return [(r.d, int(r.n)) for r in rows]
 
 
 def max_sampled_at(session: Session, psns: list[str]) -> dict[str, datetime]:

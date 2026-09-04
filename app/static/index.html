@@ -80,6 +80,11 @@
       --shadow: 0 10px 30px rgba(0,0,0,.45);
       --shadow-sm: 0 2px 8px rgba(0,0,0,.30);
       --chart-vol: #4f8ff7; --chart-pres: #93a1b8; --grid: rgba(147,161,184,.10); --axis: #64748b;
+      /* Cot ngay CO bat thuong. #ef4444 chu khong dung lai --crit (#f87171):
+         validator bao #f87171 co L=0,711 — ngoai dai 0,48-0,67 cua nen toi. Cap
+         (#4f8ff7, #ef4444) dat ca 5 kiem tren nen #111a2e: CVD dE 26,8 (protan),
+         thuong 33,6, tuong phan >= 3:1. Do bang script, khong uoc luong bang mat. */
+      --chart-anom: #ef4444;
       --scrim: rgba(4,8,16,.62);
 
       --header-h: 56px;
@@ -126,6 +131,9 @@
       --shadow: 0 10px 30px rgba(15,26,44,.14);
       --shadow-sm: 0 2px 8px rgba(15,26,44,.08);
       --chart-vol: #1558c0; --chart-pres: #64748b; --grid: rgba(15,26,44,.07); --axis: #64748b;
+      /* Nen sang: cap (#1558c0, #c02718) dat ca 5 kiem tren #ffffff —
+         CVD dE 25,7 (protan), thuong 33,5. */
+      --chart-anom: #c02718;
       --scrim: rgba(11,18,32,.42);
     }
     :root.rail-collapsed { --rail-w: 62px; }
@@ -291,6 +299,23 @@
       background: var(--surface-2); font-size: var(--fs-sm); color: var(--muted);
     }
     .kpi b { font-size: var(--fs-md); font-weight: 700; color: var(--fg); line-height: 1; }
+    /* Chip bấm được. Một tooltip KHÔNG phải cách chỉ đường: nó chỉ hiện khi người
+       ta đã nghi ngờ và đã trỏ chuột vào. Con số "5 báo động nhà máy" mà không có
+       đường đi tới danh sách là một câu hỏi bỏ lửng — đúng điều người dùng nói khi
+       xem bản đầu: "không biết vấn đề thông tin này nằm ở đâu cần xử lý gì". Dấu ›
+       và con trỏ pointer là thứ nói ra rằng bấm được. */
+    .kpi-btn { cursor: pointer; font-family: inherit; }
+    .kpi-btn:hover { filter: brightness(1.08); }
+    /* Nháy viền thẻ đích một nhịp: trang Báo cáo có bốn thẻ, không chỉ rõ thẻ nào
+       thì con số ở header vẫn là một câu hỏi bỏ lửng. */
+    .flash { animation: flash-ring 1.5s ease-out 1; }
+    @keyframes flash-ring {
+      0%, 100% { box-shadow: 0 0 0 0 transparent; }
+      15%, 55% { box-shadow: 0 0 0 3px var(--crit-line); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .flash { animation: none; box-shadow: 0 0 0 3px var(--crit-line); }
+    }
     .kpi.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
     .kpi.ok b { color: var(--ok); }
     .kpi.bad { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
@@ -782,6 +807,34 @@
     /* Cùng khuôn thu gọn với .fc-why của thẻ dự báo. Sáu ô số phía trên đã trả lời
        câu hỏi chính; 10 dòng lý do là để tra khi cần cãi lại con số, không phải để
        đọc mỗi lần mở trang. Một loại nội dung thì một kiểu trình bày. */
+    /* Bieu do do phu trong the Phan tich.
+       Vi sao co no: trang nay tung chi co o so va mot danh sach dong chu, va nguoi
+       dung noi dung — "can truc quan hoa du lieu bang bieu do chu khong phai vai
+       dong nhin rat roi". Mot cot moi ngay tra loi cau "du lieu cua toi co dung
+       duoc khong" trong mot cai nhin: 88 cot trong canh 2 cot cao CHINH LA "do phu
+       2%", nhung doc duoc ma khong can tin vao con so. */
+    .an-chart { margin-top: 12px; }
+    .an-chart-head {
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .an-chart-head h4 { margin: 0; font-size: var(--fs-sm); color: var(--fg); }
+    .an-chart-head .an-sub { margin: 0; }
+    .an-cov { position: relative; height: 132px; }
+    /* Chu giai la HTML chu khong phai legend cua Chart.js: mau o day gan cho TUNG
+       COT (mot dataset, mang mau), nen legend tu sinh cua thu vien chi ra mot o duy
+       nhat va noi sai. Ban dung bang HTML thi danh tinh khong bao gio chi nam o
+       mau — moi o mau luon di kem chu. */
+    .an-legend {
+      display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px;
+      font-size: var(--fs-xs); color: var(--muted);
+    }
+    .an-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .an-legend i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+    .an-legend i.dash {
+      height: 0; width: 14px; border-top: 2px dashed var(--axis); border-radius: 0;
+    }
+
     .an-why { margin-top: 8px; }
     .an-why > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--brand); list-style: none; }
     .an-why > summary::-webkit-details-marker { display: none; }
@@ -1101,7 +1154,9 @@
              khi nhà máy ĐANG có báo động, và đúng lúc đó thì hai chip kia là thứ
              đáng mất nhất — "bồn" suy được từ trực tuyến + ngoại tuyến, và trạng
              thái từng bồn có ngay ở danh sách bên dưới. -->
-        <span class="kpi bad" id="kpi-vendor" hidden><b class="num" id="stat-vendor">--</b> báo động nhà máy</span>
+        <button type="button" class="kpi bad kpi-btn" id="kpi-vendor" hidden
+                onclick="goVendorAlarms()"
+                aria-label="Xem danh sách báo động của nhà máy"><b class="num" id="stat-vendor">--</b> báo động nhà máy ›</button>
         <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
         <span id="stat-critical" hidden></span>
       </div>
@@ -2024,7 +2079,7 @@
       vEl.dataset.want = nVendor ? "1" : "0";
       vEl.title = nVendor
         ? `${nVendor} việc báo động do nhà máy phát trong 24 giờ qua (đã gộp các `
-          + `dòng lặp). Xem chi tiết ở trang Báo cáo.`
+          + `dòng lặp). Bấm để xem danh sách.`
         : "";
       const vol = summary.total_volume_l;
       const volEl = document.getElementById("stat-volume");
@@ -3338,10 +3393,128 @@
                      : `Tới van an toàn ${esc(Number(hold.relief_mpa).toFixed(2))} MPa`,
                    hold.days != null && hold.days <= 5 ? "crit" : "")}
         </div>
-        ${why ? `<details class="an-why"><summary>Cơ sở đánh giá</summary><ul>${why}</ul></details>` : ""}
-        ${anoms ? `<div class="an-anom">${anoms}</div>` : ""}
+        ${covBlock(a)}
+        ${why || anoms
+          ? `<details class="an-why"><summary>Cơ sở đánh giá${
+               anoms ? ` và ${(a.anomalies || []).length} bất thường` : ""
+             }</summary>${why ? `<ul>${why}</ul>` : ""}${
+               anoms ? `<div class="an-anom">${anoms}</div>` : ""
+             }</details>`
+          : ""}
         ${lastFill}
       </div>`;
+    }
+
+    // Mot Chart cho moi the. Giu tham chieu de destroy truoc khi ve lai: doi cua
+    // so la thay toan bo innerHTML — canvas cu mat nhung instance Chart.js thi
+    // khong, va moi instance con song la mot listener resize con chay.
+    let anCharts = [];
+
+    function covBlock(a) {
+      const n = (a.daily || []).length;
+      const cad = a.source_cadence_minutes;
+      const expect = cad ? Math.round(1440 / cad) : null;
+      const sub = [
+        cad ? `nguồn phát mỗi ${cad < 1 ? cad : Math.round(cad)} phút` : null,
+        expect ? `kỳ vọng ${expect.toLocaleString("vi-VN")} lần/ngày` : null,
+        `${n}/${Math.round(a.window_days)} ngày có dữ liệu`,
+      ].filter(Boolean).join(" · ");
+      return `<div class="an-chart">
+        <div class="an-chart-head">
+          <h4>Lần đo nhận được mỗi ngày</h4>
+          <p class="an-sub">${esc(sub)}</p>
+        </div>
+        <div class="an-cov"><canvas data-cov-psn="${esc(a.psn)}"
+             aria-label="Số lần đo mỗi ngày của bồn ${esc(a.name || a.psn)}"></canvas></div>
+        <div class="an-legend">
+          <span><i style="background:var(--chart-vol)"></i>ngày bình thường</span>
+          <span><i style="background:var(--chart-anom)"></i>ngày có bất thường</span>
+          ${expect ? `<span><i class="dash"></i>kỳ vọng mỗi ngày</span>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function anDrawCharts(rows) {
+      anCharts.forEach(c => { try { c.destroy(); } catch (_) {} });
+      anCharts = [];
+      const cVol = cssVar("--chart-vol"), cAnom = cssVar("--chart-anom");
+      const cGrid = cssVar("--grid"), cAxis = cssVar("--axis");
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const byPsn = new Map(rows.map(r => [r.psn, r]));
+
+      // Duyet canvas roi tra theo dataset, KHONG dung selector co gia tri PSN:
+      // querySelector voi gia tri lay tu du lieu la mot cho phai escape, va o day
+      // khong can thiet.
+      for (const cv of document.querySelectorAll("canvas[data-cov-psn]")) {
+        const a = byPsn.get(cv.dataset.covPsn);
+        if (!a) continue;
+        // Dien 0 cho ngay TRONG. API chi tra ngay co du lieu vi chi client biet cua
+        // so bao nhieu ngay — va nhung cot 0 kia chinh la thong tin chinh cua bieu
+        // do nay, khong phai cho trong can bo.
+        const byDay = new Map((a.daily || []).map(d => [d.day, d]));
+        const days = Math.round(a.window_days);
+        const end = new Date();
+        const labels = [], data = [], colors = [], anom = [];
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(end.getTime() - i * 86400000);
+          const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+          const row = byDay.get(key);
+          labels.push(`${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`);
+          data.push(row ? row.samples : 0);
+          anom.push(row ? row.anomalies : 0);
+          colors.push(row && row.anomalies > 0 ? cAnom : cVol);
+        }
+        const cad = a.source_cadence_minutes;
+        const expect = cad ? Math.round(1440 / cad) : null;
+        const ds = [{
+          label: "Lần đo", data, backgroundColor: colors,
+          borderRadius: 2, borderSkipped: false, maxBarThickness: 22,
+        }];
+        if (expect) {
+          ds.push({
+            type: "line", label: "Kỳ vọng mỗi ngày",
+            data: labels.map(() => expect), borderColor: cAxis, borderWidth: 2,
+            borderDash: [4, 4], pointRadius: 0, fill: false, order: 0,
+          });
+        }
+        anCharts.push(new Chart(cv.getContext("2d"), {
+          type: "bar",
+          data: { labels, datasets: ds },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: reduce ? false : { duration: 220 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    if (ctx.datasetIndex === 1) {
+                      return `Kỳ vọng ${expect.toLocaleString("vi-VN")} lần/ngày`;
+                    }
+                    const k = anom[ctx.dataIndex];
+                    const v = ctx.parsed.y;
+                    if (!v) return "Không có lần đo nào";
+                    return `${v.toLocaleString("vi-VN")} lần đo`
+                      + (k ? ` · ${k} bất thường` : "");
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                grid: { display: false }, border: { color: cGrid },
+                ticks: { color: cAxis, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: cGrid }, border: { display: false },
+                ticks: { color: cAxis, maxTicksLimit: 4,
+                         callback: (v) => Number(v).toLocaleString("vi-VN") },
+              },
+            },
+          },
+        }));
+      }
     }
 
     async function loadAnalytics() {
@@ -3356,6 +3529,9 @@
           return;
         }
         box.innerHTML = rows.map(anCard).join("");
+        // Ve SAU khi innerHTML da xong: canvas phai ton tai trong DOM va co
+        // kich thuoc, khong thi Chart.js dung 0x0 roi khong tu sua lai.
+        anDrawCharts(rows);
         const meta = document.getElementById("an-meta");
         if (meta) {
           const bad = rows.filter(r => r.health.risk === "cao").length;
@@ -3402,7 +3578,7 @@
           card.hidden = days >= 90;
           body.innerHTML = `<tr><td colspan="5" class="empty">Không có báo động nào trong ${days} ngày gần nhất.</td></tr>`;
           if (note) note.textContent = "";
-          return;
+          return;  // finally ở dưới vẫn chạy -> vẫn cuộn tới thẻ
         }
         card.hidden = false;
         // Nói cả hai con số: gộp bao nhiêu dòng thành bao nhiêu việc. Chỉ nói tỉ lệ
@@ -3423,6 +3599,10 @@
         card.hidden = false;
         body.innerHTML = `<tr><td colspan="5" class="empty">${esc(e.message)}</td></tr>`;
         if (note) note.textContent = "";
+      } finally {
+        // finally, không phải cuối nhánh thành công: người dùng bấm chip rồi API
+        // lỗi thì họ vẫn phải được đưa tới thẻ để ĐỌC ĐƯỢC lỗi đó.
+        vaScrollIfWanted();
       }
     }
 
@@ -4093,6 +4273,29 @@
       } else {
         mpApply();
       }
+    }
+
+    // Chip "báo động nhà máy" dẫn thẳng tới bảng, không bắt người dùng tự đi tìm.
+    //
+    // Cờ chứ không cuộn ngay: ``loadVendorAlarms`` là async, nên cuộn ở frame kế
+    // tiếp là cuộn tới một cái thẻ CHƯA CÓ NỘI DUNG — bảng điền xong thì layout
+    // dịch và đích trôi khỏi tầm mắt. Đo được: ngay sau click thẻ ở top=978, sau
+    // 1,2 s mới về top=299. Nên để chính hàm tải gọi cuộn khi nó đã vẽ xong.
+    let vaScrollWanted = false;
+
+    function goVendorAlarms() {
+      vaScrollWanted = true;
+      showView("reports");
+    }
+
+    function vaScrollIfWanted() {
+      if (!vaScrollWanted) return;
+      vaScrollWanted = false;
+      const card = document.getElementById("va-card");
+      if (!card || card.hidden) return;
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      card.classList.add("flash");
+      setTimeout(() => card.classList.remove("flash"), 1700);
     }
 
     const VIEWS = {

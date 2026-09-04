@@ -12,7 +12,7 @@ sau một lần thay pin thành một đường trung bình vô nghĩa.
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -23,6 +23,7 @@ from app.api.schemas import (
     AnalyticsOut,
     AnomalyOut,
     BatteryOut,
+    DailySamplesOut,
     DeviceHealthOut,
     QualityOut,
     SignalOut,
@@ -82,6 +83,26 @@ def _build(
     pts = [s for s in vol if s.volume_l is not None]
     regimes = [pts[i].at for i in an.change_points(vol) if 0 <= i < len(pts)]
 
+    # Số lần đo THÔ theo ngày, để trang Phân tích vẽ được độ phủ thay vì chỉ nói
+    # một phần trăm. Gom trong SQL: cửa sổ 90 ngày ở nhịp 1 phút là ~130 000 dòng
+    # và tất cả những gì cần là 90 con số.
+    tz_name = str(cfg.app_tz)
+    raw_daily = tel_repo.daily_counts(session, psn, start, now, tz_name=tz_name)
+    anom_by_day: dict[date, int] = {}
+    tz = cfg.tzinfo
+    for a in anomalies:
+        d = a.at.astimezone(tz).date()
+        anom_by_day[d] = anom_by_day.get(d, 0) + 1
+    daily = [
+        DailySamplesOut(day=d, samples=n, anomalies=anom_by_day.get(d, 0))
+        for d, n in raw_daily
+    ]
+    # Nhịp THẬT của nguồn, suy từ ngày ĐẦY ĐỦ NHẤT. Không lấy trung bình mọi ngày:
+    # ngày đầu và ngày cuối của cửa sổ luôn là ngày dở, và trộn chúng vào sẽ báo
+    # nhịp thưa hơn thực tế.
+    best = max((n for _, n in raw_daily), default=0)
+    src_cadence = round(1440.0 / best, 2) if best > 0 else None
+
     return AnalyticsOut(
         psn=psn,
         name=name,
@@ -103,6 +124,8 @@ def _build(
             reasons=health.reasons,
         ),
         anomalies=[AnomalyOut(**asdict(a)) for a in anomalies],
+        daily=daily,
+        source_cadence_minutes=src_cadence,
         regime_changes=regimes,
         generated_at=now,
     )

@@ -736,6 +736,23 @@ class AnomalyOut(BaseModel):
     note: str
 
 
+class DailySamplesOut(BaseModel):
+    """Số lần đo NGUỒN gửi trong một ngày lịch (giờ địa phương).
+
+    Đây là số dòng THÔ, khác ``QualityOut.samples`` — cái đó đếm trên lưới 30 phút
+    mà tầng phân tích tự gộp. Hai con số lệch nhau tới 30 lần trên nguồn nhịp 1
+    phút, nên chúng phải có hai cái tên và được nói rõ là hai thứ. Trước khi tách
+    ra, trang Phân tích ghi "kỳ vọng 4320 ở nhịp 30 phút" cho một nguồn phát mỗi
+    phút — con số đúng về lưới gộp nhưng sai về nguồn.
+    """
+
+    day: date
+    samples: int
+    #: Số bất thường có mốc rơi vào ngày này. Để cột được tô màu trạng thái thay vì
+    #: bắt người đọc đối chiếu một danh sách ngày ở chỗ khác.
+    anomalies: int = 0
+
+
 class AnalyticsOut(BaseModel):
     psn: str
     name: str | None = None
@@ -744,6 +761,14 @@ class AnalyticsOut(BaseModel):
     quality: QualityOut
     health: DeviceHealthOut
     anomalies: list[AnomalyOut] = Field(default_factory=list)
+    #: Số lần đo THÔ theo từng ngày, để vẽ được độ phủ thay vì chỉ nói một phần
+    #: trăm. Chỉ gồm ngày CÓ dữ liệu; client tự điền 0 cho ngày trống vì chỉ client
+    #: biết nó đang vẽ cửa sổ bao nhiêu ngày.
+    daily: list[DailySamplesOut] = Field(default_factory=list)
+    #: Nhịp phát THẬT của nguồn, suy từ số dòng thô của ngày đầy đủ nhất. None khi
+    #: chưa có ngày nào đủ để suy. Khác ``quality.cadence_minutes`` — cái đó là nhịp
+    #: của lưới gộp 30 phút.
+    source_cadence_minutes: float | None = None
     #: Thời điểm chuỗi đổi chế độ tiêu thụ — để dashboard vẽ mốc trên đồ thị.
     regime_changes: list[datetime] = Field(default_factory=list)
     generated_at: datetime
