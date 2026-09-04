@@ -29,6 +29,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain.analytics import AnomalyKind, Grade, Risk
+
 
 class TelemetryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -678,7 +680,11 @@ class QualityOut(BaseModel):
     longest_gap_hours: float | None = None
     flatline_runs: int
     longest_flatline_hours: float | None = None
-    grade: Literal["cao", "trung bình", "thấp", "không dùng được"]
+    # SUY TỪ domain, không chép lại. Chép lại là lý do endpoint /api/analytics trả
+    # 500 ngày 2026-09-04: domain thêm hạng "chưa đủ lịch sử" mà Literal ở đây vẫn
+    # là bản cũ, nên pydantic từ chối chính giá trị domain vừa sinh ra. Không test
+    # nào bắt được vì không bài nào chạy endpoint với một bồn ở hạng mới.
+    grade: Grade
     reasons: list[str] = Field(default_factory=list)
 
 
@@ -714,7 +720,7 @@ class DeviceHealthOut(BaseModel):
     delivery_ratio: float
     delivery_trend_per_day: float | None = None
     silent_days: float | None = None
-    risk: Literal["cao", "trung bình", "thấp", "chưa đủ dữ liệu"]
+    risk: Risk
     likely_cause: str | None = None
     days_to_failure: float | None = None
     reasons: list[str] = Field(default_factory=list)
@@ -722,7 +728,7 @@ class DeviceHealthOut(BaseModel):
 
 class AnomalyOut(BaseModel):
     at: datetime
-    kind: Literal["sụt bất thường", "tăng bất thường", "cảm biến kẹt"]
+    kind: AnomalyKind
     value_l: float | None = None
     expected_l: float | None = None
     deviation_l: float | None = None
