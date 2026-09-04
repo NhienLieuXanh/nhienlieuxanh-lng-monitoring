@@ -290,38 +290,62 @@
       grid-area: head; z-index: var(--z-header);
       display: flex; align-items: center; gap: 14px; padding: 0 18px;
       background: #ffffff;
-      border-bottom: 1px solid var(--line);
-      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+      border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
-    .page-title { font-weight: 700; font-size: var(--fs-lg); letter-spacing: -.01em; white-space: nowrap; flex: 0 0 auto; color: #0f172a; }
+    .page-title { font-weight: 700; font-size: 16.5px; letter-spacing: -.02em; white-space: nowrap; flex: 0 0 auto; color: #0f172a; }
     .kpis { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
     .kpi {
       flex: 0 0 auto;
-      display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap;
-      padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
-      background: var(--surface-2); font-size: var(--fs-sm); color: var(--muted);
-      transition: all .16s ease;
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      height: 28px; padding: 0 11px; border: 1px solid #e2e8f0; border-radius: 999px;
+      background: #f8fafc; font-size: 12px; color: #475569; font-weight: 500;
+      transition: all .15s ease;
     }
-    .kpi:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08); }
-    .kpi b { font-size: var(--fs-md); font-weight: 700; color: var(--fg); line-height: 1; }
+    .kpi:hover { transform: translateY(-1px); border-color: #cbd5e1; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05); }
+    .kpi b { font-size: 12.5px; font-weight: 700; font-family: var(--mono); color: #0f172a; line-height: 1; }
     .kpi-btn { cursor: pointer; font-family: inherit; }
-    .kpi-btn:hover { filter: brightness(1.05); }
-    .kpi.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
-    .kpi.ok b { color: var(--ok); }
-    .kpi.bad { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
-    .kpi.bad b { color: var(--crit); }
+    .kpi-btn:hover { filter: brightness(0.98); }
+    .kpi.ok { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .kpi.ok b { color: #047857; }
+    .kpi.bad { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .kpi.bad b { color: #b91c1c; }
     .kpi[hidden] { display: none; }
-    .kpi.vol { border-style: solid; border-color: #bae6fd; background: #f0f9ff; color: #0284c7; }
+    .kpi.vol { border-color: #bae6fd; background: #f0f9ff; color: #0284c7; }
     .kpi.vol b { color: #0284c7; }
-    .head-right { display: flex; align-items: center; gap: 10px; flex: 0 1 auto; min-width: 0; }
-    .meta-chip { min-width: 0; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; }
-    .head-right .icon-btn { flex: 0 0 auto; }
+    #kpi-vendor { background: #fff1f2; border-color: #fecdd3; color: #be123c; font-weight: 600; }
+    #kpi-vendor:hover { background: #ffe4e6; border-color: #fda4af; }
+    .head-right { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+    .meta-chip { min-width: 0; color: #475569; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+    .head-right .icon-btn { flex: 0 0 auto; width: 36px; min-height: 36px; height: 36px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #475569; }
+    .head-right .icon-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #0284c7; transform: translateY(-1px); }
     .meta-chip[hidden] { display: none; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
-    .dot.ok { background: var(--ok); animation: pulse-live 2.5s infinite; }
-    .dot.bad { background: var(--crit); animation: pulse-crit 2s infinite; }
-    .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg); }
-    .user-chip { color: var(--fg); font-weight: 600; font-size: var(--fs-body); background: var(--surface-2); padding: 4px 10px; border-radius: var(--r-sm); border: 1px solid var(--line); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+    .dot.ok { background: #10b981; animation: pulse-live 2.5s infinite; }
+    .dot.bad { background: #ef4444; animation: pulse-crit 2s infinite; }
+    .dot.warn { background: #f59e0b; }
+    #health-pill {
+      background: #ecfdf5; border: 1px solid #bbf7d0; color: #065f46;
+      font-weight: 600; font-size: 12px; height: 30px; padding: 0 10px; border-radius: 999px;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    #health-pill.degraded, #health-pill.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    #health-pill.bad, #health-pill.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    #ingest-label, #last-update {
+      background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;
+      font-size: 11.5px; font-weight: 500; height: 30px; padding: 0 9px; border-radius: 6px;
+      display: inline-flex; align-items: center;
+    }
+    .user-chip {
+      color: #0f172a; font-weight: 600; font-size: 12.5px; background: #f1f5f9;
+      height: 32px; padding: 0 11px; border-radius: 999px; border: 1px solid #cbd5e1;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .user-chip::before {
+      content: ""; width: 14px; height: 14px; flex: 0 0 auto;
+      background-size: contain; background-repeat: no-repeat; background-position: center;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");
+    }
     .alert-chip { position: relative; }
     .alert-chip .badge {
       position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
@@ -373,68 +397,105 @@
     .fleet-scroll { overflow: auto; flex: 1; min-height: 0; }
     table.tanks { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
     table.tanks th {
-      text-align: left; font-weight: 600; color: var(--faint); font-size: var(--fs-micro);
-      padding: 10px 14px; border-bottom: 1px solid var(--line); background: #f8fafc;
+      text-align: left; font-weight: 700; color: #64748b; font-size: 11px;
+      padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;
       position: sticky; top: 0; z-index: 1; text-transform: uppercase; letter-spacing: .06em;
     }
     table.tanks th.r, table.tanks td.r { text-align: right; }
-    table.tanks td { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+    table.tanks td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
     tr.tank { cursor: pointer; transition: all .12s ease; }
     tr.tank:hover { background: #f8fafc; }
     tr.tank.is-selected { background: #f0f9ff; }
     tr.tank.is-selected td:first-child { box-shadow: inset 4px 0 0 var(--brand); }
-    .tname { font-weight: 600; font-size: var(--fs-md); color: var(--fg); }
-    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: var(--fs-tiny); }
-    td.r .num { font-weight: 700; font-size: var(--fs-md); color: var(--fg); }
+    .tname { font-weight: 600; font-size: 13.5px; color: #0f172a; line-height: 1.3; }
+    .tpsn { display: block; color: #94a3b8; font-family: var(--mono); font-size: 11px; margin-top: 1px; }
+    td.r .num { font-weight: 700; font-size: 13.5px; color: #0f172a; }
     .lvl { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-    .lvl-bar { width: 50px; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .lvl-bar {
+      width: 54px; height: 6px; background: #e2e8f0; border-radius: 999px;
+      overflow: hidden; padding: 0 !important; margin: 0 !important;
+      box-sizing: border-box; display: inline-block; vertical-align: middle; flex: 0 0 auto;
+    }
     .lvl-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #0284c7, #10b981); border-radius: 999px; transition: width .3s ease; }
     .lvl-bar.low > i { background: linear-gradient(90deg, #d97706, #fbbf24); }
-    .lvl-bar.empty > i { background: linear-gradient(90deg, #dc2626, #f43f5e); }
-    .st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--fs-sm); font-weight: 700; padding: 3px 10px; border-radius: 999px; }
-    .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-    .st.on { color: var(--ok); background: var(--ok-bg); } .st.off { color: var(--crit); background: var(--crit-bg); }
-    .empty { padding: 22px 16px; color: var(--muted); }
+    .lvl-bar.empty > i { background: #ef4444; min-width: 3px; }
+    .st {
+      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+      font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; line-height: 1.2;
+    }
+    .st::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .st.on { color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .st.off { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
+    table.tanks td.empty, p.empty { padding: 22px 16px; color: var(--muted); text-align: center; }
 
     /* Inspect (Chi tiết bồn) */
     .inspect { background: var(--bg); min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
     .inspect > .card { min-width: 0; flex: 0 0 auto; }
     .card {
       background: #ffffff;
-      border: 1px solid var(--line);
+      border: 1px solid #e2e8f0;
       border-radius: var(--r);
       padding: 16px 18px;
-      box-shadow: var(--shadow-sm);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
     }
-    .hero { padding: 16px 18px; }
+    .hero { padding: 18px 20px; }
     .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-    .hero h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -.02em; color: #0f172a; }
-    .hero .ids { color: var(--muted); font-size: var(--fs-body); margin-top: 3px; }
-    .readouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .hero h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: #0f172a; }
+    .hero .ids { color: #64748b; font-size: 13px; margin-top: 3px; }
+    .readouts {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px; margin-top: 16px; align-items: stretch;
+    }
     @media (max-width: 760px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
     .readout {
-      padding: 12px 14px;
+      padding: 14px 16px;
       background: #ffffff;
-      border: 1px solid var(--line);
-      border-top: 3px solid #0284c7;
+      border: 1px solid #e2e8f0;
       border-radius: var(--r-sm);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
       transition: all .16s ease;
+      display: flex; flex-direction: column; justify-content: space-between;
+      min-height: 104px; position: relative; overflow: hidden;
     }
-    .readout:nth-child(2) { border-top-color: #0284c7; }
-    .readout:nth-child(3) { border-top-color: #059669; }
-    .readout:nth-child(4) { border-top-color: #0d9488; }
-    .readout:hover { transform: translateY(-2px); border-color: #bae6fd; box-shadow: 0 6px 18px -2px rgba(2, 132, 199, 0.12); }
-    .readout dt { color: var(--muted); font-size: var(--fs-micro); margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-    .readout dd { margin: 6px 0 0; font-size: var(--fs-3xl); font-weight: 700; font-family: var(--mono); letter-spacing: -.03em; color: var(--fg); line-height: 1; }
-    .readout dd small { font-size: var(--fs-sm); color: var(--muted); font-weight: 500; margin-left: 3px; letter-spacing: 0; }
-    .readout.bad { background: var(--crit-bg); border-color: var(--crit-line); border-top-color: var(--crit); }
-    .readout.bad dd { color: var(--crit); }
+    .readout::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: #0284c7; border-radius: 4px 4px 0 0;
+    }
+    .readout:nth-child(1)::before { background: #0284c7; }
+    .readout:nth-child(2)::before { background: #059669; }
+    .readout:nth-child(3)::before { background: #0284c7; }
+    .readout:nth-child(4)::before { background: #d97706; }
+    .readout:hover { transform: translateY(-2px); border-color: #bae6fd; box-shadow: 0 6px 18px -2px rgba(2, 132, 199, 0.10); }
+    .readout dt {
+      color: #64748b; font-size: 11px; margin: 0 0 6px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .readout dd {
+      margin: 0; font-size: 25px; font-weight: 700; font-family: var(--mono);
+      letter-spacing: -.03em; color: #0f172a; line-height: 1.1;
+      display: flex; align-items: baseline; gap: 4px;
+    }
+    .readout dd small { font-size: 13px; color: #64748b; font-weight: 600; letter-spacing: 0; font-family: var(--font); }
+    .readout.bad { background: #fef2f2; border-color: #fecaca; }
+    .readout.bad::before { background: #dc2626; }
+    .readout.bad dd { color: #dc2626; }
+    .readout-footer {
+      margin-top: 10px; padding-top: 6px; border-top: 1px dashed #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 11px; color: #64748b; font-weight: 500;
+    }
+    .readout-footer .rf-val { font-family: var(--mono); font-weight: 600; color: #334155; }
     .local-alerts { display: grid; gap: 8px; margin-top: 14px; }
-    .local-alerts p { margin: 0; font-size: var(--fs-body); font-weight: 600; padding: 9px 12px; border-radius: var(--r-sm); display: flex; gap: 8px; align-items: center; }
+    .local-alerts p {
+      margin: 0; font-size: 12.5px; font-weight: 600; padding: 9px 14px;
+      border-radius: var(--r-sm); display: flex; gap: 10px; align-items: center;
+      background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
     .local-alerts p::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
-    .local-alerts .crit { color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); }
-    .local-alerts .warn { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
+    .local-alerts .crit { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; }
+    .local-alerts .warn { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
 
     /* Chart Panel */
     .chart-panel { padding: 16px 18px; min-width: 0; }
@@ -716,12 +777,17 @@
     /* nowrap: "Đo cuối: 29 ngày" và "tới mức dự trữ" là nhãn NGẮN nhưng nhiều từ,
        để tự ngắt thì chúng gãy thành 3 dòng làm mọi hàng cao lên — mất chỗ hiển
        thị bồn trên một màn hình, đúng lỗi đã gặp với "79 ngày trước". */
-    .tago { display: block; margin-top: 3px; font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; }
-    .runpill { display: inline-block; font-family: var(--mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
-               padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
-    .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
-    .runpill.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
-    .runpill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+    .tago { display: block; margin-top: 2px; font-size: 11px; color: #64748b; white-space: nowrap; font-weight: 500; line-height: 1.2; }
+    .runpill {
+      display: inline-flex; align-items: center; font-family: var(--mono); font-size: 11.5px;
+      font-weight: 600; font-variant-numeric: tabular-nums; padding: 2px 7px;
+      border-radius: 6px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+      white-space: nowrap; line-height: 1.2;
+    }
+    .runpill.stale { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
+    .runpill.crit { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .runpill.warn { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+    .runpill.ok { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
 
     /* ===== KẾ HOẠCH: trợ lý đề xuất ===== */
     /* min-width: 0 ở CẢ khối và dòng chú thích. Mặc định flex item có
@@ -2241,7 +2307,8 @@
         const why = age != null
           ? `Lần đo cuối cách đây ${fmtDays(age)} — hệ thống không dự báo từ dữ liệu này`
           : "Chưa có lần đo nào";
-        return `<span class="runpill" title="${esc(why)}">Số liệu cũ</span>`;
+        return `<span class="runpill stale" title="${esc(why)}">Số liệu cũ</span>`
+          + `<span class="tago">dừng dự báo</span>`;
       }
       const r = (f && f.runout) || {};
       // Bồn đã ở dưới mức dự trữ thì days_to_reserve = 0 — đúng về toán nhưng vô
@@ -2255,7 +2322,7 @@
           : below
             ? "Đã dưới mức dự trữ · chưa đo được tốc độ hao để tính thời gian tới cạn"
             : "Chưa đo được mức tiêu thụ từ lịch sử";
-        return `<span class="runpill" title="${esc(why)}">--</span>`
+        return `<span class="runpill stale" title="${esc(why)}">--</span>`
           + `<span class="tago">${below ? "dưới mức dự trữ" : "chưa đủ dữ liệu"}</span>`;
       }
       // Dưới mức dự trữ thì luôn là critical, bất kể còn mấy ngày tới cạn: phần
@@ -2320,6 +2387,11 @@
         : "";
       const pctClass = p !== null && p < 15 ? " bad" : "";
 
+      const cap = detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3);
+      const vol = detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3);
+      const pres = detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa);
+      const temp = detail.temperature_c == null ? "--" : Number(detail.temperature_c);
+
       document.getElementById("tank-detail").innerHTML = `
         <div class="hero-top">
           <div>
@@ -2329,10 +2401,26 @@
           <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
         </div>
         <dl class="readouts">
-          <div class="readout${pctClass}"><dt>Mức chứa</dt><dd>${esc(fmtPct(p))}<small>%</small></dd></div>
-          <div class="readout"><dt>Thể tích</dt><dd>${esc(detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3))}<small>m³ / ${esc(detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3))}</small></dd></div>
-          <div class="readout"><dt>Áp suất</dt><dd>${esc(detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa))}<small>MPa</small></dd></div>
-          <div class="readout"><dt>Nhiệt độ</dt><dd>${esc(detail.temperature_c == null ? "--" : Number(detail.temperature_c))}<small>°C</small></dd></div>
+          <div class="readout${pctClass}">
+            <dt>Mức chứa</dt>
+            <dd>${esc(fmtPct(p))}<small>%</small></dd>
+            <div class="readout-footer"><span>Trạng thái</span><span class="rf-val">${p !== null && p < 15 ? "Mức thấp" : "Bình thường"}</span></div>
+          </div>
+          <div class="readout">
+            <dt>Thể tích hiện tại</dt>
+            <dd>${esc(vol)}<small>m³</small></dd>
+            <div class="readout-footer"><span>Dung tích</span><span class="rf-val">${esc(cap)} m³</span></div>
+          </div>
+          <div class="readout">
+            <dt>Áp suất bồn</dt>
+            <dd>${esc(pres)}<small>MPa</small></dd>
+            <div class="readout-footer"><span>Giới hạn</span><span class="rf-val">&lt; 1.6 MPa</span></div>
+          </div>
+          <div class="readout">
+            <dt>Nhiệt độ bồn</dt>
+            <dd>${esc(temp)}<small>°C</small></dd>
+            <div class="readout-footer"><span>Môi chất</span><span class="rf-val">LNG (-162°C)</span></div>
+          </div>
         </dl>
         ${alertBlock}`;
       document.getElementById("tank-specs").innerHTML = `
@@ -2515,7 +2603,19 @@
           animation: reduce ? false : { duration: 160 },
           interaction: { mode: "index", intersect: false },
           plugins: {
-            legend: { labels: { color: cAxis, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            legend: {
+              position: 'top',
+              align: 'end',
+              labels: {
+                color: '#64748b',
+                usePointStyle: true,
+                pointStyle: 'circle',
+                boxWidth: 7,
+                boxHeight: 7,
+                padding: 14,
+                font: { size: 11.5, weight: '600', family: 'var(--font)' }
+              }
+            },
             tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y}` } },
           },
           scales: {
