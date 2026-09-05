@@ -127,6 +127,9 @@ def wired(monkeypatch: pytest.MonkeyPatch):
         "health_series",
         lambda s, psn, a, b, **kw: a_health if psn == "2604200016" else [],
     )
+    # "Vừa nạp xong": các test trong file này kiểm nội dung báo cáo, không kiểm độ
+    # trễ của poller. Đặt observed_at = now giữ nguyên ngữ nghĩa cũ của chúng.
+    monkeypatch.setattr(rp.runs_repo, "last_success_at", lambda s: now)
     monkeypatch.setattr(rp, "load_config", lambda s, st: _Cfg())
     monkeypatch.setattr(
         rp.notifier,

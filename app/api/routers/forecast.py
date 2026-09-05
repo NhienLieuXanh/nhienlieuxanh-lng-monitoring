@@ -39,6 +39,7 @@ from app.api.schemas import (
 from app.db.models import Telemetry, Terminal
 from app.domain import forecast as fc
 from app.domain.status import derive_status
+from app.repositories import ingest_runs as runs_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.services.appconfig import ConfigLike, load_config
@@ -161,13 +162,16 @@ def _to_out(
     *,
     now: datetime,
     stale_after: timedelta,
+    observed_at: datetime | None,
 ) -> ForecastOut:
     return ForecastOut(
         psn=f.psn,
         name=term.name,
         # Suy status lúc đọc, giống deps.to_terminal_out — cột `terminals.status`
         # là cache và có lỗi staleness không tránh được.
-        status=derive_status(term.last_seen_at, now, stale_after).value,  # type: ignore[arg-type]
+        status=derive_status(
+            term.last_seen_at, now, stale_after, observed_at=observed_at
+        ).value,  # type: ignore[arg-type]
         sampled_at=latest.sampled_at if latest else None,
         volume_l=f.volume_l,
         capacity_l=f.capacity_l,
@@ -224,10 +228,16 @@ def forecast_all(
     stale = timedelta(minutes=cfg.online_stale_minutes)
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
+    observed_at = runs_repo.last_success_at(session)
     out: list[ForecastOut] = []
     for t in terms:
         f = _build(session, cfg, t, latest.get(t.psn), p, now)
-        out.append(_to_out(f, t, latest.get(t.psn), now=now, stale_after=stale))
+        out.append(
+            _to_out(
+                f, t, latest.get(t.psn), now=now,
+                stale_after=stale, observed_at=observed_at,
+            )
+        )
     return out
 
 
@@ -243,6 +253,7 @@ def forecast_one(
     return _to_out(
         f, term, latest, now=now,
         stale_after=timedelta(minutes=cfg.online_stale_minutes),
+        observed_at=runs_repo.last_success_at(session),
     )
 
 

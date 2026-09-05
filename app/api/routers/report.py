@@ -45,6 +45,7 @@ from app.domain import analytics as an
 from app.domain import forecast as fc
 from app.domain.alerts import fill_percent
 from app.domain.status import derive_status
+from app.repositories import ingest_runs as runs_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.repositories import vendor_alarms as alarm_repo
@@ -374,6 +375,7 @@ def export_report(
     period_start = period_end - timedelta(days=window_days)
 
     stale_after = timedelta(minutes=cfg.online_stale_minutes)
+    observed_at = runs_repo.last_success_at(session)
 
     rows_state: list[str] = []
     rows_fc: list[str] = []
@@ -389,7 +391,9 @@ def export_report(
         pres = (
             None if (lt is None or lt.pressure_mpa is None) else float(lt.pressure_mpa)
         )
-        st = derive_status(t.last_seen_at, now, stale_after).value
+        st = derive_status(
+            t.last_seen_at, now, stale_after, observed_at=observed_at
+        ).value
         if st != "online":
             n_offline += 1
         if cap is not None:

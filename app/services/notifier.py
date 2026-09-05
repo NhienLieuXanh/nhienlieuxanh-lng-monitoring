@@ -35,6 +35,7 @@ from app.domain import forecast as fc
 from app.domain.alerts import AlertThresholds, TerminalSnapshot, evaluate
 from app.domain.alerts import fill_percent as _fill_percent
 from app.domain.smtp_errors import explain as explain_smtp
+from app.repositories import ingest_runs as runs_repo
 from app.repositories import notifications as notif_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
@@ -108,6 +109,7 @@ def collect_notices(
     stale = timedelta(minutes=settings.online_stale_minutes)
     th = AlertThresholds(
         stale_after=stale,
+        observed_at=runs_repo.last_success_at(session),
         low_volume_percent=Decimal(str(settings.alert_low_volume_percent)),
         low_battery_v=Decimal(str(settings.alert_low_battery_v)),
         low_signal_percent=Decimal(str(settings.alert_low_signal_percent)),

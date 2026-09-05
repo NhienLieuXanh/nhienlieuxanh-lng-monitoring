@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import SessionDep, SettingsDep, UserDep, to_terminal_out
 from app.api.schemas import Page, TerminalDetailOut, TerminalOut, TerminalUpdateIn
+from app.repositories import ingest_runs as runs_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 
@@ -43,8 +44,11 @@ def list_terminals(
 
     # Một query cho toàn bộ "lần đọc mới nhất mỗi PSN" (DISTINCT ON), không N+1.
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
+    observed_at = runs_repo.last_success_at(session)
     items = [
-        to_terminal_out(t, latest.get(t.psn), now=now, stale_after=stale)
+        to_terminal_out(
+            t, latest.get(t.psn), now=now, stale_after=stale, observed_at=observed_at
+        )
         for t in terms
     ]
     # Lọc status SAU khi map, vì status được suy lúc đọc chứ không lấy từ cột cache.
@@ -74,6 +78,7 @@ def get_terminal(psn: str, session: SessionDep, settings: SettingsDep, _: UserDe
         tel_repo.latest_for(session, psn),
         now=datetime.now(tz=UTC),
         stale_after=timedelta(minutes=settings.online_stale_minutes),
+        observed_at=runs_repo.last_success_at(session),
         detail=True,
     )
 
@@ -106,5 +111,6 @@ def update_terminal(
         tel_repo.latest_for(session, psn),
         now=datetime.now(tz=UTC),
         stale_after=timedelta(minutes=settings.online_stale_minutes),
+        observed_at=runs_repo.last_success_at(session),
         detail=True,
     )

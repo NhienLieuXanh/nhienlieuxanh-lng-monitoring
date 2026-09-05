@@ -8,12 +8,13 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, literal_column, select, text, update
+from sqlalchemy import case, func, literal, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import Terminal
 from app.domain.contracts import NormalizedTerminal
+from app.domain.status import status_cutoff
 
 log = logging.getLogger(__name__)
 
@@ -139,7 +140,12 @@ def bump_last_seen(session: Session, latest: dict[str, datetime]) -> int:
     return n
 
 
-def refresh_status_cache(session: Session, stale_after: timedelta) -> int:
+def refresh_status_cache(
+    session: Session,
+    now: datetime,
+    stale_after: timedelta,
+    observed_at: datetime | None,
+) -> int:
     """Đồng bộ lại cột `status` cho MỌI terminal.
 
     Cần thiết vì cột lưu có lỗi staleness không tránh được: thiết bị ngừng báo thì
@@ -147,15 +153,19 @@ def refresh_status_cache(session: Session, stale_after: timedelta) -> int:
     giờ chạy và nó đứng mãi ở 'online'. API thì suy lại lúc đọc nên không bị, nhưng
     cột này vẫn cần đúng cho query SQL ad-hoc và alert phía DB.
 
+    Dùng chung ``status_cutoff`` với tầng API — xem lý do ở ``counts_by_status``.
+
     `WHERE status <> (CASE ...)` giữ cho phần lớn cycle là no-op: không dead tuple,
     không churn updated_at vô ích.
     """
-    minutes = int(stale_after.total_seconds() // 60)
-    computed = text(
-        "CASE WHEN last_seen_at IS NOT NULL "
-        "      AND last_seen_at >= now() - make_interval(mins => :mins) "
-        "     THEN 'online' ELSE 'offline' END"
-    ).bindparams(mins=minutes)
+    cutoff = status_cutoff(now, stale_after, observed_at)
+    computed = case(
+        (
+            Terminal.last_seen_at.is_not(None) & (Terminal.last_seen_at >= cutoff),
+            literal("online"),
+        ),
+        else_=literal("offline"),
+    )
     res = session.execute(
         update(Terminal)
         .where(Terminal.status != computed)
@@ -200,8 +210,37 @@ def update_operator(
     return term
 
 
-def counts_by_status(session: Session) -> dict[str, int]:
+def counts_by_status(
+    session: Session,
+    now: datetime,
+    stale_after: timedelta,
+    observed_at: datetime | None,
+) -> dict[str, int]:
+    """Đếm online/offline SUY LẠI từ ``last_seen_at``, không đọc cột ``status``.
+
+    Cột ``status`` chỉ là cache, và nó chỉ đúng ngay sau mỗi lần
+    ``refresh_status_cache()`` — tức là ngay sau một cycle ingest. Trên serverless
+    nhịp ingest do một poller bên ngoài quyết định, khoảng cách thật giữa hai lần
+    chạy có trung vị ~90 phút và max ~11 giờ, nên phần lớn thời gian cache đã cũ.
+
+    Hệ quả có thật nếu đọc cache ở đây: ``/api/health`` khai ``terminals_online: 1``
+    trong khi ``/api/terminals`` và ``/api/stats/summary`` — vốn suy lại lúc đọc —
+    khai đúng bồn đó là offline. Hai bộ phận của cùng một sản phẩm giám sát nói
+    ngược nhau về cùng một thiết bị tại cùng một thời điểm.
+
+    Suy lại trong SQL (không kéo cả bảng về Python) nên vẫn là một query.
+    """
+    # Mốc lấy từ CHÍNH hàm mà tầng API dùng, không tự dựng lại bằng SQL: hai cách
+    # tính cùng một thứ là đúng cái đã đẻ ra bug health/dashboard nói ngược nhau.
+    cutoff = status_cutoff(now, stale_after, observed_at)
+    derived = case(
+        (
+            Terminal.last_seen_at.is_not(None) & (Terminal.last_seen_at >= cutoff),
+            literal("online"),
+        ),
+        else_=literal("offline"),
+    )
     rows = session.execute(
-        select(Terminal.status, func.count()).group_by(Terminal.status)
+        select(derived.label("st"), func.count()).group_by(derived)
     ).all()
     return {str(s): int(c) for s, c in rows}

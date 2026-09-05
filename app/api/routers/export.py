@@ -35,6 +35,7 @@ from app.api.deps import HistoryQueryDep, SessionDep, SettingsDep, UserDep
 from app.domain import forecast as fc
 from app.domain.alerts import fill_percent
 from app.domain.status import derive_status
+from app.repositories import ingest_runs as runs_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.services.appconfig import ConfigLike, load_config
@@ -192,6 +193,7 @@ def export_tanks(
     now = datetime.now(tz=UTC)
     win = window_days or cfg.forecast_window_days
     stale = timedelta(minutes=cfg.online_stale_minutes)
+    observed_at = runs_repo.last_success_at(session)
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
 
@@ -228,7 +230,9 @@ def export_tanks(
             [
                 t.psn,
                 t.name or "",
-                derive_status(t.last_seen_at, now, stale).value,
+                derive_status(
+                    t.last_seen_at, now, stale, observed_at=observed_at
+                ).value,
                 _ts(t.last_seen_at, cfg),
                 _m3(cap),
                 _m3(vol),

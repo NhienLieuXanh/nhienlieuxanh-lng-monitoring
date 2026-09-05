@@ -73,3 +73,19 @@ def recent(session: Session, limit: int = 20) -> list[IngestRun]:
         .scalars()
         .all()
     )
+
+
+def last_success_at(session: Session) -> datetime | None:
+    """Mốc lần nạp THÀNH CÔNG gần nhất — tức lần cuối ta thực sự hỏi nguồn.
+
+    Tách riêng khỏi ``last_success()`` vì phần lớn nơi cần nó chỉ cần đúng một
+    timestamp: ``derive_status`` phải biết ta nhìn lần cuối lúc nào để không quy
+    độ trễ của poller thành lỗi của thiết bị. Trả thẳng cột thay vì cả row để chỗ
+    gọi không vô tình đọc thêm field và tạo phụ thuộc không cần thiết.
+    """
+    return session.execute(
+        select(IngestRun.finished_at)
+        .where(IngestRun.status.in_(OK_STATUSES), IngestRun.finished_at.is_not(None))
+        .order_by(IngestRun.finished_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()

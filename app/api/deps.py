@@ -142,6 +142,7 @@ def to_terminal_out(
     *,
     now: datetime,
     stale_after: timedelta,
+    observed_at: datetime | None,
     detail: bool = False,
 ) -> TerminalOut:
     """Map ORM -> response, suy `status` lúc ĐỌC.
@@ -149,6 +150,9 @@ def to_terminal_out(
     Suy lại thay vì đọc cột `terminals.status`: cột đó là cache và có lỗi staleness
     không tránh được (thiết bị ngừng báo thì không ingest nào chạm row nó). Suy ở
     đây thì status không bao giờ sai, bất kể ingest chạy lần cuối khi nào.
+
+    ``observed_at`` (mốc lần nạp thành công gần nhất) là bắt buộc — xem
+    ``derive_status``: thiếu nó thì độ trễ của poller bị tính thành thiết bị chết.
     """
     fill = fill_percent(
         latest.volume_l if latest else None,
@@ -157,7 +161,9 @@ def to_terminal_out(
     payload: dict[str, object] = {
         "psn": term.psn,
         "name": term.name,
-        "status": derive_status(term.last_seen_at, now, stale_after).value,
+        "status": derive_status(
+            term.last_seen_at, now, stale_after, observed_at=observed_at
+        ).value,
         "last_seen_at": term.last_seen_at,
         "capacity_l": term.capacity_l,
         "latitude": term.latitude,

@@ -39,9 +39,10 @@ UTC = ZoneInfo("UTC")
 VERSION = "0.1.0"
 
 
-def _thresholds(settings: SettingsDep) -> AlertThresholds:
+def _thresholds(settings: SettingsDep, observed_at: datetime | None) -> AlertThresholds:
     return AlertThresholds(
         stale_after=timedelta(minutes=settings.online_stale_minutes),
+        observed_at=observed_at,
         low_volume_percent=Decimal(str(settings.alert_low_volume_percent)),
         low_battery_v=Decimal(str(settings.alert_low_battery_v)),
         low_signal_percent=Decimal(str(settings.alert_low_signal_percent)),
@@ -53,13 +54,16 @@ def _thresholds(settings: SettingsDep) -> AlertThresholds:
 
 def _snapshots(
     session: SessionDep, settings: SettingsDep
-) -> tuple[list[TerminalOut], list[TerminalSnapshot], datetime]:
+) -> tuple[list[TerminalOut], list[TerminalSnapshot], datetime, datetime | None]:
     now = datetime.now(tz=UTC)
     stale = timedelta(minutes=settings.online_stale_minutes)
     terms = term_repo.list_all(session)
     latest = tel_repo.latest_many(session, [t.psn for t in terms])
+    observed_at = runs_repo.last_success_at(session)
     outs = [
-        to_terminal_out(t, latest.get(t.psn), now=now, stale_after=stale)
+        to_terminal_out(
+            t, latest.get(t.psn), now=now, stale_after=stale, observed_at=observed_at
+        )
         for t in terms
     ]
     snaps = [
@@ -73,7 +77,7 @@ def _snapshots(
         )
         for o in outs
     ]
-    return outs, snaps, now
+    return outs, snaps, now, observed_at
 
 
 def ingest_freshness(age_seconds: float | None, stale_after_minutes: int) -> CheckOut:
@@ -180,7 +184,12 @@ def health(
     counts: dict[str, int] = {}
     if db.ok:
         try:
-            counts = term_repo.counts_by_status(session)
+            counts = term_repo.counts_by_status(
+                session,
+                now,
+                timedelta(minutes=settings.online_stale_minutes),
+                observed_at=last_at,
+            )
         except Exception:
             # Bảng terminals chưa có (chưa migrate) hoặc lỗi khác — không để health 500.
             session.rollback()
@@ -238,8 +247,8 @@ def _vendor_alarm_count(session: Session, now: datetime) -> int:
 
 @router.get("/stats/summary", response_model=SummaryOut)
 def summary(session: SessionDep, settings: SettingsDep, _: UserDep) -> SummaryOut:
-    outs, snaps, now = _snapshots(session, settings)
-    th = _thresholds(settings)
+    outs, snaps, now, observed_at = _snapshots(session, settings)
+    th = _thresholds(settings, observed_at)
     found = [a for s in snaps for a in evaluate(s, th, now)]
     volumes = [o.volume_l for o in outs if o.volume_l is not None]
     return SummaryOut(
@@ -258,8 +267,8 @@ def summary(session: SessionDep, settings: SettingsDep, _: UserDep) -> SummaryOu
 
 @router.get("/alerts", response_model=list[AlertOut])
 def alerts(session: SessionDep, settings: SettingsDep, _: UserDep) -> list[AlertOut]:
-    _, snaps, now = _snapshots(session, settings)
-    th = _thresholds(settings)
+    _, snaps, now, observed_at = _snapshots(session, settings)
+    th = _thresholds(settings, observed_at)
     found = [a for s in snaps for a in evaluate(s, th, now)]
     order = {Severity.CRITICAL: 0, Severity.WARNING: 1, Severity.INFO: 2}
     found.sort(key=lambda a: (order[a.severity], a.psn))

@@ -46,6 +46,11 @@ class Alert:
 @dataclass(frozen=True, slots=True)
 class AlertThresholds:
     stale_after: timedelta
+    #: Mốc lần nạp thành công gần nhất — bằng chứng gần nhất ta có về thiết bị.
+    #: ``None`` nghĩa là chưa từng nạp thành công, và khi đó derive_status quay về
+    #: đo bằng ``now``. Không có mặc định: quên truyền nó là quy độ trễ của poller
+    #: thành lỗi của thiết bị, đúng bug đã làm bồn hiện ngoại tuyến 55% thời gian.
+    observed_at: datetime | None
     low_volume_percent: Decimal
     low_battery_v: Decimal
     low_signal_percent: Decimal
@@ -134,7 +139,10 @@ def evaluate(
         else f" — số đo {elapsed_vi(age)} trước, thiết bị đã ngoại tuyến"
     )
 
-    if derive_status(snap.last_seen_at, now, th.stale_after) is TerminalStatus.OFFLINE:
+    st = derive_status(
+        snap.last_seen_at, now, th.stale_after, observed_at=th.observed_at
+    )
+    if st is TerminalStatus.OFFLINE:
         if snap.last_seen_at is None:
             detail = "chưa từng nhận được dữ liệu"
         else:

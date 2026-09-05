@@ -24,6 +24,9 @@ STALE = timedelta(minutes=90)
 
 TH = AlertThresholds(
     stale_after=STALE,
+    # NOW = mốc "vừa nạp xong": các test trong file này kiểm luật cảnh báo, không
+    # kiểm độ trễ của poller (chuyện đó ở test_status_do_bang_lan_nhin.py).
+    observed_at=NOW,
     low_volume_percent=Decimal("15"),
     low_battery_v=Decimal("3.40"),
     low_signal_percent=Decimal("10"),
@@ -31,21 +34,26 @@ TH = AlertThresholds(
 
 
 class TestDeriveStatus:
-    """Kiểm đúng biên. `now` là tham số nên không cần freeze clock."""
+    """Kiểm đúng biên. `now` là tham số nên không cần freeze clock.
+
+    ``observed_at=NOW`` ở mọi ca dưới đây = "vừa nạp xong", tức không có độ trễ
+    poller. Đó là điều kiện cô lập đúng để kiểm riêng biên của ngưỡng; ảnh hưởng
+    của độ trễ poller được kiểm riêng ở test_status_do_bang_lan_nhin.py.
+    """
 
     def test_never_seen_is_offline(self):
-        assert derive_status(None, NOW, STALE) is TerminalStatus.OFFLINE
+        assert derive_status(None, NOW, STALE, observed_at=NOW) is TerminalStatus.OFFLINE
 
     def test_exactly_at_threshold_is_online(self):
-        assert derive_status(NOW - STALE, NOW, STALE) is TerminalStatus.ONLINE
+        assert derive_status(NOW - STALE, NOW, STALE, observed_at=NOW) is TerminalStatus.ONLINE
 
     def test_one_second_past_threshold_is_offline(self):
         last = NOW - STALE - timedelta(seconds=1)
-        assert derive_status(last, NOW, STALE) is TerminalStatus.OFFLINE
+        assert derive_status(last, NOW, STALE, observed_at=NOW) is TerminalStatus.OFFLINE
 
     def test_one_second_inside_threshold_is_online(self):
         last = NOW - STALE + timedelta(seconds=1)
-        assert derive_status(last, NOW, STALE) is TerminalStatus.ONLINE
+        assert derive_status(last, NOW, STALE, observed_at=NOW) is TerminalStatus.ONLINE
 
     def test_real_devices_are_offline(self):
         """Cả hai thiết bị thật stale hàng tháng — đây là trạng thái mặc định."""
@@ -53,7 +61,7 @@ class TestDeriveStatus:
             datetime(2026, 7, 23, 8, 3, 29, tzinfo=UTC),
             datetime(2026, 6, 2, 14, 17, 3, tzinfo=UTC),
         ):
-            assert derive_status(last, NOW, STALE) is TerminalStatus.OFFLINE
+            assert derive_status(last, NOW, STALE, observed_at=NOW) is TerminalStatus.OFFLINE
 
 
 class TestFillPercent:

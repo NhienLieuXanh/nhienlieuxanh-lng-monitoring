@@ -292,7 +292,14 @@ class IngestionService:
             # Chạy cho MỌI row, vô điều kiện: thiết bị ngừng báo thì không có
             # gì trong `latest` chạm tới nó, nên đây là chỗ duy nhất nó chuyển
             # sang offline.
-            term_repo.refresh_status_cache(session, self.stale_after)
+            #
+            # observed_at = BÂY GIỜ, và đó là giá trị đúng chứ không phải cho tiện:
+            # hàm này chạy bên trong vòng ingest, tức ta vừa hỏi nguồn xong. Đây
+            # chính là khoảnh khắc "lần ta nhìn" mà derive_status cần.
+            now = datetime.now(tz=UTC)
+            term_repo.refresh_status_cache(
+                session, now, self.stale_after, observed_at=now
+            )
 
     # ---------------------------------------------------------------- cycle
 
