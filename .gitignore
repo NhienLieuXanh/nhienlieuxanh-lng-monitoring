@@ -32,3 +32,11 @@ logs/
 
 # local MCP config (không thuộc sản phẩm)
 .mcp.json
+
+# Scaffolding của trợ lý lập trình — không thuộc sản phẩm, và 173 lỗi ruff trong
+# đó làm `ruff check .` không còn dùng được làm cổng chất lượng.
+.agents/
+.planning/
+AGENTS.md
+GEMINI.md
+*.bak
