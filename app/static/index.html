@@ -19,7 +19,7 @@
        env(safe-area-inset-*) cho tai thỏ và vạch home, mà tôi không có iPhone thật
        để kiểm. Không bật thì trình duyệt tự tránh vùng đó — mặc định an toàn. -->
   <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#0284c7" />
+  <meta name="theme-color" content="#f8fafc" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Giám sát LNG" />
@@ -1992,7 +1992,7 @@
       // localStorage quyết định, nên nó có thể ngược hẳn với cài đặt hệ điều hành —
       // lúc đó thanh trạng thái tối chồng lên một app sáng, hoặc ngược lại.
       const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", dark ? "#0b1120" : "#eef1f5");
+      if (meta) meta.setAttribute("content", dark ? "#0b1120" : "#f8fafc");
     }
     function toggleTheme() {
       const dark = document.documentElement.getAttribute("data-theme") !== "light";
