@@ -1725,6 +1725,7 @@
                   <option value="gmail">Gmail</option>
                   <option value="outlook">Outlook.com · Hotmail (thư cá nhân)</option>
                   <option value="m365">Microsoft 365 (thư công ty)</option>
+                  <option value="brevo">Brevo (dịch vụ gửi thư miễn phí)</option>
                   <option value="custom">Khác (máy chủ riêng của công ty)</option>
                 </select>
               </label>
@@ -1765,6 +1766,34 @@
                 báo lỗi khoá, đây không phải do bạn nhập sai: nhờ người quản trị
                 Microsoft 365 bật <b>Authenticated SMTP</b> cho hộp thư này, hoặc dùng
                 một hộp thư Gmail riêng cho cảnh báo.
+              </span>
+            </div>
+
+
+            <!-- Brevo KHÁC ba mục trên ở một điểm quyết định: đăng nhập SMTP và địa
+                 chỉ gửi là HAI thứ khác nhau. Ba mục trên buộc chúng giống nhau
+                 (Microsoft 365 trả 5.7.60 nếu khác), nên Brevo phải mở sẵn khối
+                 nâng cao và KHÔNG được chép user sang from. -->
+            <div id="s-guide-brevo" class="smtp-guide" hidden>
+              <b>Dùng khi thư công ty không gửi được và bạn không phải người quản trị.</b>
+              <ol>
+                <li>Đăng ký tài khoản miễn phí tại <b>brevo.com</b> (300 thư/ngày).</li>
+                <li>Vào <b>Senders, Domains &amp; Dedicated IPs → Senders → Add a Sender</b>,
+                    nhập địa chỉ thư của bạn rồi bấm liên kết xác minh trong hộp thư.</li>
+                <li>Vào <b>Transactional → Settings → SMTP</b>, bấm
+                    <b>Generate a new SMTP key</b>.</li>
+                <li>Ở Bước 2: điền <b>đăng nhập SMTP</b> (Brevo hiện ngay trên trang đó)
+                    và dán <b>khoá SMTP</b> vào ô mật khẩu.</li>
+                <li>Mở <b>Thiết lập nâng cao</b> bên dưới, điền
+                    <b>Địa chỉ gửi (From)</b> = đúng địa chỉ vừa xác minh ở bước 2.</li>
+              </ol>
+              <span class="gnote">
+                Phải là <b>khoá SMTP</b>, không phải khoá API và cũng không phải mật khẩu
+                đăng nhập Brevo — ba thứ này khác nhau và là chỗ hay nhầm nhất.
+                Nếu tên miền chưa được xác minh bằng bản ghi DNS, Brevo sẽ đổi địa chỉ
+                người gửi sang tên miền của họ và thư <b>có thể rơi vào Thư rác</b>.
+                Bấm <b>Lưu và gửi thư kiểm tra</b> rồi xem thư có vào Hộp thư đến thật
+                không — đó là câu trả lời duy nhất đáng tin.
               </span>
             </div>
 
@@ -3895,8 +3924,12 @@
       gmail:   { host: "smtp.gmail.com",        port: "587", tls: "true", ph: "vidu@gmail.com",   guide: "s-guide-gmail" },
       outlook: { host: "smtp-mail.outlook.com", port: "587", tls: "true", ph: "vidu@outlook.com", guide: "s-guide-outlook" },
       m365:    { host: "smtp.office365.com",    port: "587", tls: "true", ph: "vidu@congty.com",  guide: "s-guide-m365" },
+      // autoFrom:false vì đăng nhập SMTP của Brevo KHÔNG phải địa chỉ gửi; chép
+      // cái này sang cái kia sẽ gửi thất bại với một lỗi rất khó đoán ra.
+      brevo:   { host: "smtp-relay.brevo.com",  port: "587", tls: "true", ph: "đăng nhập SMTP của Brevo",
+                 guide: "s-guide-brevo", showAdv: true, autoFrom: false },
     };
-    const SMTP_GUIDES = ["s-guide-gmail", "s-guide-outlook", "s-guide-m365"];
+    const SMTP_GUIDES = ["s-guide-gmail", "s-guide-outlook", "s-guide-m365", "s-guide-brevo"];
 
     function applySmtpProvider(provider, autoFill = true) {
       const hostEl = document.getElementById("s-host");
@@ -3923,10 +3956,15 @@
           if (hostEl) hostEl.value = spec.host;
           if (portEl) portEl.value = spec.port;
           if (tlsEl) tlsEl.value = spec.tls;
-          if (fromEl && userEl && userEl.value) fromEl.value = userEl.value.trim();
+          if (spec.autoFrom !== false && fromEl && userEl && userEl.value) {
+            fromEl.value = userEl.value.trim();
+          }
         }
         if (userEl) userEl.placeholder = spec.ph;
-        if (advEl) advEl.hidden = true;
+        if (advEl) {
+          advEl.hidden = !spec.showAdv;
+          if (spec.showAdv && autoFill) advEl.open = true;
+        }
       } else {
         // Nhà cung cấp "Khác": mở khối thiết lập nâng cao cho máy chủ riêng.
         if (advEl) {
@@ -3944,15 +3982,21 @@
       if (h === "" || h === "smtp.gmail.com") return "gmail";
       if (h === "smtp-mail.outlook.com" || h === "smtp.live.com" || h === "smtp.outlook.com") return "outlook";
       if (h === "smtp.office365.com") return "m365";
+      // Nhận cả tên miền cũ: một cấu hình lưu từ thời Sendinblue không được rơi
+      // xuống "Khác" rồi mất hướng dẫn.
+      if (h === "smtp-relay.brevo.com" || h === "smtp-relay.sendinblue.com") return "brevo";
       return "custom";
     }
 
-    // Với ba nhà cung cấp có sẵn, tài khoản đăng nhập (user) và địa chỉ gửi (from)
-    // buộc phải giống nhau — Microsoft 365 trả lỗi 5.7.60 nếu chúng khác nhau.
+    // Với Gmail / Outlook / Microsoft 365, tài khoản đăng nhập (user) và địa chỉ
+    // gửi (from) buộc phải giống nhau — Microsoft 365 trả lỗi 5.7.60 nếu khác.
+    // Brevo thì ngược lại: đăng nhập SMTP là một chuỗi riêng, không phải địa chỉ
+    // thư, nên chép sang from sẽ hỏng. Điều đó khai bằng cờ autoFrom trên preset.
     function syncSmtpUserToFrom() {
       const providerEl = document.getElementById("s-provider");
       const prov = providerEl ? providerEl.value : "gmail";
-      if (!SMTP_PROVIDERS[prov]) return;
+      const spec = SMTP_PROVIDERS[prov];
+      if (!spec || spec.autoFrom === false) return;
       const userEl = document.getElementById("s-user");
       const fromEl = document.getElementById("s-from");
       if (userEl && fromEl) fromEl.value = userEl.value.trim();
