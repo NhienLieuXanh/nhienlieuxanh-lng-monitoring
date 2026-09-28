@@ -2859,6 +2859,12 @@
     /* ---------- KẾ HOẠCH NẠP LNG (theo công thức Book1.xlsx) ---------- */
     // Row 14 quyết định nạp; Row 15 lượng đặt = mức_sau_nạp - mức_hiện_tại.
     // WEEKDAY(,2): Thứ 2=1 ... Chủ Nhật=7. JS getDay(): CN=0..T7=6 -> iso = (getDay()+6)%7+1.
+    // Khoá theo NGÀY ("YYYY-MM-DD"), KHÔNG theo số thứ tự dòng. Khoá theo chỉ số là
+    // một bug đã xảy ra thật: người dùng tích "Nạp chỉ định" ở dòng thứ 7 khi bảng
+    // bắt đầu từ 01/09 (tức 07/09, Thứ Hai), rồi đổi ngày bắt đầu sang 28/09 — cả
+    // bảng trượt đi bên dưới còn ô tích đứng yên ở dòng 7, giờ là 04/10, CHỦ NHẬT.
+    // Ô tích đi vòng qua luật cấm Chủ Nhật (`fill = forced || trig`) nên kế hoạch
+    // khai một ngày giao hàng mà nhà cung cấp không giao.
     const planRest = new Set(), planForce = new Set();
     // Số ĐO TAY theo ngày: khoá "YYYY-MM-DD" -> m³. Nguồn là bảng plan_readings
     // trên server, không phải localStorage: hai người cùng theo một bồn phải thấy
@@ -2916,9 +2922,10 @@
       let level = p.start;
       for (let i = 0; i < p.days; i++) {
         const d = new Date(base.getTime() + i * 86400000);
+        const key = planDayKey(d);
         out.push(level);
-        const fill = planForce.has(i) || planShouldFill(level, d, p);
-        level = fill ? postFill : (planRest.has(i) ? level : level - p.use);
+        const fill = planForce.has(key) || planShouldFill(level, d, p);
+        level = fill ? postFill : (planRest.has(key) ? level : level - p.use);
       }
       return out;
     }
@@ -2946,7 +2953,7 @@
         const est = level;
         const act = planReadings.has(key) ? planReadings.get(key) : null;
         if (act !== null) { level = act; fromKey = key; }
-        const forced = planForce.has(i), rest = planRest.has(i);
+        const forced = planForce.has(key), rest = planRest.has(key);
         const trig = planShouldFill(level, d, p);                // ngưỡng tự nhiên
         const fill = forced || trig;
         const order = fill ? round2(postFill - level) : null;    // = row 15
@@ -3023,8 +3030,8 @@
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
           <td class="${cls}">${lvl}${goc}</td>
           ${planActCell(r)}
-          <td class="c"><input type="checkbox" data-kind="rest" data-i="${r.i}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
-          <td class="c"><input type="checkbox" data-kind="force" data-i="${r.i}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
+          <td class="c"><input type="checkbox" data-kind="rest" data-day="${r.key}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
+          <td class="c"><input type="checkbox" data-kind="force" data-day="${r.key}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
           <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
       }).join("");
@@ -4685,9 +4692,9 @@
           return;
         }
         if (!t.dataset || t.dataset.kind === undefined) return;
-        const i = Number(t.dataset.i);
+        const day = t.dataset.day;
         const set = t.dataset.kind === "rest" ? planRest : planForce;
-        if (t.checked) set.add(i); else set.delete(i);
+        if (t.checked) set.add(day); else set.delete(day);
         computePlan();
       });
       // ngày bắt đầu mặc định = mùng 1 tháng hiện tại (giờ địa phương)
