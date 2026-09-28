@@ -68,6 +68,7 @@ SESSION_GET = frozenset({
     "/api/analytics",
     "/api/analytics/{psn}",
     "/api/refills/{psn}",
+    "/api/plan/flags/{psn}",
     "/api/plan/readings/{psn}",
     "/api/plan/settings/{psn}",
     "/api/delivery-plan",
@@ -82,6 +83,9 @@ SESSION_POST = frozenset({"/api/settings/test-email"})
 # Số đo tay của trang Kế hoạch. Ghi bằng PUT vì địa chỉ (bồn, ngày) xác định đúng
 # một số đo — bấm Lưu hai lần không được sinh hai dòng.
 SESSION_PUT = frozenset({
+    # Cờ ngày nghỉ / nạp chỉ định: PHẢI sau phiên đăng nhập như số đo tay. Chúng
+    # quyết định ngày đặt hàng, nên để mở là cho người lạ đổi lịch nạp LNG.
+    "/api/plan/flags/{psn}/{day}",
     "/api/plan/readings/{psn}/{day}",
     "/api/plan/settings/{psn}",
 })

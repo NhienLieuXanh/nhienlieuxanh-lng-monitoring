@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -511,6 +512,70 @@ class PlanReading(Base):
             ["terminals.psn"],
             onupdate="CASCADE",
             ondelete="RESTRICT",
+        ),
+    )
+
+
+class PlanDayFlag(Base):
+    """Hai ý định của người lập kế hoạch cho MỘT ngày: nghỉ, và nạp chỉ định.
+
+    Vì sao tách khỏi ``plan_readings`` dù cùng hạt (psn, ngày). Một *số đo* luôn có
+    một con số — docstring của PlanReading nói đúng như vậy, và CHECK
+    ``volume_l >= 0`` dựa vào đó. Nhồi hai cờ này vào đấy buộc ``volume_l`` thành
+    nullable, tức cho phép tồn tại "số đo tay không có số". Trang Kế hoạch dựng
+    ``planReadings`` thành Map rồi hỏi ``has(key)``; một dòng có cờ mà không có thể
+    tích sẽ trả về true kèm giá trị null và làm hỏng cả chuỗi số học phía sau. Một
+    bảng riêng giữ được "số đo luôn có số" là bất biến thật.
+
+    Vì sao phải nằm ở server chứ không phải trong trình duyệt. Trước đây hai cờ này
+    là hai ``Set`` trong bộ nhớ trang: tải lại là mất, và hai người cùng theo một
+    bồn thấy hai kế hoạch khác nhau. Chúng quyết định NGÀY ĐẶT HÀNG, nên không được
+    sống trong một tab trình duyệt.
+
+    Khoá ``(psn, flag_date)``: một bồn một ngày có đúng một bộ cờ. ``flag_date`` là
+    DATE chứ không phải timestamptz, cùng lý do như ``plan_readings.reading_date`` —
+    kế hoạch làm việc theo ngày lịch, và dự án này đã có đủ ba múi giờ để nhầm.
+
+    CHECK ``rest OR forced``: cả hai cùng false thì dòng không mang thông tin nào.
+    Repository xoá dòng thay vì lưu một dòng rỗng, nên bảng không tích rác.
+
+    Cả hai cùng true là HỢP LỆ, cố ý không cấm: một ngày xưởng nghỉ vẫn có thể có
+    xe tới giao. Luật của trang xử lý được (nạp thắng, mức về đầy).
+    """
+
+    __tablename__ = "plan_day_flags"
+
+    psn: Mapped[str] = mapped_column(String(32), nullable=False)
+    flag_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    #: Ngày không tiêu thụ — mức đầu ngày giữ nguyên thay vì trừ đi mức dùng.
+    rest: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    #: Buộc nạp ngày đó bất kể thể tích. CỐ Ý đi vòng qua luật cấm Chủ Nhật —
+    #: người vận hành biết những thứ mà công thức không biết.
+    forced: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    #: Ai tích. Cờ này đổi ngày đặt hàng nên phải truy được người chịu trách nhiệm.
+    updated_by: Mapped[str | None] = mapped_column(String(128))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        PrimaryKeyConstraint("psn", "flag_date"),
+        CheckConstraint("rest OR forced", name="flag_not_empty"),
+        ForeignKeyConstraint(
+            ["psn"], ["terminals.psn"], onupdate="CASCADE", ondelete="RESTRICT"
         ),
     )
 

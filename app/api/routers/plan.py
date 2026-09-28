@@ -23,6 +23,8 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import SessionDep, UserDep
 from app.api.schemas import (
+    PlanDayFlagIn,
+    PlanDayFlagOut,
     PlanReadingIn,
     PlanReadingOut,
     PlanSettingsIn,
@@ -107,6 +109,50 @@ def delete_reading(psn: str, day: date, session: SessionDep, _: UserDep) -> Resp
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ngày này chưa có số đo tay")
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/flags/{psn}", response_model=list[PlanDayFlagOut])
+def list_flags(
+    psn: str,
+    session: SessionDep,
+    _: UserDep,
+    from_: Annotated[date | None, Query(alias="from")] = None,
+    to: Annotated[date | None, Query()] = None,
+) -> list[PlanDayFlagOut]:
+    """Các ngày đã đánh dấu nghỉ / nạp chỉ định của một bồn."""
+    _require_terminal(session, psn)
+    if from_ is not None and to is not None and from_ > to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "from phải <= to")
+    rows = pr_repo.list_flags(session, psn, start=from_, end=to)
+    return [PlanDayFlagOut.model_validate(r) for r in rows]
+
+
+@router.put("/flags/{psn}/{day}", response_model=PlanDayFlagOut)
+def put_flags(
+    psn: str,
+    day: date,
+    body: PlanDayFlagIn,
+    session: SessionDep,
+    user: UserDep,
+) -> PlanDayFlagOut:
+    """Đặt cờ cho một ngày. Bỏ cả hai tích là xoá đánh dấu của ngày đó.
+
+    PUT chứ không POST, cùng lý do như ``put_reading``: địa chỉ ``(bồn, ngày)``
+    xác định đúng một bộ cờ, nên lệnh này idempotent.
+
+    Bỏ cả hai tích vẫn trả 200 kèm ``rest=false, forced=false`` chứ không phải 404:
+    ở đây "ngày này không đánh dấu gì" là một trạng thái hợp lệ và chính là thứ
+    người dùng vừa yêu cầu, khác hẳn ``delete_reading`` nơi xoá một ngày vốn không
+    có số là một lệnh không làm gì và đáng báo lỗi.
+    """
+    _require_terminal(session, psn)
+    row = pr_repo.set_flags(
+        session, psn, day, rest=body.rest, forced=body.forced, by=user
+    )
+    session.commit()
+    if row is None:
+        return PlanDayFlagOut(psn=psn, flag_date=day, rest=False, forced=False)
+    return PlanDayFlagOut.model_validate(row)
 
 
 @router.get("/settings/{psn}", response_model=PlanSettingsOut)

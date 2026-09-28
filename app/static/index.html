@@ -3173,6 +3173,10 @@
       const psn = document.getElementById("p-tank").value;
       planPsn = psn;
       planReadings = new Map();
+      // Xoá cờ của bồn TRƯỚC. Chúng theo từng bồn, nên giữ lại khi đổi bồn là đem
+      // ngày nghỉ của bồn A áp lên kế hoạch bồn B — sai im lặng, đúng loại lỗi mà
+      // guard `planPsn !== psn` phía dưới đang chặn cho số đo tay.
+      planRest.clear(); planForce.clear();
       if (!psn) { computePlan(); return; }
       await loadPlanSettings(psn);
       try {
@@ -3181,6 +3185,13 @@
         // hiện trên kế hoạch của bồn B — sai im lặng và rất khó nhận ra.
         if (planPsn !== psn) return;
         for (const r of rows) planReadings.set(r.reading_date, round2(Number(r.volume_l) / 1000));
+
+        const flags = await api(`/api/plan/flags/${encodeURIComponent(psn)}`);
+        if (planPsn !== psn) return;
+        for (const f of flags) {
+          if (f.rest) planRest.add(f.flag_date);
+          if (f.forced) planForce.add(f.flag_date);
+        }
 
         // Mốc khởi đầu lấy từ SỐ ĐO TAY MỚI NHẤT, không lấy từ telemetry. Với hai
         // thiết bị đang im 35 và 86 ngày, telemetry cho 0,061 m³ — một con số của
@@ -3217,6 +3228,36 @@
       const el = document.querySelector(`#plan-body .p-act[data-day="${key}"]`);
       if (el) { el.value = raw; el.setAttribute("aria-invalid", "true"); }
       setMsg("plan-msg", msg, "bad");
+    }
+
+    async function savePlanFlags(key) {
+      // Không có bồn = chế độ "Tự nhập thông số": không có gì để lưu vào, và cả
+      // trang lúc đó vốn đã tạm thời (thông số cũng theo từng bồn). Nói thẳng ra
+      // thay vì để người dùng tưởng đã lưu.
+      if (!planPsn) {
+        setMsg("plan-msg", "Chưa chọn bồn nên đánh dấu này không được lưu.", "warn");
+        return;
+      }
+      const psn = planPsn;
+      const rest = planRest.has(key), forced = planForce.has(key);
+      try {
+        await api(`/api/plan/flags/${encodeURIComponent(psn)}/${key}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rest, forced }),
+        });
+      } catch (e) {
+        if (e.name === "AuthError") return;
+        // Trả ô tích về đúng thứ server đang giữ. Để nó hiện đã tích trong khi
+        // server chưa nhận là tái lập đúng cái bug vừa sửa: màn hình nói một đằng,
+        // kế hoạch thật một nẻo.
+        if (planPsn === psn) {
+          if (rest) planRest.delete(key);
+          if (forced) planForce.delete(key);
+          setMsg("plan-msg", `Không lưu được đánh dấu ngày ${key}: ${e.message}`, "bad");
+          computePlan();
+        }
+      }
     }
 
     async function savePlanReading(key, raw) {
@@ -4696,6 +4737,7 @@
         const set = t.dataset.kind === "rest" ? planRest : planForce;
         if (t.checked) set.add(day); else set.delete(day);
         computePlan();
+        savePlanFlags(day);
       });
       // ngày bắt đầu mặc định = mùng 1 tháng hiện tại (giờ địa phương)
       (function () {

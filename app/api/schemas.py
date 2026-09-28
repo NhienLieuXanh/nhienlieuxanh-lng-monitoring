@@ -808,6 +808,32 @@ class PlanReadingOut(BaseModel):
     updated_at: datetime
 
 
+class PlanDayFlagIn(BaseModel):
+    """Hai cờ của một ngày. Gửi CẢ HAI, luôn luôn.
+
+    Cố ý không cho gửi từng cờ một: trang có hai ô tích cạnh nhau và luôn biết cả
+    hai trạng thái, còn semantics "không gửi = giữ nguyên" ở đây sẽ làm không phân
+    biệt được "giữ nguyên" với "bỏ tích" — mà bỏ tích chính là thao tác đổi ngày
+    đặt hàng. Bỏ cả hai là xoá đánh dấu của ngày đó.
+    """
+
+    rest: bool
+    forced: bool
+
+
+class PlanDayFlagOut(BaseModel):
+    """Cờ đã lưu. Ngày chưa đánh dấu KHÔNG xuất hiện trong danh sách."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    psn: str
+    flag_date: date
+    rest: bool
+    forced: bool
+    updated_by: str | None = None
+    updated_at: datetime | None = None
+
+
 class PlanSettingsIn(BaseModel):
     """Thông số lập kế hoạch của một bồn. Gửi field nào thì sửa field đó.
 

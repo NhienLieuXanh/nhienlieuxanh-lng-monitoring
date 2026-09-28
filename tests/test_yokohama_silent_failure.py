@@ -567,7 +567,23 @@ def test_dinh_dang_ngay_la_hai_hang_so_khac_nhau() -> None:
 
 
 def test_request_gui_dung_mm_dd() -> None:
-    """Nghiệm thu trên đường dây thật: tham số fromDate/toDate phải là mm/dd."""
+    """Nghiệm thu trên đường dây thật: tham số fromDate/toDate phải là mm/dd.
+
+    Ngày lấy TƯƠNG ĐỐI theo hôm nay, không ghim cố định. Bản trước ghim
+    ``date(2026, 9, 4)`` và nó tự mục khi lịch chạy tới: adapter tính cửa sổ nạp
+    từ ngày đó tới *bây giờ*, nên sau vài ngày cửa sổ vượt ngân sách stream và
+    test đỏ vì một lý do không liên quan gì tới thứ nó kiểm. Đo được 28/09/2026:
+    "cửa sổ 25 ngày vượt ngân sách stream (≈ 4 ngày)".
+
+    Tránh ngày có số ngày trùng số tháng (3/3, 9/9…): ở những ngày đó mm/dd và
+    dd/mm ra cùng một chuỗi, và phép kiểm không chứng minh được gì cả.
+    """
+    day = date.today()
+    if day.day == day.month:
+        day -= timedelta(days=1)
+    mm_dd, dd_mm = day.strftime("%m/%d/%Y"), day.strftime("%d/%m/%Y")
+    assert mm_dd != dd_mm, "ngày này không phân biệt được hai cách viết"
+
     seen: dict[str, str] = {}
 
     class _Cap:
@@ -583,6 +599,8 @@ def test_request_gui_dung_mm_dd() -> None:
 
     settings = YokohamaSettings(enabled=False, psn=PSN)
     ad = YokohamaAdapter(settings, client=_Cap())  # type: ignore[arg-type]
-    ad.fetch_telemetry(PSN, date(2026, 9, 4))
-    # 4 thang 9 duoi mm/dd la "09/04"
-    assert seen["fromDate"].startswith("09/04/2026"), seen["fromDate"]
+    ad.fetch_telemetry(PSN, day)
+    assert seen["fromDate"].startswith(mm_dd), seen["fromDate"]
+    # Và KHÔNG phải dd/mm. Thiếu vế này thì phép kiểm chỉ đang so chuỗi với chính
+    # công thức vừa dựng ra nó, tức luôn đúng dù adapter gửi định dạng nào.
+    assert not seen["fromDate"].startswith(dd_mm), seen["fromDate"]

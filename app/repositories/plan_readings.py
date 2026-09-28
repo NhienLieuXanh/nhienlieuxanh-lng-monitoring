@@ -1,5 +1,6 @@
-"""Đọc/ghi ``plan_readings`` (thể tích đo tay) và ``plan_settings`` (thông số
-lập kế hoạch theo từng bồn) — cả hai đều chỉ dùng cho trang Kế hoạch.
+"""Đọc/ghi ``plan_readings`` (thể tích đo tay), ``plan_settings`` (thông số lập
+kế hoạch theo từng bồn) và ``plan_day_flags`` (ngày nghỉ / nạp chỉ định) — cả ba
+đều chỉ dùng cho trang Kế hoạch.
 
 Đơn vị ở tầng này là **lít**, khớp với ``telemetry.volume_l`` và
 ``terminals.capacity_l``. Trang Kế hoạch làm việc bằng m³ và quy đổi ở biên UI.
@@ -15,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.db.models import PlanReading, PlanSetting
+from app.db.models import PlanDayFlag, PlanReading, PlanSetting
 
 
 def list_for(
@@ -125,6 +126,74 @@ def save_settings(
         .returning(PlanSetting)
         # Cùng lý do như ``upsert``: không có cờ này thì lần lưu thứ hai trong
         # cùng một session trả về thông số CŨ.
+        .execution_options(populate_existing=True)
+    )
+    return session.execute(stmt).scalar_one()
+
+
+# --------------------------------------------------------------------------- #
+# Cờ theo ngày: "ngày nghỉ" và "nạp chỉ định"
+# --------------------------------------------------------------------------- #
+
+
+def list_flags(
+    session: Session,
+    psn: str,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+) -> list[PlanDayFlag]:
+    """Các ngày đã đánh dấu của một bồn, cũ trước mới sau."""
+    stmt = select(PlanDayFlag).where(PlanDayFlag.psn == psn)
+    if start is not None:
+        stmt = stmt.where(PlanDayFlag.flag_date >= start)
+    if end is not None:
+        stmt = stmt.where(PlanDayFlag.flag_date <= end)
+    return list(session.execute(stmt.order_by(PlanDayFlag.flag_date)).scalars())
+
+
+def set_flags(
+    session: Session,
+    psn: str,
+    day: date,
+    *,
+    rest: bool,
+    forced: bool,
+    by: str | None = None,
+) -> PlanDayFlag | None:
+    """Đặt cờ cho một ngày. Bỏ cả hai tích thì XOÁ dòng, trả ``None``.
+
+    Xoá thay vì lưu ``(false, false)`` vì một dòng như thế không mang thông tin
+    nào, và bảng sẽ tích rác theo đúng số lần người dùng tích rồi bỏ tích. CHECK
+    ``rest OR forced`` ở tầng DB chặn nốt đường còn lại — nếu chỗ nào đó quên
+    nhánh này, database từ chối chứ không im lặng nhận.
+
+    ``updated_at`` set tường minh: ``onupdate`` của SQLAlchemy KHÔNG chạy trên câu
+    lệnh Core như ``ON CONFLICT DO UPDATE`` — cùng cái bẫy đã ghi ở ``upsert``.
+    """
+    if not rest and not forced:
+        session.execute(
+            sa_delete(PlanDayFlag).where(
+                PlanDayFlag.psn == psn, PlanDayFlag.flag_date == day
+            )
+        )
+        return None
+
+    stmt = (
+        pg_insert(PlanDayFlag)
+        .values(psn=psn, flag_date=day, rest=rest, forced=forced, updated_by=by)
+        .on_conflict_do_update(
+            index_elements=["psn", "flag_date"],
+            set_={
+                "rest": rest,
+                "forced": forced,
+                "updated_by": by,
+                "updated_at": func.now(),
+            },
+        )
+        .returning(PlanDayFlag)
+        # Xem lý do ở ``upsert``: thiếu nó thì lần set thứ hai trong cùng session
+        # trả về object cũ và báo thành công kèm giá trị cũ.
         .execution_options(populate_existing=True)
     )
     return session.execute(stmt).scalar_one()
