@@ -3429,7 +3429,13 @@
       }
       btn.disabled = false;
       btn.dataset.value = round2(v / 1000);
-      note.textContent = `Số đo thực tế ${fmtM3(v)} m³/ngày · ${CONF_VI[c.confidence] || ""}`;
+      // Nói ra con số này là GÌ. Nó là mức dùng khi nhà máy CHẠY — ngày nghỉ đã
+      // bị loại — và nếu không ghi thì người đọc sẽ so nó với trung bình cả tháng
+      // rồi không hiểu vì sao lệch. Bản trước không ghi, và chính vì không ghi mà
+      // con số 3,44 (trộn 18 ngày tắt máy) trông như một phép đo đáng tin.
+      const nghi = Number(c.idle_days) || 0;
+      const loai = nghi >= 0.5 ? ` · đã loại ${Math.round(nghi)} ngày nhà máy nghỉ` : "";
+      note.textContent = `Số đo thực tế ${fmtM3(v)} m³/ngày khi nhà máy chạy${loai} · ${CONF_VI[c.confidence] || ""}`;
     }
 
     function useMeasuredDaily() {

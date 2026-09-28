@@ -229,6 +229,10 @@ class ConsumptionEstimate:
     #: Số ngày lịch có đủ dữ liệu để tính tổng dùng của ngày đó.
     full_days: int
     confidence: Confidence
+    #: Thời gian có dữ liệu nhưng nhà máy NGHỈ — bị loại khỏi mọi phép chia. Phát
+    #: ra để con số không bao giờ lại là một phép lấy trung bình vô hình: đây đúng
+    #: là thứ đã làm 30 ngày có 18 ngày tắt máy ra 3,44 thay vì 6,65 m³/ngày.
+    idle_days: float = 0.0
 
     @property
     def ok(self) -> bool:
@@ -338,7 +342,6 @@ def estimate_consumption(
     refill = refill_floor_l(capacity_l)
     window_days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
 
-    net_drop = 0.0
     rise_total = 0.0
     refill_total = 0.0
     refills = 0
@@ -368,16 +371,24 @@ def estimate_consumption(
         _bump(covered_s, key, gap.total_seconds())
         # TỔNG CÓ DẤU: bước dâng lại trừ vào bước sụt, nên dao động quanh một
         # lượng tử triệt tiêu chính nó thay vì cộng dồn thành tiêu thụ ảo.
-        net_drop += -delta
         _bump(per_day, key, -delta)
         if delta > 0:
             rise_total += delta
 
-    active_days = active_s / 86400.0
+    # Ngày nhà máy NGHỈ bị loại khỏi CẢ tử số lẫn mẫu số — xem _idle_day_keys.
+    idle_keys = _idle_day_keys(per_day, covered_s)
+    run_s = sum(sec for k, sec in covered_s.items() if k not in idle_keys)
+    run_drop = sum(v for k, v in per_day.items() if k not in idle_keys)
+    active_days = run_s / 86400.0
+    idle_days = (active_s - run_s) / 86400.0
+    # coverage đo MẤT UPLOAD nên tính trên MỌI ngày có dữ liệu, kể cả ngày nghỉ:
+    # một ngày nhà máy tắt máy vẫn là một ngày thiết bị gửi số đều đặn.
+    coverage = ((active_s / 86400.0) / window_days) if window_days > 0 else 0.0
+
     # Ròng âm (mức dâng ròng qua cửa sổ, không do nạp) nghĩa là KHÔNG đo được tiêu
     # thụ. Chặn ở 0 rồi để nhánh dưới trả None — thà nói "chưa đo được" hơn trả
     # một số âm hoặc một số bịa.
-    drawdown = max(0.0, net_drop)
+    drawdown = max(0.0, run_drop)
     if active_days <= 0 or drawdown <= 0:
         return ConsumptionEstimate(
             daily_use_l=None,
@@ -385,13 +396,14 @@ def estimate_consumption(
             samples=len(pts),
             window_days=window_days,
             active_days=active_days,
-            coverage=(active_days / window_days) if window_days > 0 else 0.0,
+            coverage=coverage,
             drawdown_l=drawdown,
             rise_l=rise_total,
             refills=refills,
             refill_l=refill_total,
             full_days=0,
             confidence="none",
+            idle_days=idle_days,
         )
 
     daily = drawdown / active_days
@@ -402,14 +414,17 @@ def estimate_consumption(
     # per_day giờ là tổng CÓ DẤU nên một ngày có thể ra âm (mức dâng ròng). Chặn ở
     # 0: "dùng âm" không có nghĩa vật lý, và độ lệch chuẩn ở đây là biến động của
     # LƯỢNG DÙNG, dùng để tính dự trữ an toàn.
+    #
+    # Ngày nghỉ cũng bị loại ở đây, cùng lý do như ở trung bình: trộn các ngày ~0
+    # vào các ngày ~6600 L cho ra một sigma phản ánh LỊCH NGHỈ chứ không phải độ
+    # thất thường của lượng dùng, và dự trữ an toàn sinh ra từ nó to vô lý.
     full = [
         max(0.0, per_day.get(k, 0.0))
-        for k, s in covered_s.items()
-        if s >= 0.8 * 86400.0
+        for k, sec in covered_s.items()
+        if sec >= 0.8 * 86400.0 and k not in idle_keys
     ]
     sd = _stdev(full) if len(full) >= 3 else None
 
-    coverage = (active_days / window_days) if window_days > 0 else 0.0
     conf = _confidence(active_days=active_days, coverage=coverage, full_days=len(full))
 
     return ConsumptionEstimate(
@@ -425,7 +440,65 @@ def estimate_consumption(
         refill_l=refill_total,
         full_days=len(full),
         confidence=conf,
+        idle_days=idle_days,
     )
+
+
+#: Một ngày là NGHỈ khi tốc độ sụt của nó dưới tỉ lệ này so với những ngày bận
+#: nhất của chính bồn đó. Tương đối chứ không tuyệt đối, để cùng một luật dùng
+#: được cho bồn 10 m³ lẫn 60 m³, nhà máy rút 400 L/ngày lẫn 6600 L/ngày.
+IDLE_DAY_FRACTION = 0.10
+#: Chỉ ngày có ít nhất ngần này dữ liệu mới được dùng để ước lượng "ngày bận".
+#: Một ngày phủ 30 phút mà dính một bước dao động 100 L sẽ ra tốc độ ảo 4800
+#: L/ngày; cho nó vào phân vị là để một điểm nhiễu dời cả ngưỡng.
+IDLE_REF_MIN_COVER_S = 6 * 3600.0
+
+
+def _idle_day_keys(
+    per_day: dict[str, float], covered_s: dict[str, float]
+) -> set[str]:
+    """Những ngày lịch mà nhà máy NGHỈ: có dữ liệu, nhưng gần như không rút.
+
+    Vì sao cần. Mức dùng/ngày = tổng sụt / thời gian có dữ liệu, và "có dữ liệu"
+    gồm cả những ngày nhà máy tắt máy — thiết bị vẫn gửi số đều. Đo được trên
+    YKH-TANK-01, cửa sổ 30 ngày tới 28/09/2026:
+
+        28/08 → 14/09   18 ngày đứng yên ~53 m³, lưu lượng khí 0      ~0,03 m³/ngày
+        15/09 → 28/09   14 ngày chạy, lưu lượng 90–134 Nm³/h          ~6,65 m³/ngày
+
+    Chia cho cả 30 ngày ra ~3,44 — gần đúng MỘT NỬA tốc độ khi chạy, lại kèm nhãn
+    tin cậy "cao" vì dữ liệu phủ đủ. Dự báo cạn và khuyến nghị đặt hàng dùng chính
+    con số đó, nên chúng tính như thể bồn cạn chậm GẤP ĐÔI thực tế — sai về chiều
+    nguy hiểm.
+
+    Vì sao phân loại theo NGÀY chứ không dùng ``_idle_windows``. Hàm đó xét TỪNG
+    BƯỚC với deadband ``noise_floor_l`` (0,1% dung tích = 60 L), mà cảm biến của
+    nguồn phút báo theo lượng tử 100 L — mỗi lần dao động một lượng tử đều vượt
+    ngưỡng và bị coi là "đang rút". Tổng CÓ DẤU của cả một ngày thì dao động tự
+    triệt tiêu, đúng lý do ``estimate_consumption`` chuyển sang tổng có dấu.
+
+    Nhà máy chạy đều thì không ngày nào dưới 10% ngày bận nhất, nên kết quả Y HỆT
+    cách cũ. Chỉ cửa sổ có đợt nghỉ thật mới đổi.
+
+    Hệ quả cần biết: nhà máy nghỉ Chủ Nhật hằng tuần thì Chủ Nhật cũng bị loại, nên
+    mức dùng/ngày thành "mức dùng một ngày LÀM VIỆC". Đó đúng là mô hình của trang
+    Kế hoạch, nơi ngày nghỉ được đánh dấu riêng; còn dự báo cạn thì nghiêng về sớm
+    hơn một chút — chiều an toàn: đặt hàng sớm tốn phí, cạn bồn thì dừng xưởng.
+    """
+    rates = {
+        k: per_day.get(k, 0.0) / sec * 86400.0
+        for k, sec in covered_s.items()
+        if sec > 0
+    }
+    ref = [r for k, r in rates.items() if covered_s[k] >= IDLE_REF_MIN_COVER_S]
+    if len(ref) < 3:
+        # Một hai ngày thì không phân biệt được "đang nghỉ" với "đang chạy chậm".
+        return set()
+    busy = _percentile(ref, 0.9)
+    if busy is None or busy <= 0:
+        return set()
+    cut = busy * IDLE_DAY_FRACTION
+    return {k for k, r in rates.items() if r < cut}
 
 
 def _confidence(*, active_days: float, coverage: float, full_days: int) -> Confidence:
@@ -1377,6 +1450,15 @@ def _median(xs: list[float]) -> float | None:
     n = len(s)
     mid = n // 2
     return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+def _percentile(xs: list[float], q: float) -> float | None:
+    """Phân vị kiểu nearest-rank. Không nội suy: ngưỡng phải là một ngày CÓ THẬT."""
+    if not xs:
+        return None
+    s = sorted(xs)
+    i = min(len(s) - 1, max(0, math.ceil(q * len(s)) - 1))
+    return s[i]
 
 
 def _stdev(xs: list[float]) -> float | None:

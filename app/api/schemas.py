@@ -319,6 +319,10 @@ class ConsumptionOut(BaseModel):
     refill_l: Num = 0.0
     full_days: int = 0
     confidence: Confidence = "none"
+    #: Số ngày có dữ liệu nhưng nhà máy nghỉ, đã bị loại khỏi ``daily_use_l``.
+    #: Phát ra để người đọc biết con số là "mức dùng khi đang chạy", không phải
+    #: trung bình trộn cả kỳ nghỉ — đúng cái đã làm 3,44 thay cho 6,65.
+    idle_days: Num = 0.0
 
 
 class IdleTrendOut(BaseModel):
