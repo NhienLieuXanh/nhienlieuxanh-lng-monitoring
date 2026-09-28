@@ -232,6 +232,12 @@
       --scroll-2: #3d5075;
       --hover-veil: rgba(255, 255, 255, 0.06);
     }
+    /* Dòng nguồn của điểm neo: nằm ngay dưới ô "Thể tích ban đầu" vì nó nói con số
+       trong ô đó từ đâu ra. Cỡ nhỏ, màu phụ — nó là chú thích, không tranh chỗ với
+       số liệu; nhưng KHÔNG được ẩn đi, vì chọn nguồn trong im lặng chính là lỗi cũ. */
+    .plan-anchor { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--muted); line-height: 1.35; }
+    .plan-anchor .pa-warn { color: var(--warn); font-weight: 600; }
+
     :root.rail-collapsed { --rail-w: 64px; }
 
     /* ============ SCROLLBARS & MICRO-ANIMATIONS ============ */
@@ -1403,7 +1409,8 @@
               </span>
             </label>
             <label>Mức dự trữ (m³)<input type="number" id="p-res" class="field num" value="10" step="0.1" min="0" /></label>
-            <label>Thể tích ban đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" /></label>
+            <label>Thể tích ban đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" />
+              <span class="plan-anchor" id="plan-anchor"></span></label>
             <label>Ngày bắt đầu<input type="date" id="p-date" class="field" /></label>
             <label>Giờ nạp<input type="time" id="p-time" class="field" step="1" value="08:00:00" /></label>
             <label>Số ngày lập kế hoạch<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="62" /></label>
@@ -3193,18 +3200,48 @@
           if (f.forced) planForce.add(f.flag_date);
         }
 
-        // Mốc khởi đầu lấy từ SỐ ĐO TAY MỚI NHẤT, không lấy từ telemetry. Với hai
-        // thiết bị đang im 35 và 86 ngày, telemetry cho 0,061 m³ — một con số của
-        // tháng 7 dùng làm điểm khởi đầu cho kế hoạch tháng 8. Số người vừa đo bằng
-        // tay mới là thứ đúng ở đây.
+        // Mốc khởi đầu = nguồn nào MỚI HƠN, số đo tay hay lần đo của thiết bị.
+        //
+        // Bản trước luôn lấy số đo tay và không bao giờ đọc telemetry. Lý do khi đó
+        // đúng: hai bồn còn lại khi đó đã im 35 và 86 ngày, telemetry cho 0,061 m³ — một
+        // con số của tháng 7 làm điểm khởi đầu cho kế hoạch tháng 8. Nhưng
+        // YKH-TANK-01 sống và báo mỗi phút, nên luật "số tay luôn thắng" thành ra
+        // một con số gõ tay từ lâu thắng một phép đo một phút tuổi.
+        //
+        // Hậu quả đo được 28/09/2026: số tay 53,19 m³ ghi cho ngày 27/09 (đúng bằng
+        // số của ngày 4/9) trong khi bồn thật hôm đó có 15,4 m³. Cả 30 ngày sau bị
+        // dịch lên 37,8 m³: bảng hẹn nạp ngày 02/10, còn bồn thật tụt xuống 5,96 m³
+        // sáng 28/09 — dưới nửa mức dự trữ — và xe phải tới bơm ngay hôm đó.
+        //
+        // So theo NGÀY, không theo giờ: cả hai đều mang nghĩa "thể tích đầu ngày của
+        // ngày này". Số tay thắng ở chính ngày của nó, nên người vận hành đo tay hôm
+        // nay vẫn ghi đè được cảm biến hôm nay — telemetry chỉ thắng khi nó thuộc
+        // một ngày MUỘN HƠN. Bồn đứng im (`f.stale`) thì không dùng telemetry: đó
+        // đúng là ca mà lý do cũ vẫn còn giá trị.
         const keys = [...planReadings.keys()].sort();
-        if (keys.length) {
-          const last = keys[keys.length - 1];
+        const tayKey = keys.length ? keys[keys.length - 1] : null;
+
+        const f = fcOf(psn);
+        let teleKey = null, teleM3 = null, teleAt = null;
+        if (f && !f.stale && f.sampled_at && f.volume_l != null) {
+          const at = new Date(f.sampled_at);
+          if (!Number.isNaN(at.getTime())) {
+            teleKey = planDayKey(at);
+            teleM3 = round2(Number(f.volume_l) / 1000);
+            teleAt = at;
+          }
+        }
+
+        const dungTele = teleKey !== null && (tayKey === null || teleKey > tayKey);
+        const neoKey = dungTele ? teleKey : tayKey;
+        if (neoKey !== null) {
           planLoading = true;
-          document.getElementById("p-start").value = planReadings.get(last);
-          document.getElementById("p-date").value = last;
+          document.getElementById("p-start").value =
+            dungTele ? teleM3 : planReadings.get(tayKey);
+          document.getElementById("p-date").value = neoKey;
           planLoading = false;
         }
+        planAnchorNote(dungTele, neoKey, teleAt, tayKey);
       } catch (e) {
         if (e.name !== "AuthError") setMsg("plan-msg", `Không tải được số thực tế đã lưu: ${e.message}`, "bad");
       }
@@ -3228,6 +3265,26 @@
       const el = document.querySelector(`#plan-body .p-act[data-day="${key}"]`);
       if (el) { el.value = raw; el.setAttribute("aria-invalid", "true"); }
       setMsg("plan-msg", msg, "bad");
+    }
+
+    // Nói ra điểm neo, luôn luôn. Trang này tự chọn giữa hai nguồn số, và một lựa
+    // chọn im lặng là thứ đã để một con số của ngày 4/9 chống đỡ cả kế hoạch tháng
+    // 10 mà không ai thấy. Người đọc phải biết con số đầu bảng từ đâu ra và cũ bao
+    // nhiêu, vì mọi dòng phía dưới chỉ là số học chạy tiếp từ nó.
+    function planAnchorNote(dungTele, neoKey, teleAt, tayKey) {
+      const el = document.getElementById("plan-anchor");
+      if (!el) return;
+      if (!neoKey) {
+        el.innerHTML = `<span class="pa-warn">Chưa có mốc nào: không có số đo tay, `
+          + `và thiết bị chưa gửi số liệu dùng được. Thể tích ban đầu đang là số bạn tự nhập.</span>`;
+        return;
+      }
+      if (dungTele) {
+        el.innerHTML = `Neo theo <b>số đo của thiết bị</b> lúc ${esc(fmtDT(teleAt))}`
+          + (tayKey ? ` — mới hơn số đo tay ngày ${esc(tayKey)}.` : ".");
+      } else {
+        el.innerHTML = `Neo theo <b>số đo tay</b> ngày ${esc(tayKey)}.`;
+      }
     }
 
     async function savePlanFlags(key) {
