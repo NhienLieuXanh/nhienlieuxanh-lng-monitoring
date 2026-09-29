@@ -3208,7 +3208,11 @@
       { id: "p-pct",  key: "max_fill_percent", toApi: (v) => v,        fromApi: (v) => round2(v) },
       { id: "p-use",  key: "daily_use_l",      toApi: (v) => v * 1000, fromApi: (v) => round2(v / 1000) },
       { id: "p-res",  key: "reserve_l",        toApi: (v) => v * 1000, fromApi: (v) => round2(v / 1000) },
-      { id: "p-days", key: "horizon_days",     toApi: (v) => Math.round(v), fromApi: (v) => Math.round(v) },
+      // LƯU ĐÚNG con số đang được tính, không phải con số vừa gõ. Gửi nguyên 400 thì
+      // server từ chối (trần 366) và giữ số cũ — bảng tính 366 mà F5 lại về số cũ.
+      // Trên production trước bản này: gõ 90 (trần server khi đó 62) là lần lưu
+      // đó thất bại, và người dùng không hề biết.
+      { id: "p-days", key: "horizon_days",     toApi: (v) => Math.max(1, Math.min(PLAN_MAX_DAYS, Math.round(v))), fromApi: (v) => Math.round(v) },
     ];
 
     async function loadPlanSettings(psn) {
