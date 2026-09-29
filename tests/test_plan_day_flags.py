@@ -147,3 +147,46 @@ def test_psn_la_khong_bi_tu_choi(session: Session) -> None:
             "KHONG-CO", DAY, PlanDayFlagIn(rest=True, forced=False), session, "s"
         )
     assert e.value.status_code == 404
+
+
+# ------------------------------------------------------------ ngày không giao (nghỉ lễ)
+
+
+def test_chi_mot_minh_khong_giao_van_la_dong_hop_le(session: Session) -> None:
+    """Ngày lễ bên giao hàng: nhà máy vẫn chạy (không nghỉ), không nạp chỉ định,
+    chỉ không có xe. Trước khi có cột này, CHECK `rest OR forced` từ chối dòng đó."""
+    _terminals(session)
+    row = pr_repo.set_flags(
+        session, PSN, DAY, rest=False, forced=False, no_delivery=True
+    )
+    assert row is not None and row.no_delivery and not row.rest and not row.forced
+
+
+def test_bo_ca_ba_co_thi_xoa_dong(session: Session) -> None:
+    _terminals(session)
+    pr_repo.set_flags(session, PSN, DAY, rest=False, forced=False, no_delivery=True)
+    assert (
+        pr_repo.set_flags(
+            session, PSN, DAY, rest=False, forced=False, no_delivery=False
+        )
+        is None
+    )
+    assert pr_repo.list_flags(session, PSN) == []
+
+
+def test_client_cu_chi_gui_hai_co_khong_bi_422(session: Session) -> None:
+    """Trình duyệt còn giữ bản trang cũ (chưa tải lại) vẫn lưu được."""
+    _terminals(session)
+    out = plan_router.put_flags(
+        PSN, DAY, PlanDayFlagIn(rest=True, forced=False), session, "s"
+    )
+    assert out.no_delivery is False and out.rest is True
+
+
+def test_khong_giao_di_qua_router_va_doc_lai_duoc(session: Session) -> None:
+    _terminals(session)
+    plan_router.put_flags(
+        PSN, DAY, PlanDayFlagIn(rest=False, forced=False, no_delivery=True), session, "s"
+    )
+    rows = plan_router.list_flags(PSN, session, None)  # type: ignore[arg-type]
+    assert [(r.flag_date, r.no_delivery) for r in rows] == [(DAY, True)]

@@ -147,11 +147,19 @@ def put_flags(
     """
     _require_terminal(session, psn)
     row = pr_repo.set_flags(
-        session, psn, day, rest=body.rest, forced=body.forced, by=user
+        session,
+        psn,
+        day,
+        rest=body.rest,
+        forced=body.forced,
+        no_delivery=body.no_delivery,
+        by=user,
     )
     session.commit()
     if row is None:
-        return PlanDayFlagOut(psn=psn, flag_date=day, rest=False, forced=False)
+        return PlanDayFlagOut(
+            psn=psn, flag_date=day, rest=False, forced=False, no_delivery=False
+        )
     return PlanDayFlagOut.model_validate(row)
 
 

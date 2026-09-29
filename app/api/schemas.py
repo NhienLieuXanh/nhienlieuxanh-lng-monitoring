@@ -823,6 +823,9 @@ class PlanDayFlagIn(BaseModel):
 
     rest: bool
     forced: bool
+    #: Không bắt buộc để client cũ (chỉ gửi hai cờ) không bị 422. Thiếu thì hiểu là
+    #: false — đúng nghĩa trước khi có cột này.
+    no_delivery: bool = False
 
 
 class PlanDayFlagOut(BaseModel):
@@ -834,6 +837,7 @@ class PlanDayFlagOut(BaseModel):
     flag_date: date
     rest: bool
     forced: bool
+    no_delivery: bool = False
     updated_by: str | None = None
     updated_at: datetime | None = None
 
@@ -854,7 +858,7 @@ class PlanSettingsIn(BaseModel):
     daily_use_l: Decimal | None = Field(None, ge=0)
     reserve_l: Decimal | None = Field(None, ge=0)
     refill_time: time | None = None
-    horizon_days: int | None = Field(None, ge=1, le=62)
+    horizon_days: int | None = Field(None, ge=1, le=366)
 
     @model_validator(mode="after")
     def _at_least_one(self) -> PlanSettingsIn:

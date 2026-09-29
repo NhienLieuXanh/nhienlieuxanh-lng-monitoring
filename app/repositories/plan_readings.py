@@ -159,6 +159,7 @@ def set_flags(
     *,
     rest: bool,
     forced: bool,
+    no_delivery: bool = False,
     by: str | None = None,
 ) -> PlanDayFlag | None:
     """Đặt cờ cho một ngày. Bỏ cả hai tích thì XOÁ dòng, trả ``None``.
@@ -171,7 +172,7 @@ def set_flags(
     ``updated_at`` set tường minh: ``onupdate`` của SQLAlchemy KHÔNG chạy trên câu
     lệnh Core như ``ON CONFLICT DO UPDATE`` — cùng cái bẫy đã ghi ở ``upsert``.
     """
-    if not rest and not forced:
+    if not rest and not forced and not no_delivery:
         session.execute(
             sa_delete(PlanDayFlag).where(
                 PlanDayFlag.psn == psn, PlanDayFlag.flag_date == day
@@ -181,12 +182,20 @@ def set_flags(
 
     stmt = (
         pg_insert(PlanDayFlag)
-        .values(psn=psn, flag_date=day, rest=rest, forced=forced, updated_by=by)
+        .values(
+            psn=psn,
+            flag_date=day,
+            rest=rest,
+            forced=forced,
+            no_delivery=no_delivery,
+            updated_by=by,
+        )
         .on_conflict_do_update(
             index_elements=["psn", "flag_date"],
             set_={
                 "rest": rest,
                 "forced": forced,
+                "no_delivery": no_delivery,
                 "updated_by": by,
                 "updated_at": func.now(),
             },

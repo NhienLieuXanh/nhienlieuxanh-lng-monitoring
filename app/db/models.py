@@ -552,9 +552,21 @@ class PlanDayFlag(Base):
     rest: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
-    #: Buộc nạp ngày đó bất kể thể tích. CỐ Ý đi vòng qua luật cấm Chủ Nhật —
-    #: người vận hành biết những thứ mà công thức không biết.
+    #: Buộc nạp ngày đó bất kể thể tích — người vận hành biết những thứ mà công
+    #: thức không biết. KHÔNG vượt được ``no_delivery``: ngày không có xe thì
+    #: không nạp được, và trang Kế hoạch nói ra xung đột đó thay vì nuốt nó.
     forced: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    #: Ngày KHÔNG GIAO ĐƯỢC — nghỉ lễ phía giao hàng, cùng nghĩa với Chủ Nhật. Lần
+    #: nạp phải dời sớm lên ngày giao được gần nhất trước đó.
+    #:
+    #: Vì sao là cột riêng chứ không bẻ nghĩa ``rest``. ``rest`` là "nhà máy không
+    #: tiêu thụ", và hai chuyện đó độc lập: nhà máy có thể vẫn chạy trong ngày bên
+    #: giao hàng nghỉ lễ, hoặc tắt máy trong ngày xe vẫn tới được. Trước khi có
+    #: cột này, người dùng tích "Ngày nghỉ" cho ngày lễ 24/11 và trang vẫn xếp xe
+    #: tới đúng ngày đó — vì ô ấy chưa bao giờ chặn việc giao hàng.
+    no_delivery: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
 
@@ -573,7 +585,7 @@ class PlanDayFlag(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("psn", "flag_date"),
-        CheckConstraint("rest OR forced", name="flag_not_empty"),
+        CheckConstraint("rest OR forced OR no_delivery", name="flag_not_empty"),
         ForeignKeyConstraint(
             ["psn"], ["terminals.psn"], onupdate="CASCADE", ondelete="RESTRICT"
         ),
@@ -610,7 +622,9 @@ class PlanSetting(Base):
     #: Giờ nạp trong ngày. TIME không TIMESTAMP: đây là "8 giờ sáng theo giờ kho",
     #: một giờ trong ngày lặp lại, không phải một thời điểm.
     refill_time: Mapped[time | None] = mapped_column(Time)
-    #: Số ngày lập kế hoạch.
+    #: Số ngày lập kế hoạch. Trần 366, không phải 62: người vận hành cần xếp lịch
+    #: qua các ngày lễ cuối năm (Tết dương lịch từ cuối tháng 9 là ~95 ngày), và
+    #: trần cũ chặn IM LẶNG — ô hiện 90 trong khi bảng chỉ tính 62.
     horizon_days: Mapped[int | None] = mapped_column(SmallInteger)
 
     updated_at: Mapped[datetime] = mapped_column(
@@ -633,7 +647,7 @@ class PlanSetting(Base):
             "reserve_l IS NULL OR reserve_l >= 0", name="reserve_non_negative"
         ),
         CheckConstraint(
-            "horizon_days IS NULL OR (horizon_days >= 1 AND horizon_days <= 62)",
+            "horizon_days IS NULL OR (horizon_days >= 1 AND horizon_days <= 366)",
             name="horizon_days_range",
         ),
         ForeignKeyConstraint(
