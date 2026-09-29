@@ -40,6 +40,7 @@ from app.db.models import Telemetry, Terminal
 from app.domain import forecast as fc
 from app.domain.status import derive_status
 from app.repositories import ingest_runs as runs_repo
+from app.repositories import plan_readings as pr_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.services.appconfig import ConfigLike, load_config
@@ -152,6 +153,9 @@ def _build(
         max_fill_percent=p.max_fill_percent,
         reading_at=latest.sampled_at if latest else None,
         max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
+        calendar=pr_repo.delivery_calendar(
+            session, term.psn, tz=settings.tzinfo, today=now
+        ),
     )
 
 

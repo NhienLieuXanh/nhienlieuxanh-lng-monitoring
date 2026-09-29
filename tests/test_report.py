@@ -130,6 +130,9 @@ def wired(monkeypatch: pytest.MonkeyPatch):
     # "Vừa nạp xong": các test trong file này kiểm nội dung báo cáo, không kiểm độ
     # trễ của poller. Đặt observed_at = now giữ nguyên ngữ nghĩa cũ của chúng.
     monkeypatch.setattr(rp.runs_repo, "last_success_at", lambda s: now)
+    # Không có lịch giao hàng = hành vi cũ của khuyến nghị. Các test ở đây kiểm nội
+    # dung báo cáo; lịch giao hàng có test riêng ở test_delivery_calendar.py.
+    monkeypatch.setattr(rp.pr_repo, "delivery_calendar", lambda s, psn, **kw: None)
     monkeypatch.setattr(rp, "load_config", lambda s, st: _Cfg())
     monkeypatch.setattr(
         rp.notifier,

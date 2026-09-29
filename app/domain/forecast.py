@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, tzinfo
+from datetime import date, datetime, time, timedelta, tzinfo
 from itertools import pairwise
 from typing import Literal
 
@@ -940,6 +940,48 @@ class OrderSuggestion:
     reasons: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class DeliveryCalendar:
+    """Khi nào xe CÓ THỂ tới: giờ nạp trong ngày, và những ngày không có xe.
+
+    Vì sao cần. ``suggest_order`` tính giờ giao là một mốc LIÊN TỤC — lúc bồn chạm
+    điểm đặt hàng cộng thời gian giao — rồi trả thẳng ra. Đo được 29/09/2026: khối
+    khuyến nghị ghi "giao lúc 04/10 21:17", tức Chủ Nhật 9 giờ tối, trong khi bảng
+    kế hoạch ngay bên dưới xếp nạp Thứ Bảy 03/10 lúc 08:00. Hai câu trả lời trên
+    một màn hình, và một trong hai chỉ ra một chuyến xe không tồn tại.
+
+    Chủ Nhật LUÔN bị chặn — cùng luật với trang Kế hoạch. ``blocked`` là các ngày
+    người vận hành đánh dấu "Không giao" (nghỉ lễ). Tầng domain không đọc DB: người
+    gọi dựng lịch từ ``plan_settings`` và ``plan_day_flags`` rồi truyền vào.
+    """
+
+    tz: tzinfo
+    refill_time: time = time(8, 0)
+    blocked: frozenset[date] = frozenset()
+
+    def deliverable(self, d: date) -> bool:
+        return d.weekday() != 6 and d not in self.blocked
+
+    def slot(self, d: date) -> datetime:
+        return datetime.combine(d, self.refill_time, tzinfo=self.tz)
+
+    def latest_slot_at_or_before(self, t: datetime, *, max_days: int = 62) -> datetime | None:
+        d = t.astimezone(self.tz).date()
+        for _ in range(max_days):
+            if self.deliverable(d) and self.slot(d) <= t:
+                return self.slot(d)
+            d -= timedelta(days=1)
+        return None
+
+    def earliest_slot_at_or_after(self, t: datetime, *, max_days: int = 62) -> datetime | None:
+        d = t.astimezone(self.tz).date()
+        for _ in range(max_days):
+            if self.deliverable(d) and self.slot(d) >= t:
+                return self.slot(d)
+            d += timedelta(days=1)
+        return None
+
+
 def suggest_order(
     *,
     volume_l: float | None,
@@ -951,6 +993,7 @@ def suggest_order(
     service_level: int = 95,
     max_fill_percent: float = DEFAULT_MAX_FILL_PERCENT,
     reserve_l: float | None = None,
+    calendar: DeliveryCalendar | None = None,
 ) -> OrderSuggestion:
     """Tính điểm đặt hàng lại, thời điểm đặt và lượng đặt.
 
@@ -1079,18 +1122,63 @@ def suggest_order(
     order_at = now + timedelta(days=max(0.0, days_to_rop))
     deliver_at = order_at + timedelta(days=lead_time_days)
 
+    # Theo LỊCH GIAO HÀNG: xe chỉ tới được vào giờ nạp của một ngày giao được. Lấy
+    # chuyến MUỘN NHẤT mà vẫn kịp trước mốc trên — giao muộn hơn là để bồn tụt dưới
+    # điểm đặt hàng. Chuyến đó đã quá gần để kịp đặt thì lấy chuyến sớm nhất còn đặt
+    # kịp, và nói rõ là không kịp.
+    lich_ly_do: str | None = None
+    tre_chuyen = False
+    if calendar is not None:
+        muon_nhat = calendar.latest_slot_at_or_before(deliver_at)
+        som_nhat = now + timedelta(days=lead_time_days)
+        if muon_nhat is not None and muon_nhat >= som_nhat:
+            chuyen = muon_nhat
+        else:
+            chuyen = calendar.earliest_slot_at_or_after(som_nhat) or deliver_at
+        if chuyen != deliver_at:
+            goc = deliver_at.astimezone(calendar.tz)
+            moi = chuyen.astimezone(calendar.tz)
+            lich_ly_do = (
+                f"Dời giao hàng từ {goc:%d/%m %H:%M} về {moi:%d/%m %H:%M}: xe chỉ tới "
+                "vào giờ nạp của ngày giao được (không Chủ Nhật, không ngày lễ)"
+            )
+            if chuyen > deliver_at:
+                tre_chuyen = True
+                lich_ly_do += " — không còn chuyến nào kịp trước lúc bồn chạm điểm đặt hàng"
+        deliver_at = chuyen
+        # Chuyến sớm nhất vẫn tới SAU mốc an toàn: chờ thêm không đổi được chuyến nào
+        # sớm hơn, chỉ có thể lỡ luôn chuyến này. Đặt ngay.
+        order_at = now if tre_chuyen else max(now, deliver_at - timedelta(days=lead_time_days))
+
     target = capacity_l * max_fill_percent / 100.0
-    level_at_delivery = max(
-        0.0, volume_l - loss * max(0.0, days_to_rop + lead_time_days)
-    )
+    toi_luc_giao = max(0.0, (deliver_at - now).total_seconds() / 86400.0)
+    level_at_delivery = max(0.0, volume_l - loss * toi_luc_giao)
     order = max(0.0, target - level_at_delivery)
 
     urgency: Urgency
+    days_to_order = (order_at - now).total_seconds() / 86400.0
+    if lich_ly_do:
+        reasons.append(lich_ly_do)
     if days_to_rop <= 0:
         urgency = "now"
         reasons.append(
             f"Thể tích hiện tại {volume_l / 1000:.2f} m³ đã dưới điểm đặt hàng — cần đặt ngay"
         )
+    elif calendar is not None and days_to_order <= 0:
+        # Chưa tới điểm đặt hàng, nhưng chuyến giao được muộn nhất đã sát tới mức
+        # phải đặt ngay bây giờ mới kịp — hoặc không chuyến nào kịp nữa.
+        urgency = "now"
+        reasons.append(
+            "Phải đặt ngay: chuyến giao được gần nhất vẫn tới sau lúc bồn chạm điểm đặt hàng"
+            if tre_chuyen
+            else "Phải đặt ngay để kịp chuyến giao được gần nhất"
+        )
+    elif calendar is not None and days_to_order <= 2:
+        urgency = "soon"
+        reasons.append(f"Còn {days_to_order:.1f} ngày nữa phải đặt hàng")
+    elif calendar is not None:
+        urgency = "ok"
+        reasons.append(f"Còn {days_to_order:.1f} ngày nữa phải đặt hàng")
     elif days_to_rop <= 2:
         urgency = "soon"
         reasons.append(f"Còn {days_to_rop:.1f} ngày nữa tới điểm đặt hàng lại")
@@ -1273,6 +1361,7 @@ def build_forecast(
     max_fill_percent: float = DEFAULT_MAX_FILL_PERCENT,
     reading_at: datetime | None = None,
     max_reading_age_days: float = MAX_READING_AGE_DAYS,
+    calendar: DeliveryCalendar | None = None,
 ) -> Forecast:
     """Chạy toàn bộ chuỗi dự báo cho một bồn.
 
@@ -1307,6 +1396,7 @@ def build_forecast(
         service_level=service_level,
         max_fill_percent=max_fill_percent,
         reserve_l=res,
+        calendar=calendar,
     )
     fill = None
     if volume_l is not None and capacity_l and capacity_l > 0:

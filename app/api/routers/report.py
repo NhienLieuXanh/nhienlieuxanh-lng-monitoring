@@ -46,6 +46,7 @@ from app.domain import forecast as fc
 from app.domain.alerts import fill_percent
 from app.domain.status import derive_status
 from app.repositories import ingest_runs as runs_repo
+from app.repositories import plan_readings as pr_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.repositories import vendor_alarms as alarm_repo
@@ -422,6 +423,7 @@ def export_report(
             max_fill_percent=cfg.lng_max_fill_percent,
             reading_at=lt.sampled_at if lt else None,
             max_reading_age_days=cfg.forecast_max_reading_age_hours / 24.0,
+            calendar=pr_repo.delivery_calendar(session, t.psn, tz=cfg.tzinfo, today=now),
         )
         if f.stale:
             n_stale += 1

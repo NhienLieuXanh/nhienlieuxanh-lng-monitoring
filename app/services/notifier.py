@@ -37,6 +37,7 @@ from app.domain.alerts import fill_percent as _fill_percent
 from app.domain.smtp_errors import explain as explain_smtp
 from app.repositories import ingest_runs as runs_repo
 from app.repositories import notifications as notif_repo
+from app.repositories import plan_readings as pr_repo
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.repositories import vendor_alarms as alarm_repo
@@ -160,6 +161,7 @@ def collect_notices(
             max_fill_percent=settings.lng_max_fill_percent,
             reading_at=lt.sampled_at if lt else None,
             max_reading_age_days=settings.forecast_max_reading_age_hours / 24.0,
+            calendar=pr_repo.delivery_calendar(session, t.psn, tz=settings.tzinfo, today=now),
         )
         for fa in f.alerts:
             out.append(Notice(t.psn, t.name, fa.code, fa.severity, fa.message))

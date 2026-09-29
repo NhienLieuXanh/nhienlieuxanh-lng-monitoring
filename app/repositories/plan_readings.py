@@ -8,7 +8,7 @@ kế hoạch theo từng bồn) và ``plan_day_flags`` (ngày nghỉ / nạp ch�
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, tzinfo
 from decimal import Decimal
 
 from sqlalchemy import delete as sa_delete
@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import PlanDayFlag, PlanReading, PlanSetting
+from app.domain.forecast import DeliveryCalendar
 
 
 def list_for(
@@ -206,3 +207,24 @@ def set_flags(
         .execution_options(populate_existing=True)
     )
     return session.execute(stmt).scalar_one()
+
+
+def delivery_calendar(
+    session: Session, psn: str, *, tz: tzinfo, today: datetime
+) -> DeliveryCalendar:
+    """Lịch giao hàng của MỘT bồn, dựng từ chính những gì trang Kế hoạch lưu.
+
+    Một hàm cho mọi nơi tính khuyến nghị đặt hàng — Dashboard, trang Kế hoạch, báo
+    cáo trình ký, file xuất, email cảnh báo. Để từng nơi tự đọc lịch là cách chắc
+    chắn nhất để email hẹn một ngày còn màn hình hẹn ngày khác.
+
+    Giờ nạp chưa từng lưu thì 08:00 — cùng mặc định với ô "Giờ nạp" trên trang.
+    """
+    st = get_settings_for(session, psn)
+    refill = st.refill_time if st is not None and st.refill_time is not None else time(8, 0)
+    blocked = frozenset(
+        f.flag_date
+        for f in list_flags(session, psn, start=today.astimezone(tz).date())
+        if f.no_delivery
+    )
+    return DeliveryCalendar(tz=tz, refill_time=refill, blocked=blocked)
