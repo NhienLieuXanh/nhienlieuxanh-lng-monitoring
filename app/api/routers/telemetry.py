@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.api.deps import HistoryQueryDep, SessionDep, UserDep
-from app.api.schemas import Page, SeriesPointOut, TelemetryOut
+from app.api.deps import HistoryQueryDep, SessionDep, SettingsDep, UserDep
+from app.api.schemas import DailyOpenOut, Page, SeriesPointOut, TelemetryOut
 from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 
@@ -60,6 +61,37 @@ def series(
     return [
         SeriesPointOut(at=at, volume_l=v, pressure_mpa=pr) for at, v, pr in rows
     ]
+
+
+#: Trần khoảng ngày của /daily-open — bằng trần số ngày của trang Kế hoạch.
+DAILY_OPEN_MAX_DAYS = 366
+
+
+@router.get("/{psn}/daily-open", response_model=list[DailyOpenOut])
+def daily_open(
+    psn: str,
+    session: SessionDep,
+    settings: SettingsDep,
+    _: UserDep,
+    from_: Annotated[date, Query(alias="from")],
+    to: Annotated[date, Query()],
+) -> list[DailyOpenOut]:
+    """Thể tích ĐẦU NGÀY thật, mỗi ngày một dòng, cho những ngày đã qua của kế hoạch.
+
+    Ngày theo lịch giờ địa phương (APP_TZ), cùng cách tính ngày với trang Kế hoạch.
+    Chỉ trả ngày CÓ số đo; ngày bồn im thì không có dòng — người gọi tự quyết định
+    ước tính hay để trống, vì chỉ họ biết đang cần gì.
+    """
+    _require_terminal(session, psn)
+    if from_ > to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "`from` phải <= `to`")
+    if (to - from_).days + 1 > DAILY_OPEN_MAX_DAYS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Khoảng ngày tối đa {DAILY_OPEN_MAX_DAYS} ngày",
+        )
+    rows = tel_repo.daily_open(session, psn, from_, to, tz_name=settings.app_tz)
+    return [DailyOpenOut(day=d, sampled_at=at, volume_l=v) for d, at, v in rows]
 
 
 @router.get("/{psn}", response_model=Page[TelemetryOut])

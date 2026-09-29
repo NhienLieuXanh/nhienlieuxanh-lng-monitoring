@@ -356,6 +356,17 @@ class SeriesPointOut(BaseModel):
     pressure_mpa: float | None = None
 
 
+class DailyOpenOut(BaseModel):
+    """Lần đo đầu tiên của một ngày lịch (giờ địa phương) — thể tích đầu ngày thật.
+
+    Kèm ``sampled_at`` vì "đầu tiên" có thể là 09:00 nếu bồn im cả đêm.
+    """
+
+    day: date
+    sampled_at: datetime
+    volume_l: float
+
+
 class VendorAlarmOut(BaseModel):
     """Một dòng báo động thô của nguồn.
 

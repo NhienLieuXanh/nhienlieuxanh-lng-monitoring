@@ -390,6 +390,54 @@ def daily_counts(
     return [(r.d, int(r.n)) for r in rows]
 
 
+_DAILY_OPEN_SQL = text(
+    """
+    SELECT d::date AS day, t.sampled_at, t.volume_l
+    FROM generate_series(CAST(:start AS date), CAST(:end AS date), interval '1 day') AS d
+    CROSS JOIN LATERAL (
+        SELECT sampled_at, volume_l
+        FROM telemetry
+        WHERE psn = :psn
+          AND volume_l IS NOT NULL
+          AND sampled_at >= (d::date::timestamp AT TIME ZONE :tz)
+          AND sampled_at <  ((d::date + 1)::timestamp AT TIME ZONE :tz)
+        ORDER BY sampled_at ASC
+        LIMIT 1
+    ) AS t
+    ORDER BY 1
+    """
+)
+
+
+def daily_open(
+    session: Session,
+    psn: str,
+    start: date,
+    end: date,
+    *,
+    tz_name: str,
+) -> list[tuple[date, datetime, float]]:
+    """Lần đo ĐẦU TIÊN của mỗi ngày lịch giờ địa phương: thể tích đầu ngày THẬT.
+
+    Trang Kế hoạch cần nó cho những ngày ĐÃ QUA. Bản trước chỉ có một con số khởi
+    đầu — lần đo mới nhất — rồi chiếu ngược nó lên ngày bắt đầu mà người dùng chọn.
+    Đo được 29/09/2026: đổi "Ngày bắt đầu" về 27/09 thì dòng 27/09 hiện 34,39 m³
+    (số lúc 15:59 ngày 29/09) trong khi bồn thật hôm đó 15,40, và bảng bịa ra một
+    lần nạp 29/09 trong khi xe thật đã tới 28/09.
+
+    Một truy vấn LATERAL mỗi ngày, ``LIMIT 1`` theo PK ``(psn, sampled_at)``: 366
+    lần dò index thay vì sắp xếp ~500 000 dòng của một năm ở nhịp 1 phút.
+
+    Trả kèm ``sampled_at``: bồn im cả đêm thì "lần đo đầu ngày" có thể là 09:00 —
+    sau giờ nạp — và người gọi phải biết để không gọi nó là thể tích đầu ngày.
+    Ngày không có số đo thì không xuất hiện.
+    """
+    rows = session.execute(
+        _DAILY_OPEN_SQL, {"psn": psn, "start": start, "end": end, "tz": tz_name}
+    ).all()
+    return [(r.day, r.sampled_at, float(r.volume_l)) for r in rows]
+
+
 def max_sampled_at(session: Session, psns: list[str]) -> dict[str, datetime]:
     if not psns:
         return {}

@@ -242,6 +242,7 @@
        số liệu; nhưng KHÔNG được ẩn đi, vì chọn nguồn trong im lặng chính là lỗi cũ. */
     .plan-anchor { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--muted); line-height: 1.35; }
     .plan-anchor .pa-warn { color: var(--warn); font-weight: 600; }
+    .plan-anchor .pa-back { font: inherit; font-weight: 600; color: var(--brand); background: none; border: 0; padding: 2px 0; text-decoration: underline; cursor: pointer; }
 
     :root.rail-collapsed { --rail-w: 64px; }
 
@@ -675,6 +676,9 @@
     .plan-table th.r, .plan-table td.r { text-align: right; } .plan-table th.c, .plan-table td.c { text-align: center; }
     .plan-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
     .plan-table tr.is-fill { background: var(--sel); }
+    /* Ngày đã qua: vạch trái trung tính — số liệu vẫn đọc rõ, chỉ khác là đã xảy ra. */
+    .plan-table tr.is-past td:first-child { box-shadow: inset 3px 0 0 var(--line-strong); }
+    .plan-table input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .45; }
     .plan-table td.low { color: var(--crit); font-weight: 700; }
     .plan-table input[type="checkbox"] {
       appearance: none; -webkit-appearance: none;
@@ -2507,7 +2511,7 @@
         for (const f of forecasts) fcByPsn[f.psn] = f;
         // Dự báo về sau khi dashboard đã vẽ -> vẽ lại đúng những phần phụ thuộc nó.
         renderStats(); renderAlerts(); renderTankList();
-        updateMeasuredBtn(); renderPlanAssist();
+        updateMeasuredBtn(); renderPlanAssist(); planRefreshLive();
       } catch (e) {
         if (e.name === "AuthError") return;
         // Dự báo lỗi KHÔNG được che dashboard: số liệu hiện tại vẫn đúng và vẫn
@@ -2885,11 +2889,29 @@
     // Trần số ngày lập kế hoạch. Từng là 62 và bị chặn IM LẶNG: ô hiện 90 trong khi
     // bảng dừng ở ngày thứ 62 — người dùng gõ 90 chính để với tới Tết dương lịch.
     const PLAN_MAX_DAYS = 366;
-    // Điểm neo vào một lần đo của THIẾT BỊ là số đo TẠI MỘT GIỜ trong ngày, không
-    // phải "đầu ngày". Bản trước coi số lúc 15:12 là thể tích đầu ngày rồi trừ
-    // nguyên một ngày dùng cho dòng kế, trong khi từ 15:12 tới nửa đêm chỉ còn 37%
-    // của ngày. `planAnchorFrac` = phần ngày đã trôi qua lúc đo; 0 = đầu ngày.
-    let planAnchorFrac = 0, planAnchorAt = null;
+    // Chế độ SỐ THẬT (bồn đang báo số): neo vào LẦN ĐO MỚI NHẤT của thiết bị — đúng
+    // con số và đúng GIỜ đo. Ngày đã qua hiện thể tích đầu ngày ĐO ĐƯỢC; chỉ từ lần
+    // đo đó trở đi mới là dự báo. `null` = chế độ GIẢ ĐỊNH: bảng tính từ ô "Thể tích
+    // ban đầu", coi là thể tích đầu ngày của "Ngày bắt đầu" — như bản trước.
+    //
+    // Vì sao. Bản trước chỉ có MỘT con số khởi đầu và dán nó vào "Ngày bắt đầu". Đo
+    // được 29/09/2026: đổi ngày bắt đầu về 27/09 thì dòng 27/09 hiện 34,39 m³ — số
+    // lúc 15:59 ngày 29/09 — trong khi bồn thật hôm đó có 15,40. Từ một điểm khởi
+    // đầu sai, bảng xếp nạp 29/09 trong khi xe thật đã tới 28/09 lúc 14:29, và ô
+    // "Đã nạp" trên chính dòng 28/09 nói đúng điều đó mà phép tính không hề dùng.
+    //
+    // `m3` = số đo, `at` = lúc đo, `key` = ngày của lần đo, `frac` = phần ngày đã
+    // trôi qua lúc đo (số lúc 15:12 không phải thể tích đầu ngày: từ 15:12 tới nửa
+    // đêm chỉ còn 37% của ngày).
+    let planLive = null;
+    //: Ứng viên neo của bồn đang chọn, giữ cả khi người dùng đang ở chế độ giả định
+    //: — để nút "Dùng lại số đo thật" có chỗ quay về, và để ghi đúng nguồn.
+    let planLiveCand = null;
+    //: Người dùng đã tự gõ "Thể tích ban đầu" — lần tải lại dự báo không được giành
+    //: lại ô đó.
+    let planTyped = false;
+    //: Thể tích ĐẦU NGÀY đo được: khoá "YYYY-MM-DD" -> { m3, at }. Từ /daily-open.
+    let planOpen = new Map(), planOpenFrom = null, planOpenTo = null, planOpenLoading = false;
     // Số ĐO TAY theo ngày: khoá "YYYY-MM-DD" -> m³. Nguồn là bảng plan_readings
     // trên server, không phải localStorage: hai người cùng theo một bồn phải thấy
     // cùng một con số, và số này là căn cứ để đặt hàng nên không được sống trong
@@ -3003,36 +3025,83 @@
       return { d, key, rest, forced: forcedWant, deliverable, trig, fill, order, atRefill, conflict, next };
     }
 
+    const planDayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+    const planDayShift = (key, n) => { const d = new Date(key + "T00:00:00"); d.setDate(d.getDate() + n); return planDayKey(d); };
+
+    // Điểm bắt đầu MÔ PHỎNG: từ dòng nào, thể tích bao nhiêu, ở phần nào của ngày.
+    // Giả định: dòng 0, ô "Thể tích ban đầu", đầu ngày. Số thật: dòng của ngày có
+    // lần đo mới nhất, đúng con số và đúng giờ đo — các dòng trước đó là ngày đã
+    // qua, không mô phỏng. "Ngày bắt đầu" nằm SAU lần đo thì chạy ngầm những ngày ở
+    // giữa (cùng luật, kể cả nạp) rồi mới vào bảng: đổi ngày bắt đầu là đổi KHUNG
+    // NHÌN, không được đổi con số của bất kỳ ngày nào.
+    function planSeed(p, base, postFill, h) {
+      const L = planLive;
+      if (!L) return { i0: 0, level: p.start, frac: 0 };
+      const iA = planDayDiff(planDayKey(base), L.key);
+      if (iA >= 0) return { i0: iA, level: L.m3, frac: L.frac };
+      let level = L.m3, frac = L.frac;
+      for (let i = iA; i < 0; i++) {
+        level = planStepDay(level, frac, i, base, p, postFill, h).next;
+        frac = 0;
+      }
+      return { i0: 0, level, frac: 0 };
+    }
+
     // Chuỗi THUẦN ƯỚC TÍNH: đúng công thức, bỏ qua mọi số nhập tay. Chỉ để hiển thị.
     // Đây là câu trả lời cho "không thấy số tôi nhập ảnh hưởng ngày sau": có nó thì
     // mỗi ngày sau một lần nhập tay đều chỉ ra được kế hoạch LẼ RA sẽ là bao nhiêu.
-    function planShadow(p, base, postFill) {
+    // Ngày đã qua không có ước tính gốc — ở đó chỉ có số đo.
+    function planShadow(p, base, postFill, seed) {
       const h = planRefillHour(p);
       const out = [];
-      let level = p.start, frac = planAnchorFrac;
+      let level = seed.level, frac = seed.frac;
       for (let i = 0; i < p.days; i++) {
+        if (i < seed.i0) { out.push(null); continue; }
         out.push(level);
-        const r = planStepDay(level, frac, i, base, p, postFill, h);
-        level = r.next;
+        level = planStepDay(level, frac, i, base, p, postFill, h).next;
         frac = 0;
       }
       return out;
     }
-    function computePlan() {
-      const p = planParams();
-      const postFill = round2((p.pct / 100) * p.cap);           // = B4
-      document.getElementById("p-postfill").textContent = postFill + " m³";
-      const tp = p.time.split(":").map(Number);
-      const base = p.date ? new Date(p.date + "T00:00:00") : new Date();
-      base.setHours(tp[0] || 0, tp[1] || 0, tp[2] || 0, 0);      // giờ:phút:giây nạp
+
+    function planRows(p, base, postFill) {
       const h = planRefillHour(p);
-      const shadow = planShadow(p, base, postFill);
-      let level = p.start, frac = planAnchorFrac, total = 0, fills = 0;
+      const seed = planSeed(p, base, postFill, h);
+      const shadow = planShadow(p, base, postFill, seed);
+      const rows = [];
+      let total = 0, fills = 0;
+
+      // NGÀY ĐÃ QUA (chỉ ở chế độ số thật). Không mô phỏng, không xếp nạp: xe đã tới
+      // hay chưa là chuyện đã xảy ra, và ô "Đã nạp" nói nó. Thứ tự tin: số đo tay
+      // của ngày đó, rồi lần đo đầu ngày của thiết bị. Ngày không có cả hai (bồn im)
+      // thì ước tính từ ngày trước — trừ một ngày dùng, cộng lần nạp thật nếu có —
+      // và NÓI RA là ước tính.
+      let carry = null;
+      for (let i = 0; i < Math.min(seed.i0, p.days); i++) {
+        const d = new Date(base.getTime() + i * 86400000);
+        const key = planDayKey(d);
+        const act = planReadings.has(key) ? planReadings.get(key) : null;
+        const o = planOpen.get(key) || null;
+        const real = act !== null ? act : (o ? o.m3 : null);
+        const level = real !== null ? real : carry;
+        rows.push({
+          i, d, key, level, est: o ? o.m3 : carry, act, past: true,
+          openAt: act === null && o ? o.at : null, noData: real === null,
+          fill: false, order: null, rest: planRest.has(key), forced: planForce.has(key),
+          trig: false, deliverable: planDeliverable(d, key), conflict: false,
+          atFrac: 0, atRefill: null, fromKey: null, shadow: null,
+        });
+        const thuc = planActualRefill(key);
+        carry = level === null ? null
+          : level - (planRest.has(key) ? 0 : p.use) + (thuc ? thuc.m3 : 0);
+      }
+
+      // Từ điểm neo trở đi: mô phỏng.
+      let level = seed.level, frac = seed.frac;
       // Từ lần nhập tay ĐẦU TIÊN trở đi, mọi ngày sau đều là hệ quả của nó. Giữ
       // ngày nguồn để nói rõ trên bảng "ngày này tính từ số thực tế ngày nào".
       let fromKey = null;
-      const rows = [];
-      for (let i = 0; i < p.days; i++) {
+      for (let i = seed.i0; i < p.days; i++) {
         const dKey = planDayKey(new Date(base.getTime() + i * 86400000));
         // `est` là con số công thức sinh ra cho ngày này; `act` là số người đo được.
         // Có số đo thì DỊCH MỐC về nó — đó là toàn bộ mục đích của cột Thực tế: mức
@@ -3045,8 +3114,14 @@
         if (act !== null) { level = act; fromKey = dKey; frac = 0; }
         const r = planStepDay(level, frac, i, base, p, postFill, h);
         if (r.fill) { total += r.order; fills++; }
+        // Dòng neo giữa ngày ở chế độ số thật: cột "đầu ngày" hiện thể tích đầu ngày
+        // ĐO ĐƯỢC; phép tính đi từ lần đo mới nhất, và dòng ghi rõ giờ + con số đó.
+        const neo = planLive !== null && i === seed.i0 && frac > 0;
+        const o = neo ? planOpen.get(dKey) : null;
         rows.push({
-          i, d: r.d, key: r.key, level, est, act, fill: r.fill, order: r.order,
+          i, d: r.d, key: r.key, level: o ? o.m3 : level, est, act, past: false,
+          anchor: neo ? { m3: level, at: planLive.at, open: !!o } : null,
+          fill: r.fill, order: r.order,
           rest: r.rest, forced: r.forced, trig: r.trig, deliverable: r.deliverable,
           conflict: r.conflict, atFrac: frac, atRefill: r.atRefill,
           // Ngày này có đang tính từ một số thực tế nào không, và nếu không nhập tay
@@ -3057,7 +3132,53 @@
         level = r.next;
         frac = 0;
       }
-      renderPlan(rows, round2(total), fills, postFill, p);
+      return { rows, total: round2(total), fills };
+    }
+
+    function computePlan() {
+      const p = planParams();
+      const postFill = round2((p.pct / 100) * p.cap);           // = B4
+      document.getElementById("p-postfill").textContent = postFill + " m³";
+      const tp = p.time.split(":").map(Number);
+      const base = p.date ? new Date(p.date + "T00:00:00") : new Date();
+      base.setHours(tp[0] || 0, tp[1] || 0, tp[2] || 0, 0);      // giờ:phút:giây nạp
+      const { rows, total, fills } = planRows(p, base, postFill);
+      // Chế độ số thật: ô "Thể tích ban đầu" hiện đúng con số của dòng đầu bảng.
+      // Bản trước để nguyên số của lần đo mới nhất trong ô dù ngày bắt đầu đã lùi về
+      // 27/09 — ô nói 34,39 cho một ngày mà bồn có 15,40.
+      if (planLive && rows.length && rows[0].level !== null) {
+        document.getElementById("p-start").value = round2(rows[0].level);
+      }
+      renderPlan(rows, total, fills, postFill, p);
+    }
+
+    // Tải thể tích đầu ngày đo được cho những ngày đã qua đang hiện trên bảng. Chỉ
+    // tải phần còn thiếu; trần 366 ngày là trần của server.
+    async function planEnsureOpen() {
+      const L = planLive, psn = planPsn;
+      if (!L || !psn) return;
+      const want = document.getElementById("p-date").value || L.key;
+      if (want > L.key) return;               // bảng bắt đầu sau lần đo: không có ngày đã qua
+      const floor = planDayShift(L.key, -365);
+      const lo = want < floor ? floor : want;
+      if (planOpenFrom !== null && planOpenFrom <= lo && planOpenTo === L.key) return;
+      planOpenLoading = true;
+      computePlan();
+      try {
+        const q = new URLSearchParams({ from: lo, to: L.key });
+        const rows = await api(`/api/telemetry/${encodeURIComponent(psn)}/daily-open?${q}`);
+        if (planPsn !== psn) return;
+        for (const r of rows) {
+          planOpen.set(r.day, { m3: round2(Number(r.volume_l) / 1000), at: new Date(r.sampled_at) });
+        }
+        planOpenFrom = lo; planOpenTo = L.key;
+      } catch (e) {
+        if (e.name !== "AuthError" && planPsn === psn) {
+          setMsg("plan-msg", `Không tải được thể tích đầu ngày đo được: ${e.message}`, "bad");
+        }
+      } finally {
+        if (planPsn === psn) { planOpenLoading = false; computePlan(); }
+      }
     }
 
     // Lần nạp THẬT (thiết bị phát hiện) rơi vào ngày này, nếu có. Để bảng nói được
@@ -3103,8 +3224,12 @@
         msgs.push(`Đã tích "Nạp chỉ định" vào ngày không có xe (${xung.join(", ")}) — `
           + `Chủ Nhật hoặc ngày "Không giao" nên không xếp nạp được. Lần nạp đã tự dời sớm lên ngày giao được trước đó nếu cần.`);
       }
-      if (rows.length && rows[0].level < R) {
-        msgs.push(`Thể tích ban đầu ${round2(rows[0].level)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay.`);
+      // Mức HIỆN TẠI, không phải dòng đầu bảng: ở chế độ số thật dòng đầu có thể là
+      // một ngày đã qua, và "cần nạp ngay" cho một con số của hôm kia là báo động giả.
+      const cur = rows.find(r => !r.past);
+      const curLvl = cur ? (cur.anchor ? cur.anchor.m3 : cur.level) : null;
+      if (curLvl !== null && curLvl < R) {
+        msgs.push(`${cur.anchor ? "Thể tích hiện tại" : "Thể tích ban đầu"} ${round2(curLvl)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay.`);
       }
       // Mức đích không được nằm dưới ngưỡng kích hoạt: nạp xong mà vẫn dưới ngưỡng
       // thì ngày nào cũng "phải nạp" với lượng đặt bằng 0 — một lịch vô nghĩa.
@@ -3131,15 +3256,26 @@
       warn.innerHTML = msgs.map(m => `<span>${m}</span>`).join("");
       warn.hidden = !msgs.length;
       document.getElementById("plan-body").innerHTML = rows.map(r => {
-        const lvl = round2(r.level);
-        // Dòng neo đo giữa ngày: con số KHÔNG phải thể tích đầu ngày, nên ghi giờ đo.
-        const luc = (r.i === 0 && r.atFrac > 0 && planAnchorAt)
-          ? `<span class="p-goc">đo lúc ${pad2(planAnchorAt.getHours())}:${pad2(planAnchorAt.getMinutes())}</span>`
-          : "";
+        const lvl = r.level === null ? "—" : round2(r.level);
+        const hhmm = (t) => `${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
+        // Nói ra con số trong ô là GÌ: số đo thật, ước tính cho ngày bồn im, hay dòng
+        // neo — nơi thể tích đầu ngày là số đo được còn phép tính đi từ lần đo mới nhất.
+        let luc = "";
+        if (r.anchor) {
+          luc = `<span class="p-goc" title="Dự báo tính từ lần đo mới nhất của thiết bị">`
+            + `${r.anchor.open ? "" : "đo "}lúc ${hhmm(r.anchor.at)}${r.anchor.open ? ": " + round2(r.anchor.m3) : ""}</span>`;
+        } else if (r.past && r.noData) {
+          luc = `<span class="p-goc">${planOpenLoading ? "đang tải…" : (r.level === null ? "không có số đo" : "không có số đo · ước tính")}</span>`;
+        } else if (r.past) {
+          // Lần đo đầu ngày muộn (bồn im cả đêm) thì không phải thể tích đầu ngày.
+          const muon = r.openAt && (r.openAt.getHours() >= 1);
+          luc = `<span class="p-goc">${r.act !== null ? "số đo tay" : (muon ? "đo lúc " + hhmm(r.openAt) : "đo thật")}</span>`;
+        }
         let cls = "r num";
         // Đỏ khi dưới dự trữ ở BẤT KỲ lúc nào trong ngày: đầu ngày, hoặc ngay trước
         // lúc xe tới — điểm thấp nhất của một ngày có nạp.
-        if (r.level < R || (r.fill && r.atRefill < R)) cls += " low";
+        if (r.level === null) cls += "";
+        else if (r.level < R || (r.fill && r.atRefill < R)) cls += " low";
         else if (r.trig) cls += " trigger";
         // Vạch xanh: ngày này là hệ quả của một số thực tế đã nhập. Dùng vạch chứ
         // không dùng màu chữ để không tranh chấp với đỏ (dưới dự trữ) và vàng
@@ -3158,13 +3294,16 @@
         }
         const when = r.fill ? fmtDT(r.d) : "";
         const order = r.order === null ? "" : `<b>${r.order}</b>`;
-        return `<tr${r.fill ? ' class="is-fill"' : ""}>
+        // Ngày đã qua: đánh dấu không có tác dụng gì nữa, nên khoá lại thay vì để
+        // người dùng tích rồi thấy bảng không đổi.
+        const qua = r.past ? ' disabled title="Ngày đã qua"' : "";
+        return `<tr${r.fill ? ' class="is-fill"' : r.past ? ' class="is-past"' : ""}>
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
           <td class="${cls}">${lvl}${luc}${goc}</td>
           ${planActCell(r)}
-          <td class="c"><input type="checkbox" data-kind="rest" data-day="${r.key}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"></td>
-          <td class="c"><input type="checkbox" data-kind="nodeliver" data-day="${r.key}"${planNoDeliver.has(r.key) ? " checked" : ""} aria-label="Không giao"></td>
-          <td class="c"><input type="checkbox" data-kind="force" data-day="${r.key}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"></td>
+          <td class="c"><input type="checkbox" data-kind="rest" data-day="${r.key}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"${qua}></td>
+          <td class="c"><input type="checkbox" data-kind="nodeliver" data-day="${r.key}"${planNoDeliver.has(r.key) ? " checked" : ""} aria-label="Không giao"${qua}></td>
+          <td class="c"><input type="checkbox" data-kind="force" data-day="${r.key}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"${qua}></td>
           <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
       }).join("");
@@ -3177,7 +3316,7 @@
       const has = r.act !== null && r.act !== undefined;
       const dd = `${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}`;
       let est = "";
-      if (has) {
+      if (has && r.est !== null && r.est !== undefined) {
         const diff = round2(r.act - r.est);
         // diff > 0: còn nhiều hơn ước tính, tức hôm đó dùng ÍT hơn dự kiến.
         const cls = diff >= 0 ? "up" : "dn";
@@ -3194,7 +3333,7 @@
     // riêng ngày đó), vì sau mỗi lần dịch mốc thì ước tính ngày kế đã tính từ số
     // thực tế — nên cộng lại là "cả kỳ đã dùng ít/nhiều hơn kế hoạch bao nhiêu m³".
     function planDeviationTile(rows) {
-      const acts = rows.filter(r => r.act !== null && r.act !== undefined);
+      const acts = rows.filter(r => r.act !== null && r.act !== undefined && r.est !== null && r.est !== undefined);
       if (!acts.length) return "";
       const dev = round2(acts.reduce((a, r) => a + (r.act - r.est), 0));
       return `<div class="ps-tile" title="Cộng dồn (thực tế − ước tính) của các ngày đã nhập. `
@@ -3314,8 +3453,9 @@
       // ngày nghỉ của bồn A áp lên kế hoạch bồn B — sai im lặng, đúng loại lỗi mà
       // guard `planPsn !== psn` phía dưới đang chặn cho số đo tay.
       planRest.clear(); planForce.clear(); planNoDeliver.clear();
-      planAnchorFrac = 0; planAnchorAt = null;
-      if (!psn) { computePlan(); return; }
+      planLive = null; planLiveCand = null; planTyped = false;
+      planOpen = new Map(); planOpenFrom = null; planOpenTo = null; planOpenLoading = false;
+      if (!psn) { planAnchorNote(); computePlan(); return; }
       await loadPlanSettings(psn);
       try {
         const rows = await api(`/api/plan/readings/${encodeURIComponent(psn)}`);
@@ -3332,53 +3472,19 @@
           if (f.no_delivery) planNoDeliver.add(f.flag_date);
         }
 
-        // Mốc khởi đầu = nguồn nào MỚI HƠN, số đo tay hay lần đo của thiết bị.
-        //
-        // Bản trước luôn lấy số đo tay và không bao giờ đọc telemetry. Lý do khi đó
-        // đúng: hai bồn còn lại khi đó đã im 35 và 86 ngày, telemetry cho 0,061 m³ — một
-        // con số của tháng 7 làm điểm khởi đầu cho kế hoạch tháng 8. Nhưng
-        // YKH-TANK-01 sống và báo mỗi phút, nên luật "số tay luôn thắng" thành ra
-        // một con số gõ tay từ lâu thắng một phép đo một phút tuổi.
-        //
-        // Hậu quả đo được 28/09/2026: số tay 53,19 m³ ghi cho ngày 27/09 (đúng bằng
-        // số của ngày 4/9) trong khi bồn thật hôm đó có 15,4 m³. Cả 30 ngày sau bị
-        // dịch lên 37,8 m³: bảng hẹn nạp ngày 02/10, còn bồn thật tụt xuống 5,96 m³
-        // sáng 28/09 — dưới nửa mức dự trữ — và xe phải tới bơm ngay hôm đó.
-        //
-        // So theo NGÀY, không theo giờ: cả hai đều mang nghĩa "thể tích đầu ngày của
-        // ngày này". Số tay thắng ở chính ngày của nó, nên người vận hành đo tay hôm
-        // nay vẫn ghi đè được cảm biến hôm nay — telemetry chỉ thắng khi nó thuộc
-        // một ngày MUỘN HƠN. Bồn đứng im (`f.stale`) thì không dùng telemetry: đó
-        // đúng là ca mà lý do cũ vẫn còn giá trị.
-        const keys = [...planReadings.keys()].sort();
-        const tayKey = keys.length ? keys[keys.length - 1] : null;
-
-        const f = fcOf(psn);
-        let teleKey = null, teleM3 = null, teleAt = null;
-        if (f && !f.stale && f.sampled_at && f.volume_l != null) {
-          const at = new Date(f.sampled_at);
-          if (!Number.isNaN(at.getTime())) {
-            teleKey = planDayKey(at);
-            teleM3 = round2(Number(f.volume_l) / 1000);
-            teleAt = at;
-          }
-        }
-
-        const dungTele = teleKey !== null && (tayKey === null || teleKey > tayKey);
-        const neoKey = dungTele ? teleKey : tayKey;
-        if (neoKey !== null) {
+        planLiveCand = planPickAnchor(psn);
+        const L = planLiveCand;
+        // Bồn đang báo số -> chế độ số thật. Bồn im (neo vào số đo tay) -> giả định
+        // từ số đo tay, như bản trước: không có số đo nào mới hơn để làm khác đi.
+        planLive = L && L.src === "tele" ? L : null;
+        if (L) {
           planLoading = true;
-          document.getElementById("p-start").value =
-            dungTele ? teleM3 : planReadings.get(tayKey);
-          document.getElementById("p-date").value = neoKey;
+          document.getElementById("p-start").value = L.m3;
+          document.getElementById("p-date").value = L.key;
           planLoading = false;
         }
-        if (dungTele) {
-          const nua = new Date(teleAt.getFullYear(), teleAt.getMonth(), teleAt.getDate());
-          planAnchorFrac = Math.min(1, Math.max(0, (teleAt - nua) / 86400000));
-          planAnchorAt = teleAt;
-        }
-        planAnchorNote(dungTele, neoKey, teleAt, tayKey);
+        planAnchorNote();
+        await planEnsureOpen();
       } catch (e) {
         if (e.name !== "AuthError") setMsg("plan-msg", `Không tải được số thực tế đã lưu: ${e.message}`, "bad");
       }
@@ -3408,20 +3514,81 @@
     // chọn im lặng là thứ đã để một con số của ngày 4/9 chống đỡ cả kế hoạch tháng
     // 10 mà không ai thấy. Người đọc phải biết con số đầu bảng từ đâu ra và cũ bao
     // nhiêu, vì mọi dòng phía dưới chỉ là số học chạy tiếp từ nó.
-    function planAnchorNote(dungTele, neoKey, teleAt, tayKey) {
+    // Mốc = nguồn nào MỚI HƠN, số đo tay hay lần đo của thiết bị.
+    //
+    // Bản đầu luôn lấy số đo tay và không bao giờ đọc telemetry. Lý do khi đó đúng:
+    // hai bồn còn lại khi đó đã im 35 và 86 ngày, telemetry cho 0,061 m³ — một con
+    // số của tháng 7 làm điểm khởi đầu cho kế hoạch tháng 8. Nhưng YKH-TANK-01 sống
+    // và báo mỗi phút, nên luật "số tay luôn thắng" thành ra một con số gõ tay từ
+    // lâu thắng một phép đo một phút tuổi. Đo được 28/09/2026: số tay 53,19 m³ ghi
+    // cho 27/09 trong khi bồn thật hôm đó 15,4; cả 30 ngày sau bị dịch lên 37,8 m³.
+    //
+    // So theo NGÀY: số tay thắng ở chính ngày của nó, nên người vận hành đo tay hôm
+    // nay vẫn ghi đè được cảm biến hôm nay — telemetry chỉ thắng khi nó thuộc một
+    // ngày MUỘN HƠN. Bồn đứng im (`f.stale`) thì không dùng telemetry.
+    function planPickAnchor(psn) {
+      const keys = [...planReadings.keys()].sort();
+      const tayKey = keys.length ? keys[keys.length - 1] : null;
+      const f = fcOf(psn);
+      if (f && !f.stale && f.sampled_at && f.volume_l != null) {
+        const at = new Date(f.sampled_at);
+        const key = Number.isNaN(at.getTime()) ? null : planDayKey(at);
+        if (key !== null && (tayKey === null || key > tayKey)) {
+          const nua = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+          return {
+            src: "tele", key, m3: round2(Number(f.volume_l) / 1000), at,
+            frac: Math.min(1, Math.max(0, (at - nua) / 86400000)), tayKey,
+          };
+        }
+      }
+      if (tayKey !== null) return { src: "tay", key: tayKey, m3: planReadings.get(tayKey), at: null, frac: 0, tayKey };
+      return null;
+    }
+
+    function planAnchorNote() {
       const el = document.getElementById("plan-anchor");
       if (!el) return;
-      if (!neoKey) {
-        el.innerHTML = `<span class="pa-warn">Chưa có mốc nào: không có số đo tay, `
-          + `và thiết bị chưa gửi số liệu dùng được. Thể tích ban đầu đang là số bạn tự nhập.</span>`;
+      const L = planLiveCand;
+      if (planLive) {
+        el.innerHTML = `Ngày đã qua là <b>số đo thật</b>; dự báo tính từ lần đo mới nhất của thiết bị lúc `
+          + `<b>${esc(fmtDT(planLive.at))}</b> (${esc(String(planLive.m3))} m³)`
+          + (planLive.tayKey ? ` — mới hơn số đo tay ngày ${esc(planLive.tayKey)}.` : ".")
+          + ` Gõ vào ô này để thử một con số khác.`;
         return;
       }
-      if (dungTele) {
-        el.innerHTML = `Neo theo <b>số đo của thiết bị</b> lúc ${esc(fmtDT(teleAt))}`
-          + (tayKey ? ` — mới hơn số đo tay ngày ${esc(tayKey)}.` : ".");
+      const back = L && L.src === "tele"
+        ? ` <button type="button" class="pa-back" id="p-live-back">Dùng lại số đo thật</button>` : "";
+      if (planTyped) {
+        el.innerHTML = `Đang dùng số bạn tự nhập — tính là thể tích đầu ngày của "Ngày bắt đầu".${back}`;
+      } else if (L && L.src === "tay") {
+        el.innerHTML = `Neo theo <b>số đo tay</b> ngày ${esc(L.key)} — thiết bị không có số nào mới hơn.`;
       } else {
-        el.innerHTML = `Neo theo <b>số đo tay</b> ngày ${esc(tayKey)}.`;
+        el.innerHTML = `<span class="pa-warn">Chưa có mốc nào: không có số đo tay, `
+          + `và thiết bị chưa gửi số liệu dùng được. Thể tích ban đầu đang là số bạn tự nhập.</span>`;
       }
+    }
+
+    function planBackToLive() {
+      if (!planLiveCand || planLiveCand.src !== "tele") return;
+      planTyped = false;
+      planLive = planLiveCand;
+      planAnchorNote();
+      computePlan();
+      planEnsureOpen();
+    }
+
+    // Lần đo mới về (mỗi lần tải lại dự báo): dời neo theo, GIỮ nguyên ngày bắt đầu
+    // người dùng đã chọn. Bản trước chỉ chọn neo lúc mở trang, nên bảng đứng yên ở
+    // con số của lúc mở trong khi bồn vẫn vơi.
+    function planRefreshLive() {
+      const view = document.getElementById("view-planner");
+      if (!planPsn || !view || view.hidden) return;
+      const c = planPickAnchor(planPsn);
+      if (!c || c.src !== "tele") return;     // không có số mới hơn: giữ nguyên
+      planLiveCand = c;
+      if (!planTyped) planLive = c;
+      planAnchorNote();
+      if (!planTyped) { computePlan(); planEnsureOpen(); }
     }
 
     async function savePlanFlags(key) {
@@ -4888,14 +5055,17 @@
       document.getElementById("s-save-test").addEventListener("click", () => onSaveEmail(true));
       document.getElementById("s-save2").addEventListener("click", onSaveParams);
       document.getElementById("plan-form").addEventListener("input", (e) => {
-        // Người dùng tự gõ thể tích ban đầu hoặc ngày bắt đầu: số đó là thể tích
-        // ĐẦU NGÀY chứ không phải số đo lúc giữa ngày, nên bỏ giờ của điểm neo cũ.
         const id = e && e.target ? e.target.id : "";
-        if (id === "p-start" || id === "p-date") {
-          planAnchorFrac = 0; planAnchorAt = null;
-          const el = document.getElementById("plan-anchor");
-          if (el) el.textContent = "Đang dùng số bạn tự nhập — tính là thể tích đầu ngày.";
+        // Tự gõ thể tích ban đầu = chuyển sang GIẢ ĐỊNH: con số đó là thể tích ĐẦU
+        // NGÀY của "Ngày bắt đầu", không còn neo vào lần đo của thiết bị.
+        if (id === "p-start") {
+          planLive = null; planTyped = true;
+          planAnchorNote();
         }
+        // Đổi NGÀY BẮT ĐẦU thì KHÔNG bỏ neo. Bản trước bỏ, và đó chính là lỗi: lùi
+        // ngày bắt đầu về 27/09 thì số lúc 15:59 ngày 29/09 bị dán vào 27/09. Đổi
+        // ngày là đổi khung nhìn — chỉ cần tải thêm số đo của những ngày mới lộ ra.
+        if (id === "p-date" && planLive) planEnsureOpen();
         computePlan();
         updateCapSaveBtn();
       });
@@ -4907,6 +5077,9 @@
       document.getElementById("p-cap-save").addEventListener("click", saveCapacityToTank);
       document.getElementById("p-tank").addEventListener("change", applyTankToPlan);
       document.getElementById("p-use-measured").addEventListener("click", useMeasuredDaily);
+      document.getElementById("plan-anchor").addEventListener("click", (e) => {
+        if (e.target && e.target.id === "p-live-back") { e.preventDefault(); planBackToLive(); }
+      });
 
       // Báo cáo
       document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); });

@@ -49,13 +49,19 @@ def _trich() -> str:
     return "\n".join(
         [
             "const planRest=new Set(), planForce=new Set(), planNoDeliver=new Set();",
-            "let planAnchorFrac=0;",
+            # Trạng thái chế độ số thật, và lần nạp thật giả lập (bản thật đọc dự báo).
+            "let planLive=null, planReadings=new Map(), planOpen=new Map(), REFILLS={};",
+            "function planActualRefill(k){ return REFILLS[k] || null; }",
             one(r"const pad2 = "),
             one(r"const round2 = "),
             one(r"const planDayKey = "),
             block(r"function planDeliverable"),
             block(r"function planRefillHour"),
             block(r"function planStepDay"),
+            one(r"const planDayDiff = "),
+            block(r"function planSeed"),
+            block(r"function planShadow"),
+            block(r"function planRows"),
         ]
     )
 
@@ -134,6 +140,51 @@ kq.neo_nap_ao = rows[0].fill;
 kq.neo_hom_sau = rows[1].lvl;
 kq.neo_ky_vong = 41.18 - (1 - frac) * 7.7;
 
+// 8. CHẾ ĐỘ SỐ THẬT — đúng ca 29/09/2026: lần đo mới nhất 34,39 lúc 15:59 ngày 29,
+// xe thật tới 28/09 lúc 14:29 (+35,31). Người dùng lùi ngày bắt đầu về 27/09.
+const P2 = { cap: 60, pct: 90, use: 5.99, res: 10, start: 0, days: 12, time: "08:00:00" };
+function bang(start, days = P2.days, p = P2) {
+  const base = new Date(start + "T00:00:00"); base.setHours(8, 0, 0, 0);
+  return planRows({ ...p, days, date: start }, base, 54);
+}
+planOpen = new Map([
+  ["2026-09-27", { m3: 15.40, at: new Date("2026-09-27T00:05:00") }],
+  ["2026-09-28", { m3: 9.88, at: new Date("2026-09-28T00:10:00") }],
+  ["2026-09-29", { m3: 40.2, at: new Date("2026-09-29T00:01:00") }],
+]);
+REFILLS = { "2026-09-28": { m3: 35.31, hhmm: "14:29" } };
+planLive = { src: "tele", key: "2026-09-29", m3: 34.39,
+             at: new Date("2026-09-29T15:59:00"), frac: (15 * 60 + 59) / 1440 };
+let b27 = bang("2026-09-27").rows;
+kq.live_27 = b27[0].level; kq.live_27_past = b27[0].past;
+kq.live_28 = b27[1].level;
+kq.live_nap_qua_khu = b27.slice(0, 3).some(r => r.fill);
+kq.live_29_dau_ngay = b27[2].level; kq.live_29_neo = b27[2].anchor && b27[2].anchor.m3;
+kq.live_30 = b27[3].level;
+kq.live_30_ky_vong = 34.39 - (1 - planLive.frac) * 5.99;
+
+// Đổi ngày bắt đầu = đổi KHUNG NHÌN: mọi ngày chung phải trùng số và trùng lịch nạp.
+const sig = (rows) => Object.fromEntries(rows.map(r => [r.key, JSON.stringify([round2(r.level ?? -1), r.fill, r.order])]));
+const s27 = sig(bang("2026-09-27", 40).rows);
+let chung = 0, lech_khung = 0;
+for (const s of [sig(bang("2026-09-29", 38).rows), sig(bang("2026-10-03", 34).rows)]) {
+  for (const [k, v] of Object.entries(s)) if (s27[k]) { chung++; if (s27[k] !== v) lech_khung++; }
+}
+kq.khung_chung = chung; kq.khung_lech = lech_khung;
+
+// Ngày đã qua không có số đo: ước tính từ ngày trước (trừ dùng, cộng nạp thật).
+planOpen.delete("2026-09-28");
+b27 = bang("2026-09-27").rows;
+kq.im_28 = b27[1].level; kq.im_28_nodata = b27[1].noData;
+kq.im_29_dau_ngay = b27[2].level;
+planOpen.delete("2026-09-27");
+kq.im_dau = bang("2026-09-27").rows[0].level;
+
+// Chế độ giả định giữ nguyên hành vi cũ: dòng 0 = ô "Thể tích ban đầu", đầu ngày.
+planLive = null;
+const gd = bang("2026-09-27", 5, { ...P2, start: 20 }).rows;
+kq.gia_dinh_0 = gd[0].level; kq.gia_dinh_past = gd.some(r => r.past);
+
 console.log(JSON.stringify(kq));
 """
 
@@ -195,3 +246,43 @@ def test_neo_giua_ngay_chi_tru_phan_con_lai_va_khong_bia_lan_nap(kq: dict) -> No
     """Số lúc 15:12 không phải thể tích đầu ngày; sau giờ nạp thì xe hôm nay đã qua."""
     assert kq["neo_nap_ao"] is False
     assert kq["neo_hom_sau"] == pytest.approx(kq["neo_ky_vong"])
+
+
+# --- chế độ số thật: đúng ca 29/09/2026 -----------------------------------------
+
+
+def test_lui_ngay_bat_dau_thi_ngay_da_qua_hien_SO_DO_THAT(kq: dict) -> None:
+    """Bản cũ: dòng 27/09 = 34,39 (số lúc 15:59 ngày 29/09); bồn thật hôm đó 15,40."""
+    assert kq["live_27"] == pytest.approx(15.40)
+    assert kq["live_27_past"] is True
+    assert kq["live_28"] == pytest.approx(9.88)
+
+
+def test_khong_bia_lan_nap_trong_qua_khu(kq: dict) -> None:
+    """Bản cũ xếp nạp 29/09 trong khi xe thật tới 28/09."""
+    assert kq["live_nap_qua_khu"] is False
+
+
+def test_dong_neo_hien_dau_ngay_that_va_tinh_tu_lan_do_moi_nhat(kq: dict) -> None:
+    assert kq["live_29_dau_ngay"] == pytest.approx(40.2)
+    assert kq["live_29_neo"] == pytest.approx(34.39)
+    assert kq["live_30"] == pytest.approx(kq["live_30_ky_vong"])
+
+
+def test_doi_ngay_bat_dau_KHONG_doi_so_cua_ngay_nao(kq: dict) -> None:
+    assert kq["khung_chung"] > 60
+    assert kq["khung_lech"] == 0, f"{kq['khung_lech']}/{kq['khung_chung']} ngày lệch"
+
+
+def test_ngay_bon_im_thi_uoc_tinh_va_noi_ra(kq: dict) -> None:
+    assert kq["im_28_nodata"] is True
+    assert kq["im_28"] == pytest.approx(15.40 - 5.99)
+    # Ngày kế có số đo thật thì lại dùng số thật, không kéo ước tính theo.
+    assert kq["im_29_dau_ngay"] == pytest.approx(40.2)
+    # Không có gì để ước tính từ đó thì để trống, không bịa.
+    assert kq["im_dau"] is None
+
+
+def test_che_do_gia_dinh_giu_hanh_vi_cu(kq: dict) -> None:
+    assert kq["gia_dinh_0"] == pytest.approx(20)
+    assert kq["gia_dinh_past"] is False
