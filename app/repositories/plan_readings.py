@@ -225,6 +225,9 @@ def delivery_calendar(
     blocked = frozenset(
         f.flag_date
         for f in list_flags(session, psn, start=today.astimezone(tz).date())
-        if f.no_delivery
+        # "Ngày nghỉ" trên trang = không tiêu thụ VÀ không nhận hàng (hai cột cũ đã
+        # gộp làm một). Đọc cả ``rest`` để một ngày nghỉ lưu từ trước khi gộp — chỉ
+        # có ``rest`` — cũng chặn được giao hàng, như trang đang hiện nó.
+        if f.no_delivery or f.rest
     )
     return DeliveryCalendar(tz=tz, refill_time=refill, blocked=blocked)

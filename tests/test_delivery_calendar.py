@@ -112,7 +112,9 @@ def test_moi_chuyen_giao_deu_roi_vao_ngay_giao_duoc() -> None:
 
 
 @pytest.mark.db
-def test_lich_dung_tu_DB_lay_gio_nap_va_ngay_khong_giao(session) -> None:
+def test_lich_dung_tu_DB_lay_gio_nap_va_ngay_nghi(session) -> None:
+    """Trang gộp "Không giao" vào "Ngày nghỉ": một ngày nghỉ chặn giao hàng dù nó
+    được lưu bằng cờ nào — ``no_delivery`` (bản hai cột cũ) hay chỉ ``rest``."""
     from app.db.models import Terminal
     from app.repositories import plan_readings as pr_repo
 
@@ -122,6 +124,9 @@ def test_lich_dung_tu_DB_lay_gio_nap_va_ngay_khong_giao(session) -> None:
     pr_repo.set_flags(session, "CAL-01", date(2026, 11, 24), rest=False, forced=False,
                       no_delivery=True)
     pr_repo.set_flags(session, "CAL-01", date(2026, 11, 25), rest=True, forced=False)
+    pr_repo.set_flags(session, "CAL-01", date(2026, 11, 26), rest=False, forced=True)
     cal = pr_repo.delivery_calendar(session, "CAL-01", tz=VN, today=NOW)
     assert cal.refill_time == time(9, 30)
-    assert cal.blocked == frozenset({date(2026, 11, 24)}), "chỉ ngày KHÔNG GIAO"
+    assert cal.blocked == frozenset({date(2026, 11, 24), date(2026, 11, 25)}), (
+        "ngày nghỉ chặn giao; nạp chỉ định thì không"
+    )

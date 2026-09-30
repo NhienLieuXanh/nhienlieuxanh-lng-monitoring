@@ -670,6 +670,11 @@
     .plan-help { margin: 0; font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; box-shadow: var(--shadow-sm); }
     .plan-warn { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 10px 14px; display: grid; gap: 6px; }
     .plan-warn[hidden] { display: none; }
+    .plan-export .px-head { grid-column: 1 / -1; display: grid; gap: 4px; }
+    .plan-export .px-head b { font-size: var(--fs-body); color: var(--fg); }
+    .plan-export .px-act { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .plan-export .note { font-size: var(--fs-sm); color: var(--muted); font-weight: 400; }
+    .plan-export .btn-dl[disabled] { opacity: .5; cursor: not-allowed; }
     .plan-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: auto; box-shadow: var(--shadow-sm); }
     .plan-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
     .plan-table th { position: sticky; top: 0; z-index: 1; background: var(--bg); color: var(--faint); font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .06em; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -1443,7 +1448,8 @@
             Ô <span class="lg lg-trig">vàng</span>: đang ở ngưỡng kích hoạt.
             Ô <span class="lg lg-low">đỏ</span>: dưới mức dự trữ.
             <span class="lg lg-from">vạch xanh</span>: ngày đang tính từ một số thực tế bạn đã nhập.
-            Cột <b>Ngày nghỉ</b>: nhà máy không tiêu thụ. Cột <b>Không giao</b>: ngày lễ không có xe — như Chủ Nhật, lần nạp tự dời sớm lên ngày giao được trước đó. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
+            Cột <b>Ngày nghỉ</b>: nhà máy không tiêu thụ và cũng không nhận hàng (ngày lễ, Tết) — như
+            Chủ Nhật, lần nạp tự dời sớm lên ngày giao được trước đó. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
             bất kể thể tích.
           </p>
           <p class="plan-help">
@@ -1461,12 +1467,29 @@
             Bảng điều khiển hay Dự báo.
           </p>
           <p class="set-msg" id="plan-msg" hidden></p>
+          <!-- File gửi đối tác: CHỈ các ngày nạp, không phải cả bảng. Ba ô chữ là
+               hằng số của bồn nên lưu theo bồn như các thông số khác. -->
+          <form class="plan-params plan-export" id="plan-export" autocomplete="off">
+            <div class="px-head"><b>Xuất các ngày nạp (Excel)</b>
+              <span class="note">Chỉ những ngày có nạp trong khung đang xem: lần nạp thật đã qua (thiết bị ghi nhận) và lần nạp theo kế hoạch. Lượng ghi cả tấn và m³. Các ô dưới đây lưu theo bồn, chỉ cần gõ một lần.</span></div>
+            <label>Đơn vị cung cấp<input type="text" id="p-x-supplier" class="field" maxlength="200" /></label>
+            <label>Khách hàng<input type="text" id="p-x-customer" class="field" maxlength="200" /></label>
+            <label>Địa điểm<input type="text" id="p-x-site" class="field" maxlength="200" /></label>
+            <label>Quy đổi (m³ / tấn)<input type="number" id="p-x-ratio" class="field num" value="2.2" step="0.01" min="0.01" max="10" /></label>
+            <div class="px-act">
+              <button type="button" class="btn-dl" id="plan-export-btn" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
+                Xuất Excel các ngày nạp
+              </button>
+              <span class="note" id="plan-export-note">chọn bồn để xuất</span>
+            </div>
+          </form>
           <div class="plan-table-wrap">
             <table class="plan-table">
               <thead>
                 <tr>
                   <th scope="col">Ngày</th><th scope="col">Thứ</th><th scope="col" class="r">Thể tích đầu ngày (m³)</th><th scope="col" class="r">Thực tế đo được (m³)</th>
-                  <th scope="col" class="c">Ngày nghỉ</th><th scope="col" class="c">Không giao</th><th scope="col" class="c">Nạp chỉ định</th><th scope="col">Hoạt động</th><th scope="col">Thời điểm nạp</th><th scope="col" class="r">Lượng đặt (m³)</th>
+                  <th scope="col" class="c">Ngày nghỉ</th><th scope="col" class="c">Nạp chỉ định</th><th scope="col">Hoạt động</th><th scope="col">Thời điểm nạp</th><th scope="col" class="r">Lượng đặt (m³)</th>
                 </tr>
               </thead>
               <tbody id="plan-body"></tbody>
@@ -2885,7 +2908,10 @@
     // bảng trượt đi bên dưới còn ô tích đứng yên ở dòng 7, giờ là 04/10, CHỦ NHẬT.
     // Ô tích đi vòng qua luật cấm Chủ Nhật (`fill = forced || trig`) nên kế hoạch
     // khai một ngày giao hàng mà nhà cung cấp không giao.
-    const planRest = new Set(), planForce = new Set(), planNoDeliver = new Set();
+    // "Ngày nghỉ" = nhà máy không tiêu thụ VÀ không nhận hàng. Từng là hai cột
+    // riêng ("Ngày nghỉ" và "Không giao"); người dùng thấy cột thứ hai thừa nên gộp
+    // lại — trong DB vẫn là hai cờ, trang luôn ghi cả hai cùng giá trị.
+    const planRest = new Set(), planForce = new Set();
     // Trần số ngày lập kế hoạch. Từng là 62 và bị chặn IM LẶNG: ô hiện 90 trong khi
     // bảng dừng ở ngày thứ 62 — người dùng gõ 90 chính để với tới Tết dương lịch.
     const PLAN_MAX_DAYS = 366;
@@ -2923,6 +2949,12 @@
     //: Chống lưu vòng: khi nạp thông số đã lưu vào form, sự kiện change không được
     //: kích hoạt lưu lại (vô ích, và ghi đè updated_by/updated_at oan).
     let planLoading = false;
+    // Dòng của lần tính gần nhất — file xuất lấy ĐÚNG những gì bảng đang hiện.
+    let planLastRows = [];
+    // Lần lưu thông số đang chạy. Bấm "Xuất" ngay sau khi sửa tên khách hàng thì
+    // `change` (rời ô) và `click` tới cùng lúc; phải chờ lần lưu xong, không thì
+    // file ra với tên cũ.
+    let planSavePending = null;
     const planDayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const WD_VI = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
     const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
@@ -2951,9 +2983,9 @@
     //
     // Bỏ sàn đi thì hành vi TRONG dải không đổi một chút nào (dải cũ là tập con),
     // chỉ thêm đúng cái ca đang hỏng: đã ở dưới mức dự trữ thì phải nạp, không chờ.
-    // Giao được không: Chủ Nhật và ngày đánh dấu "Không giao" (nghỉ lễ) thì KHÔNG.
+    // Giao được không: Chủ Nhật và ngày đánh dấu "Ngày nghỉ" thì KHÔNG.
     function planDeliverable(d, key) {
-      return d.getDay() !== 0 && !planNoDeliver.has(key);
+      return d.getDay() !== 0 && !planRest.has(key);
     }
     function planRefillHour(p) {
       const tp = p.time.split(":").map(Number);
@@ -3150,6 +3182,55 @@
         document.getElementById("p-start").value = round2(rows[0].level);
       }
       renderPlan(rows, total, fills, postFill, p);
+      planLastRows = rows;
+      planExportState();
+    }
+
+    // Các ngày nạp của bảng, đúng thứ file xuất sẽ chứa. Lần nạp THẬT thắng lần nạp
+    // kế hoạch cùng ngày: xe đã tới thì lịch mô phỏng cho ngày đó không còn nghĩa.
+    function planExportRows(rows) {
+      const out = [];
+      for (const r of rows) {
+        const thuc = planActualRefill(r.key);
+        if (thuc && thuc.m3 > 0) {
+          out.push({ day: r.key, m3: thuc.m3, note: `Đã nạp thực tế lúc ${thuc.hhmm}` });
+        } else if (r.fill && r.order !== null && r.order > 0) {
+          out.push({ day: r.key, m3: r.order, note: r.forced ? "Nạp chỉ định" : null });
+        }
+      }
+      return out;
+    }
+    function planExportState() {
+      const btn = document.getElementById("plan-export-btn");
+      const note = document.getElementById("plan-export-note");
+      if (!btn || !note) return;
+      const dd = (k) => `${k.slice(8, 10)}/${k.slice(5, 7)}/${k.slice(0, 4)}`;
+      if (!planPsn) {
+        btn.disabled = true;
+        note.textContent = "chọn bồn để xuất";
+        return;
+      }
+      const rows = planLastRows;
+      const n = rows.length ? planExportRows(rows).length : 0;
+      btn.disabled = !rows.length;
+      note.textContent = rows.length
+        ? `${n} lần nạp · ${dd(rows[0].key)} – ${dd(rows[rows.length - 1].key)}`
+        : "";
+    }
+    async function planExportXlsx() {
+      const rows = planLastRows;
+      if (!planPsn || !rows.length) return;
+      const psn = planPsn;
+      if (planSavePending) await planSavePending;
+      const body = {
+        from_day: rows[0].key, to_day: rows[rows.length - 1].key,
+        rows: planExportRows(rows),
+      };
+      await dlCsv(`/api/plan/export/${encodeURIComponent(psn)}`, `lich_nap_${psn}.xlsx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
     }
 
     // Tải thể tích đầu ngày đo được cho những ngày đã qua đang hiện trên bảng. Chỉ
@@ -3222,7 +3303,7 @@
       const xung = rows.filter(r => r.conflict).map(r => `${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}`);
       if (xung.length) {
         msgs.push(`Đã tích "Nạp chỉ định" vào ngày không có xe (${xung.join(", ")}) — `
-          + `Chủ Nhật hoặc ngày "Không giao" nên không xếp nạp được. Lần nạp đã tự dời sớm lên ngày giao được trước đó nếu cần.`);
+          + `Chủ Nhật hoặc ngày nghỉ nên không xếp nạp được. Lần nạp đã tự dời sớm lên ngày giao được trước đó nếu cần.`);
       }
       // Mức HIỆN TẠI, không phải dòng đầu bảng: ở chế độ số thật dòng đầu có thể là
       // một ngày đã qua, và "cần nạp ngay" cho một con số của hôm kia là báo động giả.
@@ -3302,7 +3383,6 @@
           <td class="${cls}">${lvl}${luc}${goc}</td>
           ${planActCell(r)}
           <td class="c"><input type="checkbox" data-kind="rest" data-day="${r.key}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"${qua}></td>
-          <td class="c"><input type="checkbox" data-kind="nodeliver" data-day="${r.key}"${planNoDeliver.has(r.key) ? " checked" : ""} aria-label="Không giao"${qua}></td>
           <td class="c"><input type="checkbox" data-kind="force" data-day="${r.key}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"${qua}></td>
           <td>${res}</td><td class="num">${when}</td><td class="r num">${order}</td>
         </tr>`;
@@ -3352,6 +3432,13 @@
       // Trên production trước bản này: gõ 90 (trần server khi đó 62) là lần lưu
       // đó thất bại, và người dùng không hề biết.
       { id: "p-days", key: "horizon_days",     toApi: (v) => Math.max(1, Math.min(PLAN_MAX_DAYS, Math.round(v))), fromApi: (v) => Math.round(v) },
+      { id: "p-x-ratio", key: "m3_per_tonne",  toApi: (v) => v,        fromApi: (v) => Number(v) },
+    ];
+    // Chữ trên file xuất. Ô trống = xoá (server lưu NULL).
+    const PLAN_TEXT_FIELDS = [
+      { id: "p-x-supplier", key: "supplier_name" },
+      { id: "p-x-customer", key: "customer_name" },
+      { id: "p-x-site",     key: "site_name" },
     ];
 
     async function loadPlanSettings(psn) {
@@ -3359,6 +3446,10 @@
         const st = await api(`/api/plan/settings/${encodeURIComponent(psn)}`);
         if (planPsn !== psn) return;   // đã đổi bồn trong lúc chờ mạng
         planLoading = true;
+        // Các ô của file xuất là của RIÊNG bồn: không được để tên khách hàng của bồn
+        // trước nằm lại trên bồn vừa chọn chỉ vì bồn này chưa lưu gì.
+        for (const f of PLAN_TEXT_FIELDS) document.getElementById(f.id).value = st[f.key] || "";
+        document.getElementById("p-x-ratio").value = "2.2";
         for (const f of PLAN_FIELDS) {
           if (st[f.key] !== null && st[f.key] !== undefined) {
             document.getElementById(f.id).value = f.fromApi(Number(st[f.key]));
@@ -3381,6 +3472,8 @@
         if (!t) return;
         // <input type=time> có thể trả "08:00" — API cần HH:MM:SS.
         body.refill_time = t.length === 5 ? t + ":00" : t;
+      } else if (PLAN_TEXT_FIELDS.some(x => x.id === id)) {
+        body[PLAN_TEXT_FIELDS.find(x => x.id === id).key] = document.getElementById(id).value.trim();
       } else {
         const f = PLAN_FIELDS.find(x => x.id === id);
         if (!f) return;
@@ -3389,11 +3482,13 @@
         body[f.key] = String(f.toApi(v));
       }
       try {
-        await api(`/api/plan/settings/${encodeURIComponent(psn)}`, {
+        const req = api(`/api/plan/settings/${encodeURIComponent(psn)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        planSavePending = req.catch(() => {});
+        await req;
         if (planPsn !== psn) return;
         setMsg("plan-msg", "Đã lưu thông số cho bồn này.", "ok");
       } catch (e) {
@@ -3452,7 +3547,7 @@
       // Xoá cờ của bồn TRƯỚC. Chúng theo từng bồn, nên giữ lại khi đổi bồn là đem
       // ngày nghỉ của bồn A áp lên kế hoạch bồn B — sai im lặng, đúng loại lỗi mà
       // guard `planPsn !== psn` phía dưới đang chặn cho số đo tay.
-      planRest.clear(); planForce.clear(); planNoDeliver.clear();
+      planRest.clear(); planForce.clear();
       planLive = null; planLiveCand = null; planTyped = false;
       planOpen = new Map(); planOpenFrom = null; planOpenTo = null; planOpenLoading = false;
       if (!psn) { planAnchorNote(); computePlan(); return; }
@@ -3467,9 +3562,11 @@
         const flags = await api(`/api/plan/flags/${encodeURIComponent(psn)}`);
         if (planPsn !== psn) return;
         for (const f of flags) {
-          if (f.rest) planRest.add(f.flag_date);
+          // Ngày chỉ đánh "Không giao" từ bản hai cột cũ cũng hiện là ngày nghỉ: đó là
+          // cột duy nhất còn lại, và để một cờ đang chặn giao hàng mà không có ô nào
+          // hiện ra là chặn mà không ai thấy.
+          if (f.rest || f.no_delivery) planRest.add(f.flag_date);
           if (f.forced) planForce.add(f.flag_date);
-          if (f.no_delivery) planNoDeliver.add(f.flag_date);
         }
 
         planLiveCand = planPickAnchor(psn);
@@ -3600,12 +3697,12 @@
         return;
       }
       const psn = planPsn;
-      const rest = planRest.has(key), forced = planForce.has(key), noDeliver = planNoDeliver.has(key);
+      const rest = planRest.has(key), forced = planForce.has(key);
       try {
         await api(`/api/plan/flags/${encodeURIComponent(psn)}/${key}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rest, forced, no_delivery: noDeliver }),
+          body: JSON.stringify({ rest, forced, no_delivery: rest }),
         });
       } catch (e) {
         if (e.name === "AuthError") return;
@@ -3615,7 +3712,6 @@
         if (planPsn === psn) {
           if (rest) planRest.delete(key);
           if (forced) planForce.delete(key);
-          if (noDeliver) planNoDeliver.delete(key);
           setMsg("plan-msg", `Không lưu được đánh dấu ngày ${key}: ${e.message}`, "bad");
           computePlan();
         }
@@ -3807,9 +3903,9 @@
     // (khoảng quá 90 ngày) hay 401, một thẻ <a> sẽ điều hướng cả trang sang JSON lỗi
     // và người dùng mất phiên làm việc đang mở. Cách này giữ trang nguyên vẹn và
     // hiện lỗi bằng banner.
-    async function dlCsv(path, fallbackName) {
+    async function dlCsv(path, fallbackName, init) {
       try {
-        const r = await fetch(API + path, { credentials: "same-origin" });
+        const r = await fetch(API + path, { credentials: "same-origin", ...(init || {}) });
         if (r.status === 401) { showLogin(); return; }
         if (!r.ok) {
           let d = "";
@@ -5074,6 +5170,11 @@
       document.getElementById("plan-form").addEventListener("change", (e) => {
         if (e.target && e.target.id) savePlanSettings(e.target.id);
       });
+      document.getElementById("plan-export").addEventListener("change", (e) => {
+        if (e.target && e.target.id) savePlanSettings(e.target.id);
+      });
+      document.getElementById("plan-export").addEventListener("submit", (e) => e.preventDefault());
+      document.getElementById("plan-export-btn").addEventListener("click", planExportXlsx);
       document.getElementById("p-cap-save").addEventListener("click", saveCapacityToTank);
       document.getElementById("p-tank").addEventListener("change", applyTankToPlan);
       document.getElementById("p-use-measured").addEventListener("click", useMeasuredDaily);
@@ -5116,8 +5217,7 @@
         }
         if (!t.dataset || t.dataset.kind === undefined) return;
         const day = t.dataset.day;
-        const set = t.dataset.kind === "rest" ? planRest
-          : t.dataset.kind === "nodeliver" ? planNoDeliver : planForce;
+        const set = t.dataset.kind === "rest" ? planRest : planForce;
         if (t.checked) set.add(day); else set.delete(day);
         computePlan();
         savePlanFlags(day);

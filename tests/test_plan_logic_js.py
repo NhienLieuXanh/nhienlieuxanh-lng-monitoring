@@ -48,7 +48,7 @@ def _trich() -> str:
 
     return "\n".join(
         [
-            "const planRest=new Set(), planForce=new Set(), planNoDeliver=new Set();",
+            "const planRest=new Set(), planForce=new Set();",
             # Trạng thái chế độ số thật, và lần nạp thật giả lập (bản thật đọc dự báo).
             "let planLive=null, planReadings=new Map(), planOpen=new Map(), REFILLS={};",
             "function planActualRefill(k){ return REFILLS[k] || null; }",
@@ -111,20 +111,20 @@ kq.nguong_so = dem; kq.nguong_lech = lech;
 // 4. ngày lễ TRÙNG một lần nạp ngày thường -> dời sớm, vẫn giữ dự trữ
 const truoc = lich().filter(r => r.fill);
 const bi = truoc.find(r => r.dow >= 1 && r.dow <= 5 && r.key.slice(5, 7) === "11");
-planNoDeliver.add(bi.key);
+planRest.add(bi.key);   // ngày nghỉ = không nhận hàng
 rows = lich();
 const sau = rows.filter(r => r.fill);
 kq.le_ngay = bi.key;
 kq.le_van_nap = rows.find(r => r.key === bi.key).fill;
 kq.le_thap_nhat = Math.min(...sau.map(r => r.atRefill));
 const tBi = Date.parse(bi.key);
-kq.le_doi_som = sau.some(r => Date.parse(r.key) < tBi && Date.parse(r.key) >= tBi - 3 * 86400000);
+kq.le_doi_gan = sau.some(r => r.key !== bi.key && Math.abs(Date.parse(r.key) - tBi) <= 3 * 86400000);
 
 // 5. tích "Nạp chỉ định" vào đúng ngày lễ đó -> xung đột, không nạp
 planForce.add(bi.key);
 const x = lich().find(r => r.key === bi.key);
 kq.xung_dot = x.conflict; kq.xung_dot_nap = x.fill;
-planForce.clear(); planNoDeliver.clear();
+planForce.clear(); planRest.clear();
 
 // 6. ngày nghỉ: nhà máy tắt, không trừ tiêu thụ
 planRest.add("2026-09-29");
@@ -226,9 +226,13 @@ def test_nguong_kich_hoat_tinh_toi_GIO_XE_TOI(kq: dict) -> None:
     assert kq["nguong_lech"] == 0, f"{kq['nguong_lech']}/{kq['nguong_so']} lệch"
 
 
-def test_ngay_le_trung_lan_nap_thi_doi_som_va_van_giu_du_tru(kq: dict) -> None:
-    assert kq["le_van_nap"] is False, f"vẫn xếp nạp vào ngày lễ {kq['le_ngay']}"
-    assert kq["le_doi_som"] is True, "lần nạp không dời sớm lên trước ngày lễ"
+def test_ngay_nghi_trung_lan_nap_thi_doi_ngay_va_van_giu_du_tru(kq: dict) -> None:
+    """Ngày nghỉ = không nhận hàng VÀ không tiêu thụ (hai cột cũ đã gộp). Bồn không
+    vơi trong ngày nghỉ nên lần nạp có thể dời sang hôm sau chứ không buộc dời sớm —
+    điều bắt buộc là không nạp vào ngày đó và xe tới lúc bồn chưa dưới dự trữ.
+    Dời SỚM trước ngày không giao mà vẫn tiêu thụ là việc của Chủ Nhật, test riêng."""
+    assert kq["le_van_nap"] is False, f"vẫn xếp nạp vào ngày nghỉ {kq['le_ngay']}"
+    assert kq["le_doi_gan"] is True, "lần nạp biến mất thay vì dời sang ngày gần đó"
     assert kq["le_thap_nhat"] >= 10.0 - 1e-9
 
 

@@ -561,6 +561,10 @@ class PlanDayFlag(Base):
     #: Ngày KHÔNG GIAO ĐƯỢC — nghỉ lễ phía giao hàng, cùng nghĩa với Chủ Nhật. Lần
     #: nạp phải dời sớm lên ngày giao được gần nhất trước đó.
     #:
+    #: Từ 30/09/2026 trang Kế hoạch GỘP cột này vào "Ngày nghỉ" (người dùng thấy hai
+    #: cột là thừa) và luôn ghi ``no_delivery = rest``; ``delivery_calendar`` chặn
+    #: giao cho cả hai cờ. Cột giữ lại để không phải migration xoá dữ liệu.
+    #:
     #: Vì sao là cột riêng chứ không bẻ nghĩa ``rest``. ``rest`` là "nhà máy không
     #: tiêu thụ", và hai chuyện đó độc lập: nhà máy có thể vẫn chạy trong ngày bên
     #: giao hàng nghỉ lễ, hoặc tắt máy trong ngày xe vẫn tới được. Trước khi có
@@ -627,6 +631,13 @@ class PlanSetting(Base):
     #: trần cũ chặn IM LẶNG — ô hiện 90 trong khi bảng chỉ tính 62.
     horizon_days: Mapped[int | None] = mapped_column(SmallInteger)
 
+    #: Ba cột chữ của file Excel "Lịch nạp" — hằng số của bồn, gõ một lần.
+    supplier_name: Mapped[str | None] = mapped_column(String(200))
+    customer_name: Mapped[str | None] = mapped_column(String(200))
+    site_name: Mapped[str | None] = mapped_column(String(200))
+    #: Quy đổi lượng đặt m³ -> tấn trên file xuất. NULL = 2,2 ("20 tấn ≈ 44 m³").
+    m3_per_tonne: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -649,6 +660,10 @@ class PlanSetting(Base):
         CheckConstraint(
             "horizon_days IS NULL OR (horizon_days >= 1 AND horizon_days <= 366)",
             name="horizon_days_range",
+        ),
+        CheckConstraint(
+            "m3_per_tonne IS NULL OR (m3_per_tonne > 0 AND m3_per_tonne <= 10)",
+            name="m3_per_tonne_range",
         ),
         ForeignKeyConstraint(
             ["psn"], ["terminals.psn"], onupdate="CASCADE", ondelete="RESTRICT"
