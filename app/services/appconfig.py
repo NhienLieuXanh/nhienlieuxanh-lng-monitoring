@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.domain.smtp_errors import host_requires_auth
 from app.repositories import app_settings as store
 
 log = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ class EffectiveConfig:
             and self.smtp_host
             and (self.smtp_from or self.smtp_user)
             and self.alert_email_list
+            and (self.has_secret("smtp_password") or not host_requires_auth(self.smtp_host))
         )
 
     @property

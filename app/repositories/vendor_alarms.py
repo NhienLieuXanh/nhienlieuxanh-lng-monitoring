@@ -7,6 +7,7 @@ Ghi: ON CONFLICT DO NOTHING — một báo động đã xảy ra là lịch sử
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,6 +24,39 @@ CHUNK = 500
 
 def message_hash(message: str) -> str:
     return hashlib.md5(message.encode("utf-8"), usedforsecurity=False).hexdigest()
+
+
+#: Một CON SỐ đứng riêng — không phải chữ số trong tên thiết bị ("LT1", "PS1") hay
+#: đơn vị ("m3").
+_NUM = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w.])")
+
+
+def message_template(message: str) -> str:
+    """Câu báo động với mọi con số thay bằng ``#``: định nghĩa "cùng một việc".
+
+    Nguồn gắn con số ĐO ĐƯỢC vào câu ("…thấp hơn mức dự trữ: 14.897530555725
+    m3"), mỗi lần quét một số khác. Gộp theo nguyên văn thì 51 dòng ra 51 việc
+    (production, 30/09/2026) và email chặn-gửi-lại theo hash cũng thua theo.
+    """
+    return _NUM.sub("#", message)
+
+
+def _fmt(x: float) -> str:
+    return f"{x:.2f}".rstrip("0").rstrip(".") if x != int(x) else str(int(x))
+
+
+def _merge_text(messages: list[str]) -> str:
+    """Một câu cho cả nhóm: mỗi chỗ số là giá trị (nếu mọi dòng như nhau) hoặc
+    khoảng min–max, làm tròn 2 chữ số — không in 13 chữ số thập phân của nguồn."""
+    nums = [[float(m) for m in _NUM.findall(msg)] for msg in messages]
+    width = min(len(n) for n in nums)
+    slots = []
+    for k in range(width):
+        vals = [n[k] for n in nums]
+        lo, hi = min(vals), max(vals)
+        slots.append(_fmt(lo) if lo == hi else f"{_fmt(lo)}–{_fmt(hi)}")
+    it = iter(slots)
+    return _NUM.sub(lambda m: next(it, m.group(0)), messages[0])
 
 
 def to_row(alarm: NormalizedAlarm) -> dict:
@@ -145,18 +179,26 @@ def summarize(
         .order_by(func.max(VendorAlarm.raised_at).desc(), func.count().desc())
     ).all()
 
-    return [
+    # Gộp tiếp theo MẪU câu (bỏ con số): SQL đã gộp các dòng trùng nguyên văn,
+    # còn đây gộp các dòng chỉ khác số đo. Khoá chặn-gửi-lại lấy hash của MẪU, nên
+    # một cảnh báo "nhiên liệu thấp" không thành việc mới mỗi lần số đo đổi.
+    groups: dict[tuple[str, str, str], list] = {}
+    for r in rows:
+        groups.setdefault((r.site_code, r.device_id, message_template(r.message)), []).append(r)
+    episodes = [
         AlarmEpisode(
-            site_code=r.site_code,
-            device_id=r.device_id,
-            message=r.message,
-            message_hash=r.message_hash,
-            count=int(r.n),
-            first_raised_at=r.first_at,
-            last_raised_at=r.last_at,
+            site_code=site,
+            device_id=dev,
+            message=_merge_text([g.message for g in grp]),
+            message_hash=message_hash(tpl),
+            count=sum(int(g.n) for g in grp),
+            first_raised_at=min(g.first_at for g in grp),
+            last_raised_at=max(g.last_at for g in grp),
         )
-        for r in rows
-    ], int(raw_total)
+        for (site, dev, tpl), grp in groups.items()
+    ]
+    episodes.sort(key=lambda e: (e.last_raised_at, e.count), reverse=True)
+    return episodes, int(raw_total)
 
 
 def bulk_insert(session: Session, alarms: Sequence[NormalizedAlarm]) -> tuple[int, int]:

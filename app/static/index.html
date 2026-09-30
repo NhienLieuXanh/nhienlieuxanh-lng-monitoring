@@ -1070,8 +1070,10 @@
     .rep-card > h2 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin-bottom: 4px; }
     .rep-card > .hint { font-size: var(--fs-prose); color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
     .rep-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-    .rep-row label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); }
-    .rep-row .field { min-width: 120px; }
+    .rep-row label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); min-width: 0; max-width: 100%; }
+    /* max-width: ô chọn bồn rộng bằng tên dài nhất ("Bồn LNG - Fuji Seal · 2604200016")
+       và tràn khỏi màn hình điện thoại 390px (đo 30/09/2026). */
+    .rep-row .field { min-width: 120px; max-width: 100%; }
     .btn-dl { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-body); padding: 6px 12px; border-radius: var(--r-sm);
               border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); cursor: pointer; }
     .btn-dl:hover { border-color: var(--brand); color: var(--brand); }
@@ -1595,7 +1597,7 @@
               cấp thiết nhất ở chuyến đầu. Chưa tối ưu tuyến đường do hệ thống chưa có toạ độ kho.
             </p>
             <div class="rep-row">
-              <label>Sức chứa xe (m³)<input type="number" id="rep-truck" class="field num" value="20" step="0.5" min="1" /></label>
+              <label>Sức chứa xe (m³)<input type="number" id="rep-truck" class="field num" value="" placeholder="theo Cài đặt" step="0.5" min="1" /></label>
               <label>Phạm vi (ngày)<input type="number" id="rep-horizon" class="field num" value="7" step="1" min="1" max="90" /></label>
               <button type="button" class="btn-dl" id="btn-trips">Lập lịch giao</button>
             </div>
@@ -2739,19 +2741,21 @@
         ? "Khoảng đã chọn không có dữ liệu đo — đang hiển thị lịch sử 90 ngày gần nhất"
         : "";
 
-      // Nhãn trục: GIỜ thôi, và chỉ thêm NGÀY khi sang ngày mới. Trước đây dùng
-      // toLocaleString("vi-VN", {month,day,hour,minute}) -> "00:42 03-09" trên MỌI
-      // điểm, nên với nguồn 1 phút các nhãn dính vào nhau thành "03-0900:42" và
-      // ngày lặp lại vô nghĩa hàng trăm lần.
-      let lastDay = null;
-      const labels = items.map(r => {
-        const d = new Date(r.at);
-        const dayKey = d.toDateString();
-        const hhmm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-        if (dayKey === lastDay) return hhmm;
-        lastDay = dayKey;
-        return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hhmm}`;
-      });
+      // Nhãn trục: GIỜ thôi, và thêm NGÀY khi nhãn ĐANG HIỆN sang ngày khác nhãn
+      // hiện trước nó. Quyết định ở callback của trục chứ không ở mảng nhãn: bản
+      // trước gắn ngày vào điểm ĐẦU TIÊN của mỗi ngày, nhưng Chart.js bỏ bớt nhãn
+      // cho khỏi chồng — ở 7/30 ngày gần như chẳng nhãn nào hiện ra là điểm đầu
+      // ngày, nên trục ghi "05:29, 05:29, 05:29…" không một ngày nào (đo trên
+      // production 30/09/2026). Nhãn đầy đủ vẫn nằm trong mảng để tooltip có ngày.
+      const times = items.map(r => new Date(r.at));
+      const hhmmOf = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      const labels = times.map(d => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hhmmOf(d)}`);
+      const xTick = (v, i, ticks) => {
+        const d = times[v];
+        if (!d) return "";
+        const prev = i > 0 ? times[ticks[i - 1].value] : null;
+        return prev && prev.toDateString() === d.toDateString() ? hhmmOf(d) : labels[v];
+      };
       const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l) / 1000);
       const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
       const cVol = cssVar("--chart-vol"), cPres = cssVar("--chart-pres"), cGrid = cssVar("--grid"), cAxis = cssVar("--axis");
@@ -2804,7 +2808,8 @@
             y1: { type: "linear", position: "right",
                   title: { display: true, text: "MPa", color: cAxis, font: { size: 11 } },
                   grid: { drawOnChartArea: false }, ticks: { color: cAxis, font: { family: "IBM Plex Mono", size: 10 } } },
-            x:  { grid: { color: cGrid }, ticks: { color: cAxis, maxRotation: 0, font: { size: 10 } } },
+            x:  { grid: { color: cGrid }, ticks: { color: cAxis, maxRotation: 0, autoSkip: true, maxTicksLimit: 8,
+                                                     autoSkipPadding: 16, font: { size: 10 }, callback: xTick } },
           },
         },
       });
@@ -3184,6 +3189,7 @@
       renderPlan(rows, total, fills, postFill, p);
       planLastRows = rows;
       planExportState();
+      renderPlanAssist();
     }
 
     // Các ngày nạp của bảng, đúng thứ file xuất sẽ chứa. Lần nạp THẬT thắng lần nạp
@@ -3551,16 +3557,25 @@
       planLive = null; planLiveCand = null; planTyped = false;
       planOpen = new Map(); planOpenFrom = null; planOpenTo = null; planOpenLoading = false;
       if (!psn) { planAnchorNote(); computePlan(); return; }
-      await loadPlanSettings(psn);
+      // Ngày bắt đầu lúc BẮT ĐẦU tải. Người dùng đổi ngày trong lúc chờ mạng thì
+      // giữ ngày họ chọn: bản trước tải xong là đè "Ngày bắt đầu" bằng ngày đo mới
+      // nhất, nên chọn 27/09 ngay sau khi chọn bồn thì bảng nhảy về 30/09 (đo trên
+      // production 30/09/2026, lần tải mất ~4 giây).
+      const dateAtStart = document.getElementById("p-date").value;
+      // Ba lần tải độc lập: chạy song song cho trang nhanh hơn.
+      const [, rows, flags] = await Promise.all([
+        loadPlanSettings(psn),
+        api(`/api/plan/readings/${encodeURIComponent(psn)}`).catch(e => e),
+        api(`/api/plan/flags/${encodeURIComponent(psn)}`).catch(e => e),
+      ]);
       try {
-        const rows = await api(`/api/plan/readings/${encodeURIComponent(psn)}`);
+        if (rows instanceof Error) throw rows;
+        if (flags instanceof Error) throw flags;
         // Đổi bồn trong lúc chờ mạng thì bỏ kết quả cũ: nếu không, số của bồn A sẽ
         // hiện trên kế hoạch của bồn B — sai im lặng và rất khó nhận ra.
         if (planPsn !== psn) return;
         for (const r of rows) planReadings.set(r.reading_date, round2(Number(r.volume_l) / 1000));
 
-        const flags = await api(`/api/plan/flags/${encodeURIComponent(psn)}`);
-        if (planPsn !== psn) return;
         for (const f of flags) {
           // Ngày chỉ đánh "Không giao" từ bản hai cột cũ cũng hiện là ngày nghỉ: đó là
           // cột duy nhất còn lại, và để một cờ đang chặn giao hàng mà không có ô nào
@@ -3573,11 +3588,14 @@
         const L = planLiveCand;
         // Bồn đang báo số -> chế độ số thật. Bồn im (neo vào số đo tay) -> giả định
         // từ số đo tay, như bản trước: không có số đo nào mới hơn để làm khác đi.
-        planLive = L && L.src === "tele" ? L : null;
+        // Đã tự gõ "Thể tích ban đầu" trong lúc chờ thì tôn trọng: đó là giả định.
+        planLive = L && L.src === "tele" && !planTyped ? L : null;
         if (L) {
           planLoading = true;
-          document.getElementById("p-start").value = L.m3;
-          document.getElementById("p-date").value = L.key;
+          if (!planTyped) document.getElementById("p-start").value = L.m3;
+          if (document.getElementById("p-date").value === dateAtStart) {
+            document.getElementById("p-date").value = L.key;
+          }
           planLoading = false;
         }
         planAnchorNote();
@@ -3860,7 +3878,62 @@
           tính theo các thông số bạn nhập.</p>`;
         return;
       }
-      box.innerHTML = suggestionHtml(f, "Khuyến nghị đặt hàng");
+      box.innerHTML = suggestionHtml({ suggestion: planAssistSuggestion(f) }, "Khuyến nghị đặt hàng");
+    }
+
+    // Khuyến nghị lấy THẲNG từ bảng bên dưới: lần nạp kế tiếp của bảng, lùi lại
+    // thời gian giao hàng. Bản trước lấy khuyến nghị của server — tính theo mức
+    // tiêu thụ ĐO ĐƯỢC và dự trữ 15% dung tích — nên cùng một màn hình nói hai
+    // câu: bảng "nạp 02/10, 37,35 m³", khung "giao 03/10, 41,18 m³" (production
+    // 30/09/2026). Trên trang này người dùng đang lập kế hoạch với số CỦA HỌ, nên
+    // khung phải nói đúng số đó. Dashboard, email, báo cáo vẫn theo số đo thật.
+    // Luật "gấp" giống hệt server (forecast.suggest_order).
+    function planAssistSuggestion(f) {
+      const p = planParams();
+      const rows = planLastRows || [];
+      const now = Date.now();
+      const lead = Number.isFinite(Number(f.suggestion && f.suggestion.lead_time_days))
+        ? Number(f.suggestion.lead_time_days) : 1;
+      const postFill = round2((p.pct / 100) * p.cap);
+      const reasons = [
+        `Tính đúng theo bảng bên dưới: mức tiêu thụ ${round2(p.use)} m³/ngày, mức dự trữ `
+          + `${round2(p.res)} m³, nạp tới ${postFill} m³, giờ nạp ${p.time.slice(0, 5)}; `
+          + `Chủ Nhật và ngày nghỉ không giao.`,
+      ];
+      const meas = f.consumption && f.consumption.daily_use_l != null ? Number(f.consumption.daily_use_l) / 1000 : null;
+      if (meas && Math.abs(meas - p.use) / meas > 0.05) {
+        reasons.push(`Số đo thực tế là ${round2(meas)} m³/ngày khi nhà máy chạy — bấm "Áp dụng số đo thực tế" `
+          + `nếu muốn kế hoạch dùng số này.`);
+      }
+      const next = rows.find(r => !r.past && r.fill && r.order > 0 && r.d.getTime() >= now - 60000);
+      if (!next) {
+        reasons.push(`Không có lần nạp nào trong ${p.days} ngày của kế hoạch.`);
+        return { urgency: "ok", order_l: null, reasons };
+      }
+      const deliverAt = next.d;
+      const orderAt = new Date(Math.max(now, deliverAt.getTime() - lead * 86400000));
+      const daysToOrder = (orderAt.getTime() - now) / 86400000;
+      const cur = rows.find(r => !r.past);
+      const curLvl = cur ? (cur.anchor ? cur.anchor.m3 : cur.level) : null;
+      let urgency;
+      if (curLvl !== null && curLvl < p.res) {
+        urgency = "now";
+        reasons.push(`Thể tích hiện tại ${round2(curLvl)} m³ đã dưới mức dự trữ — cần đặt ngay.`);
+      } else if (daysToOrder <= 0) {
+        urgency = "now";
+        reasons.push(`Phải đặt ngay để kịp chuyến giao ${fmtWhen(deliverAt.toISOString())}.`);
+      } else {
+        urgency = daysToOrder <= 2 ? "soon" : "ok";
+        reasons.push(`Còn ${daysToOrder.toFixed(1)} ngày nữa phải đặt hàng.`);
+      }
+      reasons.push(`Lần nạp kế tiếp trong bảng: ${fmtWhen(deliverAt.toISOString())}, lúc xe tới bồn còn `
+        + `${round2(next.atRefill)} m³.`);
+      reasons.push(`Lượng đặt = mức sau nạp ${postFill} m³ trừ ${round2(next.atRefill)} m³ = ${next.order} m³.`);
+      reasons.push(`Đặt trước ${lead} ngày — thời gian giao hàng trong Cài đặt.`);
+      return {
+        urgency, order_l: next.order * 1000,
+        order_at: orderAt.toISOString(), deliver_at: deliverAt.toISOString(), reasons,
+      };
     }
     /* ---------- BÁO CÁO & NHẬT KÝ ---------- */
 
@@ -3891,10 +3964,14 @@
       const last = tank && tank.last_seen_at ? new Date(tank.last_seen_at) : null;
       const anchor = last || new Date();
       to.value = isoDate(anchor);
-      from.value = isoDate(new Date(anchor.getTime() - 29 * 86400000));
+      // 7 ngày chứ không 30: server xuất tối đa 20.000 dòng, và bồn báo mỗi phút
+      // có ~1.440 dòng/ngày — mặc định 30 ngày (~43.000 dòng) bấm là ra lỗi 422
+      // (đo trên production 30/09/2026). 7 ngày ≈ 10.000 dòng, còn dư cho bồn dày.
+      from.value = isoDate(new Date(anchor.getTime() - 6 * 86400000));
       if (note) {
         note.textContent = last
-          ? `Khoảng mặc định kết ở lần đo cuối của bồn (${fmtWhen(tank.last_seen_at)}), không phải hôm nay — chọn hôm nay sẽ ra file rỗng.`
+          ? `Khoảng mặc định là 7 ngày, kết ở lần đo cuối của bồn (${fmtWhen(tank.last_seen_at)}) — không phải hôm nay, chọn hôm nay sẽ ra file rỗng. `
+            + `Mỗi file tối đa 20.000 dòng (bồn báo mỗi phút ≈ 13 ngày).`
           : "Bồn này chưa có lần đo nào.";
       }
     }
@@ -4076,7 +4153,9 @@
                    h.likely_cause ? esc(h.likely_cause) : "Chưa đoán được thời điểm",
                    dead ? "crit" : "")}
           ${anTile("Độ phủ dữ liệu", esc(pct(q.coverage)),
-                   `${q.samples ?? "--"} / ${q.expected_samples ?? "--"} lần đo`)}
+                   q.expected_samples
+                     ? `${q.samples ?? "--"} / ${q.expected_samples} lần đo`
+                     : `${q.samples ?? 0} lần đo · chưa đủ để tính số kỳ vọng`)}
           ${anTile("Pin", b.current_v == null ? "--" : esc(Number(b.current_v).toFixed(2)) + "<small>V</small>",
                    b.current_v == null
                      ? "Không có số đo pin"
@@ -4355,11 +4434,17 @@
     async function loadTrips() {
       const box = document.getElementById("trip-list");
       if (!box) return;
-      const truckM3 = Math.max(1, parseFloat(document.getElementById("rep-truck").value) || 20);
+      // Ô trống = dùng "Sức chứa xe" trong Cài đặt. Bản trước cứng 20 m³ ở đây và
+      // bỏ qua Cài đặt — một xe 20 TẤN là ~44 m³, nên lịch cắt lượng đặt còn nửa.
+      const truckEl = document.getElementById("rep-truck");
+      const typed = parseFloat(truckEl.value);
       const horizon = Math.max(1, Math.min(90, parseInt(document.getElementById("rep-horizon").value, 10) || 7));
       box.innerHTML = `<p class="hint">Đang lập lịch…</p>`;
       try {
-        const p = await api(`/api/delivery-plan?truck_capacity_l=${truckM3 * 1000}&horizon_days=${horizon}`);
+        const q = new URLSearchParams({ horizon_days: String(horizon) });
+        if (Number.isFinite(typed) && typed > 0) q.set("truck_capacity_l", String(typed * 1000));
+        const p = await api(`/api/delivery-plan?${q}`);
+        truckEl.placeholder = `${fmtM3(p.truck_capacity_l)} · theo Cài đặt`;
         if (!p.trips || !p.trips.length) {
           box.innerHTML = `<p class="hint">Không có bồn nào cần nạp trong ${horizon} ngày tới.</p>`;
           return;
@@ -4377,7 +4462,7 @@
                 <span>${esc(s.name || s.psn)} · ${s.days_to_reserve != null && s.days_to_reserve <= 0
                   ? "đã dưới mức dự trữ"
                   : "còn " + esc(fmtDays(s.days_to_reserve)) + " tới mức dự trữ"}</span>
-                <span class="q">${esc(fmtM3(s.order_l))} m³</span>
+                <span class="q">${esc(fmtM3(s.order_l))} m³${s.parts > 1 ? ` <small>(phần ${s.part}/${s.parts})</small>` : ""}</span>
               </div>`).join("")}
           </div>`).join("")
           + `<p class="hint" style="margin-top:8px">Tổng ${esc(fmtM3(p.total_l))} m³ · ${p.trips.length} chuyến · ${p.stops} điểm giao.</p>`;

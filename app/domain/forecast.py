@@ -1449,6 +1449,9 @@ class DeliveryStop:
     order_l: float
     days_to_reserve: float | None
     urgency: Urgency
+    #: Lượng đặt lớn hơn một xe thì chia nhiều chuyến: đây là phần thứ mấy / mấy.
+    part: int = 1
+    parts: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -1494,20 +1497,29 @@ def plan_trips(
     cur: list[DeliveryStop] = []
     load = 0.0
     for f in cand:
-        qty = min(f.suggestion.order_l or 0.0, truck_capacity_l)
-        if cur and load + qty > truck_capacity_l:
-            trips.append(DeliveryTrip(len(trips) + 1, cur, load, truck_capacity_l))
-            cur, load = [], 0.0
-        cur.append(
-            DeliveryStop(
-                psn=f.psn,
-                name=(names or {}).get(f.psn),
-                order_l=qty,
-                days_to_reserve=f.runout.days_to_reserve,
-                urgency=f.suggestion.urgency,
+        # Lượng đặt lớn hơn một xe thì CHIA chuyến, không cắt. Bản trước lấy
+        # ``min(lượng đặt, tải xe)``: bồn cần 41 m³, xe 20 m³ -> lịch ghi "1 chuyến
+        # 20 m³", nửa còn lại biến mất không một lời (đo trên production 30/09).
+        remaining = f.suggestion.order_l or 0.0
+        parts = max(1, math.ceil(remaining / truck_capacity_l - 1e-9))
+        for part in range(1, parts + 1):
+            qty = min(remaining, truck_capacity_l)
+            if cur and load + qty > truck_capacity_l + 1e-6:
+                trips.append(DeliveryTrip(len(trips) + 1, cur, load, truck_capacity_l))
+                cur, load = [], 0.0
+            cur.append(
+                DeliveryStop(
+                    psn=f.psn,
+                    name=(names or {}).get(f.psn),
+                    order_l=qty,
+                    days_to_reserve=f.runout.days_to_reserve,
+                    urgency=f.suggestion.urgency,
+                    part=part,
+                    parts=parts,
+                )
             )
-        )
-        load += qty
+            load += qty
+            remaining -= qty
     if cur:
         trips.append(DeliveryTrip(len(trips) + 1, cur, load, truck_capacity_l))
     return trips

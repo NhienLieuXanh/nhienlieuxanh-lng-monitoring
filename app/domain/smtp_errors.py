@@ -187,3 +187,25 @@ def explain(exc: BaseException) -> str:
         f"{_guidance(exc, _haystack(exc), type(exc).__name__)} "
         f"(Chi tiết: {_detail(exc)})"
     )
+
+
+#: Máy chủ thư công cộng LUÔN bắt đăng nhập. Thiếu mật khẩu ở đây không phải "có
+#: thể chạy nếu máy chủ không cần xác thực" — nó chắc chắn không gửi được thư nào.
+#:
+#: Vì sao cần danh sách này. Trước đây ``smtp_ready`` bỏ qua mật khẩu hoàn toàn
+#: (đúng với máy chủ nội bộ không cần xác thực), nên trang Cài đặt báo "Cấu hình
+#: đầy đủ" cho một cấu hình Outlook chưa có mật khẩu — đo trên production
+#: 30/09/2026 — trong khi không một cảnh báo nào ra khỏi hệ thống được.
+AUTH_REQUIRED_HOSTS = frozenset({
+    "smtp.gmail.com",
+    "smtp-mail.outlook.com",
+    "smtp.outlook.com",
+    "smtp.live.com",
+    "smtp.office365.com",
+    "smtp-relay.brevo.com",
+    "smtp-relay.sendinblue.com",
+})
+
+
+def host_requires_auth(host: str | None) -> bool:
+    return (host or "").strip().lower().rstrip(".") in AUTH_REQUIRED_HOSTS

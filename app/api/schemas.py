@@ -526,6 +526,8 @@ class DeliveryStopOut(BaseModel):
     order_l: Num
     days_to_reserve: OptNum = None
     urgency: Urgency = "unknown"
+    part: int = 1
+    parts: int = 1
 
 
 class DeliveryTripOut(BaseModel):

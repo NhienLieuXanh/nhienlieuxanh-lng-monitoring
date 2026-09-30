@@ -15,6 +15,8 @@ from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
+from app.domain.smtp_errors import host_requires_auth
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -102,7 +104,9 @@ class Settings(BaseSettings):
     lng_relief_pressure_mpa: float = 0.8
     # Trần rót: bồn lạnh sâu phải chừa khoảng hơi cho giãn nở nhiệt.
     lng_max_fill_percent: float = 90.0
-    truck_capacity_l: float = 20_000.0
+    # Một xe 20 tấn LNG ≈ 44 m³ (người vận hành, 30/09/2026). Mặc định cũ 20 000 L
+    # là nhầm "20 tấn" thành "20 m³": lịch giao cắt lượng đặt còn một nửa.
+    truck_capacity_l: float = 44_000.0
 
     # ---- thông báo (email) ----
     # SMTP thuần thay vì SDK của một nhà cung cấp: không phát sinh chi phí, không
@@ -184,6 +188,7 @@ class Settings(BaseSettings):
             and self.smtp_host
             and (self.smtp_from or self.smtp_user)
             and self.alert_email_list
+            and (self.smtp_password or not host_requires_auth(self.smtp_host))
         )
 
     @property

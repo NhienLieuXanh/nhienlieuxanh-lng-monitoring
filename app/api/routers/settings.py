@@ -27,6 +27,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import SessionDep, SettingsDep, UserDep
 from app.api.schemas import ActionOut, SettingsIn, SettingsOut
 from app.domain.smtp_errors import explain as explain_smtp
+from app.domain.smtp_errors import host_requires_auth
 from app.repositories import app_settings as store
 from app.services import notifier
 from app.services.appconfig import EffectiveConfig, load_config
@@ -64,6 +65,11 @@ def _why_blocked(cfg: EffectiveConfig) -> str | None:
         return "Chưa khai báo địa chỉ gửi hoặc tài khoản đăng nhập"
     if not cfg.alert_email_list:
         return "Chưa khai báo địa chỉ nhận"
+    if not cfg.has_secret("smtp_password") and host_requires_auth(cfg.smtp_host):
+        return (
+            f"Chưa có mật khẩu ứng dụng — máy chủ {cfg.smtp_host} bắt buộc đăng nhập, "
+            f"nên hiện chưa gửi được cảnh báo nào"
+        )
     if not cfg.has_secret("smtp_password"):
         # KHÔNG chặn: một số máy chủ SMTP nội bộ không cần xác thực. Chỉ nhắc.
         return "Chưa có mật khẩu ứng dụng — chỉ phù hợp nếu máy chủ thư không yêu cầu xác thực"
