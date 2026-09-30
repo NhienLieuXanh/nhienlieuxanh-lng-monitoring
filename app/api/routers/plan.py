@@ -16,6 +16,7 @@ số của thiết bị. Nhờ vậy không có chỗ nào trong hệ thống ph
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Annotated
 
@@ -25,6 +26,7 @@ from app.api.deps import SessionDep, UserDep
 from app.api.schemas import (
     PlanDayFlagIn,
     PlanDayFlagOut,
+    PlanExportIn,
     PlanReadingIn,
     PlanReadingOut,
     PlanSettingsIn,
@@ -32,6 +34,7 @@ from app.api.schemas import (
 )
 from app.repositories import plan_readings as pr_repo
 from app.repositories import terminals as term_repo
+from app.services import plan_export
 
 router = APIRouter(prefix="/plan", tags=["plan"])
 
@@ -191,3 +194,41 @@ def put_plan_settings(
     row = pr_repo.save_settings(session, psn, patch, by=user)
     session.commit()
     return PlanSettingsOut.model_validate(row)
+
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.post("/export/{psn}", response_class=Response)
+def export_refills_xlsx(
+    psn: str, body: PlanExportIn, session: SessionDep, _: UserDep
+) -> Response:
+    """File Excel CHỈ gồm các ngày nạp của khung đang xem trên trang Kế hoạch.
+
+    POST vì các dòng do trang gửi lên: lịch được tính ở trình duyệt, từ đúng những
+    ô tích và số đo mà người dùng đang nhìn. Server thêm đơn vị cung cấp, khách
+    hàng, địa điểm (lưu theo bồn) và quy đổi tấn.
+    """
+    _require_terminal(session, psn)
+    st = pr_repo.get_settings_for(session, psn)
+    ratio = (
+        st.m3_per_tonne
+        if st is not None and st.m3_per_tonne is not None
+        else plan_export.DEFAULT_M3_PER_TONNE
+    )
+    content = plan_export.build_xlsx(
+        [plan_export.ExportRow(day=r.day, m3=r.m3, note=r.note) for r in body.rows],
+        supplier=st.supplier_name if st is not None else None,
+        customer=st.customer_name if st is not None else None,
+        site=st.site_name if st is not None else None,
+        m3_per_tonne=ratio,
+    )
+    # Tên file chỉ ASCII: PSN là chuỗi từ URL, và header Content-Disposition
+    # không phải chỗ để thử xem trình duyệt nào chịu ký tự lạ.
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", psn)
+    name = f"lich_nap_{safe}_{body.from_day:%Y%m%d}_{body.to_day:%Y%m%d}.xlsx"
+    return Response(
+        content=content,
+        media_type=_XLSX,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )

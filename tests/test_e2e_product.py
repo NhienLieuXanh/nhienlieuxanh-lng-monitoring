@@ -81,7 +81,11 @@ SESSION_GET = frozenset({
     "/api/settings",
 })
 SESSION_PATCH = frozenset({"/api/settings", "/api/terminals/{psn}"})
-SESSION_POST = frozenset({"/api/settings/test-email"})
+SESSION_POST = frozenset({
+    "/api/settings/test-email",
+    # File Excel "Lịch nạp": trang gửi các ngày nạp nó đã tính.
+    "/api/plan/export/{psn}",
+})
 # Số đo tay của trang Kế hoạch. Ghi bằng PUT vì địa chỉ (bồn, ngày) xác định đúng
 # một số đo — bấm Lưu hai lần không được sinh hai dòng.
 SESSION_PUT = frozenset({

@@ -870,6 +870,19 @@ class PlanSettingsIn(BaseModel):
     reserve_l: Decimal | None = Field(None, ge=0)
     refill_time: time | None = None
     horizon_days: int | None = Field(None, ge=1, le=366)
+    #: Chữ trên file Excel "Lịch nạp". Chuỗi rỗng = xoá (lưu NULL).
+    supplier_name: str | None = Field(None, max_length=200)
+    customer_name: str | None = Field(None, max_length=200)
+    site_name: str | None = Field(None, max_length=200)
+    m3_per_tonne: Decimal | None = Field(None, gt=0, le=10)
+
+    @field_validator("supplier_name", "customer_name", "site_name")
+    @classmethod
+    def _blank_is_none(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
 
     @model_validator(mode="after")
     def _at_least_one(self) -> PlanSettingsIn:
@@ -889,5 +902,39 @@ class PlanSettingsOut(BaseModel):
     reserve_l: Decimal | None = None
     refill_time: time | None = None
     horizon_days: int | None = None
+    supplier_name: str | None = None
+    customer_name: str | None = None
+    site_name: str | None = None
+    m3_per_tonne: Decimal | None = None
     updated_at: datetime | None = None
     updated_by: str | None = None
+
+
+#: Trần số dòng của một file xuất: một năm nạp mỗi ngày còn chưa tới.
+PLAN_EXPORT_MAX_ROWS = 400
+
+
+class PlanExportRowIn(BaseModel):
+    """Một lần nạp trên file xuất — lần nạp thật đã qua, hoặc lần nạp theo kế hoạch."""
+
+    day: date
+    #: m³ như trên trang Kế hoạch. Trần 1.000 như số đo tay (xem FALLBACK_MAX_L).
+    m3: Decimal = Field(gt=0, le=1000)
+    note: str | None = Field(None, max_length=200)
+
+
+class PlanExportIn(BaseModel):
+    """Các ngày nạp của khung đang xem trên trang Kế hoạch, do trang tự tính."""
+
+    from_day: date
+    to_day: date
+    rows: list[PlanExportRowIn] = Field(max_length=PLAN_EXPORT_MAX_ROWS)
+
+    @model_validator(mode="after")
+    def _rows_in_window(self) -> PlanExportIn:
+        if self.from_day > self.to_day:
+            raise ValueError("from_day phải <= to_day")
+        for r in self.rows:
+            if not self.from_day <= r.day <= self.to_day:
+                raise ValueError(f"ngày {r.day} nằm ngoài khung {self.from_day}..{self.to_day}")
+        return self
