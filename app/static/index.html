@@ -1129,6 +1129,7 @@
        (0,2,0) thì không phụ thuộc thứ tự khai trong file nữa. */
     .btn-primary-sm:hover { filter: brightness(1.1); background: var(--brand-solid); border-color: var(--brand-solid); }
     .btn-primary-sm[disabled] { opacity: .5; cursor: not-allowed; }
+    a.btn-primary-sm { display: inline-flex; align-items: center; text-decoration: none; }
 
     /* Hướng dẫn mật khẩu ứng dụng: hiển thị các bước thao tác rõ ràng */
     .smtp-guide {
@@ -1534,7 +1535,7 @@
               </label>
             </div>
             <div class="rep-row" style="margin-top:10px">
-              <button type="button" class="btn-primary-sm" id="rp-open">Mở báo cáo để in</button>
+              <a class="btn-primary-sm" id="rp-open" href="/api/export/report.html?window_days=30" target="_blank" rel="noopener">Mở báo cáo để in</a>
             </div>
             <p class="hint" id="rp-note" style="margin:8px 0 0"></p>
           </div>
@@ -4042,30 +4043,20 @@
     // gọi sau một await không còn được coi là do người dùng bấm và bị trình duyệt
     // chặn như cửa sổ tự bật. Nạp nội dung bằng fetch thay vì trỏ thẳng href để
     // phiên hết hạn ra màn hình đăng nhập, không ra một trang JSON 401.
-    async function openReport() {
+    // Nút "Mở báo cáo để in" là một LIÊN KẾT thật (<a target="_blank">), không phải
+    // window.open. Bản trước mở một tab trống rồi chờ tải xong mới ghi báo cáo vào;
+    // Edge chặn tab đó ("Trình duyệt đã chặn tab mới", người dùng báo 30/09/2026).
+    // Người bấm vào một liên kết thì không trình duyệt nào chặn. Ở đây chỉ gắn phạm
+    // vi + kỳ vào địa chỉ ngay lúc bấm; điều hướng mặc định của thẻ <a> làm phần còn lại.
+    function reportUrl() {
       const scope = (document.getElementById("rp-scope") || {}).value || "";
       const win = (document.getElementById("rp-win") || {}).value || "30";
       const q = new URLSearchParams({ window_days: win });
       if (scope) q.set("psn", scope);
-      const w = window.open("", "_blank");
-      try {
-        const r = await fetch(API + "/api/export/report.html?" + q.toString(), { credentials: "same-origin" });
-        if (r.status === 401) { if (w) w.close(); showLogin(); return; }
-        if (!r.ok) {
-          if (w) w.close();
-          let d = "";
-          try { d = apiErrText(await r.json()); } catch (_) {}
-          showError(`Không tạo được báo cáo (${r.status})${d ? " — " + d : ""}`);
-          return;
-        }
-        const html = await r.text();
-        if (!w) { showError("Trình duyệt đã chặn tab mới. Cho phép cửa sổ bật lên cho trang này rồi thử lại."); return; }
-        w.document.open(); w.document.write(html); w.document.close();
-        clearError();
-      } catch (e) {
-        if (w) w.close();
-        showError(e.message);
-      }
+      return API + "/api/export/report.html?" + q.toString();
+    }
+    function openReport(e) {
+      e.currentTarget.href = reportUrl();
     }
 
     /* ---------- PHÂN TÍCH ---------- */
