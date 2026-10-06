@@ -51,3 +51,26 @@ def test_ban_do_co_hai_bon_va_chu_quyen_bien_dao(app_page: Page) -> None:
     expect(view.get_by_text("Hoàng Sa", exact=True)).to_be_visible()
     expect(view.get_by_text("Trường Sa", exact=True)).to_be_visible()
     expect(view).to_contain_text("10.932519, 106.734816")
+
+
+def test_danh_sach_bon_khong_cat_chu_khong_xuong_dong_tung_chu(app_page: Page) -> None:
+    """Ảnh người dùng 06/10/2026: "Bồn LNG / - Fuji Seal" xuống dòng từng chữ, cột
+    Trạng thái bị cắt "Ngoại tuy…", "Đo cuối: 69 ng…"."""
+    for width in (1280, 1440):
+        app_page.set_viewport_size({"width": width, "height": 900})
+        app_page.wait_for_timeout(300)
+        clipped = app_page.evaluate(
+            """() => [...document.querySelectorAll('table.tanks th, #tank-list td')]
+                 .filter(c => c.scrollWidth > c.clientWidth + 1)
+                 .map(c => c.textContent.trim().slice(0, 30))"""
+        )
+        assert clipped == [], f"{width}px: ô bị cắt chữ {clipped}"
+        over = app_page.evaluate(
+            """() => { const t = document.querySelector('table.tanks');
+                       return t.scrollWidth - t.parentElement.clientWidth; }"""
+        )
+        assert over <= 1, f"{width}px: bảng tràn ra ngoài khung danh sách {over}px (cột Trạng thái bị cắt)"
+        heights = app_page.evaluate(
+            "() => [...document.querySelectorAll('#tank-list .tname')].map(e => e.getBoundingClientRect().height)"
+        )
+        assert heights and max(heights) < 24, f"{width}px: tên bồn xuống dòng {heights}"
