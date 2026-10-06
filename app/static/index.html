@@ -558,6 +558,11 @@
       gap: 12px; margin-top: 16px; align-items: stretch;
     }
     @media (max-width: 760px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+    /* Theo bề rộng của CHÍNH khung chi tiết, không theo màn hình: từ khi cột danh
+       sách rộng 46%, khung này ở 1440px chỉ còn ~620px và bốn ô số liệu chật tới mức
+       "Thể tích hiện tại", "Dung tích" xuống dòng từng chữ. Hẹp thì xếp 2×2. */
+    #tank-detail { container-type: inline-size; }
+    @container (max-width: 720px) { .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .readout {
       padding: 14px 16px;
       background: var(--surface);
@@ -956,6 +961,20 @@
     .an-tag.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
     .an-tag.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
     .an-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .an-verdict { margin: 8px 0 0; padding: 10px 14px; border-radius: var(--r-sm); font-size: var(--fs-body);
+      line-height: 1.5; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
+    .an-verdict.ok { background: var(--ok-bg); border-color: var(--ok-line); }
+    .an-verdict.ok b { color: var(--ok); }
+    .an-verdict.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+    .an-verdict.warn b { color: var(--warn); }
+    .an-verdict.crit { background: var(--crit-bg); border-color: var(--crit-line); }
+    .an-verdict.crit b { color: var(--crit); }
+    .an-more { margin-top: 10px; }
+    .an-more > summary { cursor: pointer; list-style: none; font-size: var(--fs-sm); color: var(--brand); font-weight: 600; }
+    .an-more > summary::-webkit-details-marker { display: none; }
+    .an-more > summary::before { content: "▸ "; }
+    .an-more[open] > summary::before { content: "▾ "; }
+    .an-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
     .an-tile { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; }
     .an-tile dt { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin-bottom: 2px; }
     .an-tile dd { font-family: var(--mono); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; color: var(--fg); }
@@ -4156,6 +4175,36 @@
         </div>`;
     }
 
+    // MỘT câu kết luận cho mỗi bồn: có việc gì phải làm không. Trang Phân tích từng
+    // chỉ có các ô kỹ thuật ("Còn báo được --", "Tỉ lệ nhận mẫu", "Bay hơi tự nhiên
+    // 0.050 Tham chiếu") — người vận hành không rút ra được việc gì (06/10/2026).
+    // Thứ tự = mức gấp: mất liên lạc > áp suất > sắp cạn > thiết bị yếu dần > ổn.
+    function anVerdict(a, fc, ageD) {
+      const h = a.health || {}, hold = fc.hold || {}, ro = fc.runout || {};
+      if (h.days_to_failure === 0 || (fc.stale && ageD != null && ageD >= 1)) {
+        return { cls: "crit", title: `Thiết bị mất liên lạc${ageD != null ? " " + ageD + " ngày" : ""}`,
+                 text: "— cần ra kiểm tra thiết bị (pin, sóng, nguồn điện). Số liệu của bồn này đang cũ." };
+      }
+      if (hold.days != null && hold.days <= 5) {
+        return { cls: "crit", title: `Áp suất sắp chạm van an toàn (còn ${fmtDays(hold.days)})`,
+                 text: "— cần tăng tiêu thụ hoặc xả áp theo quy trình." };
+      }
+      if (ro.days_to_reserve != null && ro.days_to_reserve <= 3) {
+        return { cls: "warn", title: `Còn ${fmtDays(ro.days_to_reserve)} tới mức dự trữ`,
+                 text: "— cần đặt hàng. Xem lượng và thời điểm ở trang Kế hoạch nạp." };
+      }
+      if (h.risk === "cao" || h.risk === "trung bình") {
+        return { cls: "warn", title: "Thiết bị có dấu hiệu yếu dần",
+                 text: "— " + (h.likely_cause || "nên kiểm tra pin và sóng trong lần ghé tới.") };
+      }
+      const cons = fc.consumption || {};
+      const bits = [];
+      if (cons.daily_use_l != null) bits.push(`tiêu thụ ~${fmtM3(cons.daily_use_l, 1)} m³/ngày`);
+      if (ro.days_to_reserve != null) bits.push(`còn ${fmtDays(ro.days_to_reserve)} tới mức dự trữ`);
+      return { cls: "ok", title: "Ổn — không cần làm gì",
+               text: bits.length ? "· " + bits.join(", ") + "." : "" };
+    }
+
     function anCard(a) {
       const h = a.health || {}, q = a.quality || {}, b = h.battery || {}, s = h.signal || {};
       const pct = (x) => x == null ? "--" : `${Math.round(x * 100)}%`;
@@ -4208,19 +4257,26 @@
           }</p>`
         : "";
 
+      const v = anVerdict(a, fc, ageD);
       return `<div class="an-card ${RISK_CARD[h.risk] || "r-nd"}">
         <div class="an-head">
           <span class="an-name">${esc(a.name || a.psn)}</span>
           <span class="an-psn">${esc(a.psn)}</span>
-          <span class="an-tag ${RISK_CLS[h.risk] || ""}">Rủi ro ${esc(h.risk || "--")}</span>
-          <span class="an-tag ${GRADE_CLS[q.grade] || ""}">Dữ liệu ${esc(q.grade || "--")}</span>
+        </div>
+        <p class="an-verdict ${v.cls}" data-verdict="${v.cls}"><b>${esc(v.title)}</b> ${esc(v.text)}</p>
+        ${lastFill}
+        <details class="an-more">
+          <summary>Chi tiết kỹ thuật</summary>
+        <div class="an-tags">
+          <span class="an-tag ${RISK_CLS[h.risk] || ""}">Rủi ro thiết bị: ${esc(h.risk || "--")}</span>
+          <span class="an-tag ${GRADE_CLS[q.grade] || ""}">Chất lượng dữ liệu: ${esc(q.grade || "--")}</span>
         </div>
         ${emptyWhy}
         <div class="an-grid">
-          ${anTile("Còn báo được", esc(headline),
+          ${anTile("Thiết bị còn hoạt động được", esc(headline),
                    h.likely_cause ? esc(h.likely_cause) : "Chưa đoán được thời điểm",
                    dead ? "crit" : "")}
-          ${anTile("Độ phủ dữ liệu", esc(pct(q.coverage)),
+          ${anTile("Số lần đo nhận được", esc(pct(q.coverage)),
                    q.expected_samples
                      ? `${q.samples ?? "--"} / ${q.expected_samples} lần đo`
                      : `${q.samples ?? 0} lần đo · chưa đủ để tính số kỳ vọng`)}
@@ -4236,19 +4292,19 @@
                      : s.below_floor_ratio
                        ? `${pct(s.below_floor_ratio)} mẫu dưới sàn ${esc(s.floor_percent)}%`
                        : "Trên sàn")}
-          ${anTile("Tỉ lệ nhận mẫu", esc(pct(h.delivery_ratio)),
+          ${anTile("Tỉ lệ lần đo về đủ", esc(pct(h.delivery_ratio)),
                    "Trong khoảng thiết bị còn báo")}
-          ${anTile("Bất thường", String((a.anomalies || []).length),
+          ${anTile("Lần đo bất thường", String((a.anomalies || []).length),
                    (a.regime_changes || []).length
                      ? `${a.regime_changes.length} lần đổi chế độ tiêu thụ`
                      : "Không đổi chế độ tiêu thụ")}
           ${anTile("Mức tiêu thụ/ngày",
                    esc(fmtM3(cons.daily_use_l)) + "<small>m³</small>",
                    cons.confidence ? esc(CONF_VI[cons.confidence] || "--") : "Chưa có dự báo")}
-          ${anTile("Bay hơi tự nhiên",
+          ${anTile("Hao hụt do bay hơi",
                    bor == null ? "--" : esc(Number(bor).toFixed(3)) + "<small>%/ngày</small>",
                    fc.idle ? esc(METHOD_VI[fc.idle.method] || "--") : "Chưa có dự báo")}
-          ${anTile("Thời gian giữ áp", esc(fmtDays(hold.days)),
+          ${anTile("Còn giữ được áp", esc(fmtDays(hold.days)),
                    hold.days == null
                      ? "Chưa đo được tốc độ tăng áp"
                      : `Tới van an toàn ${esc(Number(hold.relief_mpa).toFixed(2))} MPa`,
@@ -4262,7 +4318,7 @@
                anoms ? `<div class="an-anom">${anoms}</div>` : ""
              }</details>`
           : ""}
-        ${lastFill}
+        </details>
       </div>`;
     }
 

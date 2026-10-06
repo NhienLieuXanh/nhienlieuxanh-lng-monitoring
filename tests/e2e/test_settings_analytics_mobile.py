@@ -61,13 +61,27 @@ def test_luu_email_va_trang_thai_noi_ro_vi_sao_chua_gui_duoc(app_page: Page) -> 
     expect(pill).to_have_text("Đang tắt")
 
 
-def test_phan_tich_co_the_cho_moi_bon(app_page: Page) -> None:
+def test_phan_tich_co_cau_ket_luan_de_hieu_cho_moi_bon(app_page: Page) -> None:
+    """06/10/2026: thẻ toàn chỉ số kỹ thuật, người vận hành không biết phải làm gì."""
     go(app_page, "analytics")
     view = app_page.locator("#view-analytics")
     expect(view).not_to_contain_text("Đang phân tích", timeout=20_000)
-    expect(view).to_contain_text(YKH)
-    expect(view).to_contain_text(FUJI)
+    fuji = view.locator(".an-card", has_text=FUJI)
+    ykh = view.locator(".an-card", has_text=YKH)
+    expect(fuji.locator(".an-verdict")).to_contain_text("mất liên lạc 69 ngày")
+    expect(fuji.locator(".an-verdict")).to_have_attribute("data-verdict", "crit")
+    expect(ykh.locator(".an-verdict")).not_to_have_attribute("data-verdict", "crit")
+    expect(ykh.locator(".an-verdict")).to_contain_text("tới mức dự trữ")
+    # Ô kỹ thuật gấp sẵn; mở ra thì có đủ, tên dễ hiểu, và biểu đồ có kích thước thật.
+    more = ykh.locator("details.an-more")
+    expect(more).not_to_have_attribute("open", "")
+    more.locator("summary").first.click()
+    expect(more).to_contain_text("Hao hụt do bay hơi")
+    expect(more).to_contain_text("Còn giữ được áp")
     expect(view).not_to_contain_text("1 / 0 lần đo")
+    app_page.wait_for_timeout(500)
+    w = more.locator("canvas").first.evaluate("c => c.getBoundingClientRect().width")
+    assert w > 100, f"biểu đồ trong mục gấp không có kích thước: {w}"
 
 
 def test_dien_thoai_khong_tran_ngang(app_page: Page) -> None:

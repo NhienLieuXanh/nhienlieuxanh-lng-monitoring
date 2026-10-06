@@ -74,3 +74,16 @@ def test_danh_sach_bon_khong_cat_chu_khong_xuong_dong_tung_chu(app_page: Page) -
             "() => [...document.querySelectorAll('#tank-list .tname')].map(e => e.getBoundingClientRect().height)"
         )
         assert heights and max(heights) < 24, f"{width}px: tên bồn xuống dòng {heights}"
+
+
+def test_o_so_lieu_chi_tiet_khong_xuong_dong_tung_chu(app_page: Page) -> None:
+    """Hệ quả của việc nới danh sách: khung chi tiết hẹp, nhãn ô số liệu bị bẻ chữ."""
+    for width in (1280, 1440, 1920):
+        app_page.set_viewport_size({"width": width, "height": 900})
+        app_page.locator(f'#tank-list tr[data-psn="{FUJI}"]').click()
+        app_page.wait_for_timeout(300)
+        tall = app_page.evaluate(
+            """() => [...document.querySelectorAll('#tank-detail .readout dt')]
+                 .filter(e => e.getBoundingClientRect().height > 22).map(e => e.textContent.trim())"""
+        )
+        assert tall == [], f"{width}px: nhãn bị xuống dòng {tall}"
