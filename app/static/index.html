@@ -1474,11 +1474,8 @@
                hằng số của bồn nên lưu theo bồn như các thông số khác. -->
           <form class="plan-params plan-export" id="plan-export" autocomplete="off">
             <div class="px-head"><b>Xuất các ngày nạp (Excel)</b>
-              <span class="note">Chỉ những ngày có nạp trong khung đang xem: lần nạp thật đã qua (thiết bị ghi nhận) và lần nạp theo kế hoạch. Lượng ghi cả tấn và m³. Các ô dưới đây lưu theo bồn, chỉ cần gõ một lần.</span></div>
-            <label>Đơn vị cung cấp<input type="text" id="p-x-supplier" class="field" maxlength="200" /></label>
-            <label>Khách hàng<input type="text" id="p-x-customer" class="field" maxlength="200" /></label>
-            <label>Địa điểm<input type="text" id="p-x-site" class="field" maxlength="200" /></label>
-            <label>Quy đổi (m³ / tấn)<input type="number" id="p-x-ratio" class="field num" value="2.2" step="0.01" min="0.01" max="10" /></label>
+              <span class="note">Cùng mẫu với báo cáo Excel ở trang Báo cáo, cho đúng khung ngày đang xem: lịch nạp (lần nạp thật + kế hoạch, m³, ghi chú ngày nghỉ), nhật ký nạp thật và tiêu thụ theo ngày. Ô Khách hàng lưu theo bồn, chỉ cần gõ một lần.</span></div>
+            <label>Khách hàng<input type="text" id="p-x-customer" class="field" maxlength="200" placeholder="Tên khách hàng" /></label>
             <div class="px-act">
               <button type="button" class="btn-dl" id="plan-export-btn" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
@@ -1501,18 +1498,17 @@
         </div>
       </section>
 
-      <!-- BÁO CÁO: xuất CSV, nhật ký nạp, lịch giao. Tất cả từ dữ liệu thật —
+      <!-- BÁO CÁO: báo cáo in, báo cáo Excel lịch nạp, nhật ký nạp, lịch giao. Tất cả từ dữ liệu thật —
            nhật ký nạp được SUY từ telemetry nên không ai phải nhập tay và nó
            không bao giờ lệch với số đo. -->
       <section id="view-reports" class="reports" hidden aria-label="Báo cáo và nhật ký">
         <div class="pane-head">
           <h1>Báo cáo</h1>
-          <span class="meta">Báo cáo trình ký in ra PDF, và dữ liệu thô dạng CSV cho Excel</span>
+          <span class="meta">Báo cáo trình ký in ra PDF, và báo cáo Excel lịch nạp gửi đối tác</span>
         </div>
         <div class="rep-scroll">
-          <!-- Báo cáo hoàn chỉnh đứng TRƯỚC các nút CSV: đây là thứ người ta mang đi
-               họp và trình ký, còn CSV là dữ liệu thô để tự tính lại. Đặt CSV lên
-               trước thì người dùng tải file thô rồi tự dựng báo cáo bằng tay. -->
+          <!-- Báo cáo hoàn chỉnh đứng TRƯỚC: đây là thứ người ta mang đi họp và
+               trình ký; báo cáo Excel lịch nạp là thứ gửi đối tác. -->
           <div class="rep-card">
             <h2>Báo cáo giám sát bồn LNG (bản trình ký)</h2>
             <p class="hint">
@@ -1540,42 +1536,31 @@
             <p class="hint" id="rp-note" style="margin:8px 0 0"></p>
           </div>
 
+          <!-- Thay cho thẻ "Xuất dữ liệu thô (CSV)" (06/10/2026): người dùng không dùng
+               CSV thô, họ gửi đối tác một bảng lịch nạp. Một file Excel, ba sheet. -->
           <div class="rep-card">
-            <h2>Xuất dữ liệu thô (CSV)</h2>
+            <h2>Báo cáo Excel — lịch nạp LNG</h2>
             <p class="hint">
-              Dành cho việc tự tính lại bằng Excel. File dùng mã hoá UTF-8 và mốc thời gian
-              theo giờ Việt Nam, mở bằng Excel không lỗi phông chữ. Nếu máy của bạn dùng dấu
-              chấm phẩy làm dấu phân tách, hãy chọn lại ở ô tương ứng.
+              Một file Excel ba sheet, in vừa khổ A4: <b>Lịch nạp</b> (lần nạp thật đã qua và lần
+              nạp theo kế hoạch, lượng tính bằng m³, ngày nghỉ ghi chú ở dòng giao trước nó),
+              <b>Nhật ký nạp thật</b> và <b>Tiêu thụ theo ngày</b> kèm biểu đồ. Kế hoạch tính bằng
+              đúng các thông số đã lưu ở trang Kế hoạch nạp của bồn.
             </p>
-            <p class="hint" id="rep-anchor"></p>
             <div class="rep-row">
               <label>Bồn
                 <select id="rep-tank" class="field"></select>
               </label>
+              <label>Khách hàng<input type="text" id="rep-customer" class="field" maxlength="200" placeholder="Tên khách hàng" /></label>
               <label>Từ ngày<input type="date" id="rep-from" class="field" /></label>
               <label>Đến ngày<input type="date" id="rep-to" class="field" /></label>
-              <label>Dấu phân tách
-                <select id="rep-delim" class="field">
-                  <option value="comma">Phẩy ( , )</option>
-                  <option value="semicolon">Chấm phẩy ( ; )</option>
-                  <option value="tab">Tab</option>
-                </select>
-              </label>
             </div>
             <div class="rep-row" style="margin-top:10px">
-              <button type="button" class="btn-dl" id="dl-tanks">
+              <button type="button" class="btn-dl" id="rep-xlsx">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
-                Báo cáo tổng hợp bồn
-              </button>
-              <button type="button" class="btn-dl" id="dl-refills">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
-                Nhật ký nạp
-              </button>
-              <button type="button" class="btn-dl" id="dl-telemetry">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>
-                Dữ liệu đo chi tiết
+                Xuất báo cáo Excel
               </button>
             </div>
+            <p class="hint" id="rep-anchor" style="margin:8px 0 0"></p>
           </div>
 
           <div class="rep-card">
@@ -3193,19 +3178,28 @@
       renderPlanAssist();
     }
 
-    // Các ngày nạp của bảng, đúng thứ file xuất sẽ chứa. Lần nạp THẬT thắng lần nạp
-    // kế hoạch cùng ngày: xe đã tới thì lịch mô phỏng cho ngày đó không còn nghĩa.
+    // Các lần nạp KẾ HOẠCH của bảng — thứ duy nhất trang gửi lên. Lần nạp THẬT,
+    // thể tích từng ngày và ghi chú ngày nghỉ server tự đọc từ dữ liệu.
     function planExportRows(rows) {
-      const out = [];
-      for (const r of rows) {
-        const thuc = planActualRefill(r.key);
-        if (thuc && thuc.m3 > 0) {
-          out.push({ day: r.key, m3: thuc.m3, note: `Đã nạp thực tế lúc ${thuc.hhmm}` });
-        } else if (r.fill && r.order !== null && r.order > 0) {
-          out.push({ day: r.key, m3: r.order, note: r.forced ? "Nạp chỉ định" : null });
-        }
-      }
-      return out;
+      return rows
+        .filter(r => !r.past && r.fill && r.order !== null && r.order > 0)
+        .map(r => ({ day: r.key, m3: r.order, forced: !!r.forced }));
+    }
+    // Một dòng in ở đầu sheet Lịch nạp: kế hoạch tính theo thông số nào.
+    function planBasis() {
+      const p = planParams();
+      const postFill = round2((p.pct / 100) * p.cap);
+      return `Kế hoạch tính theo: tiêu thụ ${round2(p.use)} m³/ngày · dự trữ ${round2(p.res)} m³ · `
+        + `nạp tới ${postFill} m³ · giờ nạp ${p.time.slice(0, 5)}`
+        + (planLive ? ` · tính từ số đo thật lúc ${fmtDT(planLive.at)}.`
+                    : " · bồn không có số đo mới, tính từ thể tích nhập tay.");
+    }
+    async function postPlanXlsx(psn, from, to, rows, basis) {
+      await dlCsv(`/api/plan/export/${encodeURIComponent(psn)}`, `lich_nap_${psn}.xlsx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_day: from, to_day: to, basis, rows }),
+      });
     }
     function planExportState() {
       const btn = document.getElementById("plan-export-btn");
@@ -3221,7 +3215,7 @@
       const n = rows.length ? planExportRows(rows).length : 0;
       btn.disabled = !rows.length;
       note.textContent = rows.length
-        ? `${n} lần nạp · ${dd(rows[0].key)} – ${dd(rows[rows.length - 1].key)}`
+        ? `${dd(rows[0].key)} – ${dd(rows[rows.length - 1].key)} · ${n} lần nạp kế hoạch (lần nạp thật hệ thống tự thêm)`
         : "";
     }
     async function planExportXlsx() {
@@ -3229,15 +3223,72 @@
       if (!planPsn || !rows.length) return;
       const psn = planPsn;
       if (planSavePending) await planSavePending;
-      const body = {
-        from_day: rows[0].key, to_day: rows[rows.length - 1].key,
-        rows: planExportRows(rows),
-      };
-      await dlCsv(`/api/plan/export/${encodeURIComponent(psn)}`, `lich_nap_${psn}.xlsx`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      await postPlanXlsx(psn, rows[0].key, rows[rows.length - 1].key, planExportRows(rows), planBasis());
+    }
+
+    // Báo cáo Excel ở trang Báo cáo: chạy ĐÚNG bộ tính của trang Kế hoạch cho bồn
+    // và kỳ đã chọn, với các thông số đã lưu của bồn — một bộ tính thứ hai (ở đây
+    // hay ở server) là cách chắc chắn nhất để file lệch với trang Kế hoạch.
+    // Bộ tính đọc các ô của trang Kế hoạch, nên mượn chúng rồi trả lại: chỉ gán
+    // .value, KHÔNG phát sự kiện, nên không có gì bị lưu. Vào lại trang Kế hoạch là
+    // nó tự tải lại bồn đang chọn ở đó.
+    async function reportXlsx() {
+      const psn = document.getElementById("rep-tank").value;
+      const from = document.getElementById("rep-from").value;
+      const to = document.getElementById("rep-to").value;
+      if (!psn) { showError("Chưa chọn bồn để xuất báo cáo."); return; }
+      if (!from || !to || from > to) { showError("Chọn đủ Từ ngày và Đến ngày (Từ ngày không sau Đến ngày)."); return; }
+      const days = planDayDiff(from, to) + 1;
+      if (days > PLAN_MAX_DAYS) { showError(`Kỳ báo cáo tối đa ${PLAN_MAX_DAYS} ngày.`); return; }
+      const btn = document.getElementById("rep-xlsx");
+      const ids = ["p-tank", "p-date", "p-days", "p-start"];
+      const keep = Object.fromEntries(ids.map(id => [id, document.getElementById(id).value]));
+      btn.disabled = true;
+      const label = btn.lastChild.textContent;
+      btn.lastChild.textContent = " Đang tính kế hoạch…";
+      try {
+        renderPlanTankOptions();
+        document.getElementById("p-tank").value = psn;
+        await loadPlanReadings();
+        if (planPsn !== psn) return;
+        document.getElementById("p-date").value = from;
+        document.getElementById("p-days").value = String(days);
+        if (planLive) await planEnsureOpen();
+        computePlan();
+        btn.lastChild.textContent = " Đang tạo file…";
+        await postPlanXlsx(psn, from, to, planExportRows(planLastRows), planBasis());
+      } finally {
+        for (const id of ids) document.getElementById(id).value = keep[id];
+        btn.disabled = false;
+        btn.lastChild.textContent = label;
+      }
+    }
+
+    // Ô Khách hàng ở Báo cáo: cùng một giá trị với ô ở trang Kế hoạch (lưu theo bồn).
+    async function loadRepCustomer() {
+      const psn = document.getElementById("rep-tank").value;
+      const el = document.getElementById("rep-customer");
+      repCustomerPsn = psn;
+      el.value = "";
+      if (!psn) return;
+      try {
+        const st = await api(`/api/plan/settings/${encodeURIComponent(psn)}`);
+        if (document.getElementById("rep-tank").value === psn) el.value = st.customer_name || "";
+      } catch (e) { /* ô trống là đủ: không chặn việc xuất */ }
+    }
+    async function saveRepCustomer() {
+      const psn = document.getElementById("rep-tank").value;
+      if (!psn) return;
+      try {
+        await api(`/api/plan/settings/${encodeURIComponent(psn)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customer_name: document.getElementById("rep-customer").value.trim() }),
+        });
+        if (planPsn === psn) document.getElementById("p-x-customer").value = document.getElementById("rep-customer").value.trim();
+      } catch (e) {
+        if (e.name !== "AuthError") showError(`Không lưu được tên khách hàng: ${e.message}`);
+      }
     }
 
     // Tải thể tích đầu ngày đo được cho những ngày đã qua đang hiện trên bảng. Chỉ
@@ -3439,13 +3490,12 @@
       // Trên production trước bản này: gõ 90 (trần server khi đó 62) là lần lưu
       // đó thất bại, và người dùng không hề biết.
       { id: "p-days", key: "horizon_days",     toApi: (v) => Math.max(1, Math.min(PLAN_MAX_DAYS, Math.round(v))), fromApi: (v) => Math.round(v) },
-      { id: "p-x-ratio", key: "m3_per_tonne",  toApi: (v) => v,        fromApi: (v) => Number(v) },
     ];
     // Chữ trên file xuất. Ô trống = xoá (server lưu NULL).
+    // (Đơn vị cung cấp, địa điểm và hệ số tấn đã bỏ khỏi mẫu 06/10/2026 — người dùng
+    // gạch hai cột đó và đổi lượng sang m³. Cột trong DB giữ nguyên, không dùng.)
     const PLAN_TEXT_FIELDS = [
-      { id: "p-x-supplier", key: "supplier_name" },
       { id: "p-x-customer", key: "customer_name" },
-      { id: "p-x-site",     key: "site_name" },
     ];
 
     async function loadPlanSettings(psn) {
@@ -3456,7 +3506,6 @@
         // Các ô của file xuất là của RIÊNG bồn: không được để tên khách hàng của bồn
         // trước nằm lại trên bồn vừa chọn chỉ vì bồn này chưa lưu gì.
         for (const f of PLAN_TEXT_FIELDS) document.getElementById(f.id).value = st[f.key] || "";
-        document.getElementById("p-x-ratio").value = "2.2";
         for (const f of PLAN_FIELDS) {
           if (st[f.key] !== null && st[f.key] !== undefined) {
             document.getElementById(f.id).value = f.fromApi(Number(st[f.key]));
@@ -3949,31 +3998,25 @@
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
       applyRepDates();
       renderRpScope();
+      // Chỉ nạp lại ô Khách hàng khi BỒN đổi: hàm này chạy mỗi lần làm mới dữ liệu,
+      // và nạp lại vô điều kiện sẽ đè lên chữ người dùng đang gõ.
+      if (sel.value !== repCustomerPsn) { repCustomerPsn = sel.value; loadRepCustomer(); }
     }
+    let repCustomerPsn = null;
 
-    // Neo khoảng ngày vào LẦN ĐO CUỐI của bồn, không phải vào "hôm nay".
-    // Mặc định cũ là 30 ngày tính từ hôm nay. Với đội bồn hiện tại — dữ liệu kết ở
-    // 30 và 81 ngày trước — nó luôn trả về file rỗng, và người dùng kết luận rất hợp
-    // lý rằng chức năng xuất báo cáo chỉ là mockup. Một khoảng ngày không chứa dữ
-    // liệu nào thì không phải mặc định trung lập, nó là mặc định sai.
+    // Kỳ mặc định của báo cáo Excel: từ đầu tháng này tới hết tháng thứ ba — đúng
+    // nhịp người vận hành gửi lịch cho đối tác (mẫu 28/09 → 02/01). Chỉ điền khi ô
+    // còn trống: đổi bồn không được xoá kỳ người dùng vừa chọn.
     function applyRepDates() {
-      const sel = document.getElementById("rep-tank");
       const from = document.getElementById("rep-from"), to = document.getElementById("rep-to");
       const note = document.getElementById("rep-anchor");
-      if (!sel || !from || !to) return;
-      const tank = tanks.find(t => t.psn === sel.value);
-      const last = tank && tank.last_seen_at ? new Date(tank.last_seen_at) : null;
-      const anchor = last || new Date();
-      to.value = isoDate(anchor);
-      // 7 ngày chứ không 30: server xuất tối đa 20.000 dòng, và bồn báo mỗi phút
-      // có ~1.440 dòng/ngày — mặc định 30 ngày (~43.000 dòng) bấm là ra lỗi 422
-      // (đo trên production 30/09/2026). 7 ngày ≈ 10.000 dòng, còn dư cho bồn dày.
-      from.value = isoDate(new Date(anchor.getTime() - 6 * 86400000));
+      if (!from || !to) return;
+      const n = new Date();
+      if (!from.value) from.value = isoDate(new Date(n.getFullYear(), n.getMonth(), 1));
+      if (!to.value) to.value = isoDate(new Date(n.getFullYear(), n.getMonth() + 3, 0));
       if (note) {
-        note.textContent = last
-          ? `Khoảng mặc định là 7 ngày, kết ở lần đo cuối của bồn (${fmtWhen(tank.last_seen_at)}) — không phải hôm nay, chọn hôm nay sẽ ra file rỗng. `
-            + `Mỗi file tối đa 20.000 dòng (bồn báo mỗi phút ≈ 13 ngày).`
-          : "Bồn này chưa có lần đo nào.";
+        note.textContent = `Ngày đã qua lấy lần nạp thật từ số đo; từ hôm nay trở đi là kế hoạch. `
+          + `Kỳ tối đa ${PLAN_MAX_DAYS} ngày.`;
       }
     }
 
@@ -4004,7 +4047,6 @@
       }
     }
 
-    function repDelim() { return document.getElementById("rep-delim").value; }
 
     function renderRpScope() {
       const sel = document.getElementById("rp-scope");
@@ -5259,30 +5301,14 @@
       });
 
       // Báo cáo
-      document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); });
+      document.getElementById("rep-tank").addEventListener("change", () => { applyRepDates(); loadRefills(); loadRepCustomer(); });
+      document.getElementById("rep-customer").addEventListener("change", saveRepCustomer);
+      document.getElementById("rep-xlsx").addEventListener("click", reportXlsx);
       document.getElementById("va-win").addEventListener("change", loadVendorAlarms);
       document.getElementById("rp-scope").addEventListener("change", applyRpNote);
       document.getElementById("rp-open").addEventListener("click", openReport);
       document.getElementById("an-window").addEventListener("change", loadAnalytics);
       document.getElementById("btn-trips").addEventListener("click", loadTrips);
-      document.getElementById("dl-tanks").addEventListener("click", () =>
-        dlCsv(`/api/export/tanks.csv?delimiter=${repDelim()}`, "tong_hop_bon.csv"));
-      document.getElementById("dl-refills").addEventListener("click", () =>
-        dlCsv(`/api/export/refills.csv?window_days=${refillWindowDays()}&delimiter=${repDelim()}`,
-              "nhat_ky_nap.csv"));
-      document.getElementById("dl-telemetry").addEventListener("click", () => {
-        const psn = document.getElementById("rep-tank").value;
-        if (!psn) { showError("Chưa chọn bồn để xuất dữ liệu đo."); return; }
-        const from = document.getElementById("rep-from").value;
-        const to = document.getElementById("rep-to").value;
-        if (!from || !to) { showError("Vui lòng chọn đủ khoảng thời gian từ ngày và đến ngày."); return; }
-        // `to` lấy hết ngày (23:59:59), nếu không thì ngày cuối chỉ được nửa đêm và
-        // người ta tưởng mất dữ liệu. Server localize datetime naive theo APP_TZ.
-        const q = new URLSearchParams({
-          psn, from: `${from}T00:00:00`, to: `${to}T23:59:59`, delimiter: repDelim(),
-        });
-        dlCsv(`/api/export/telemetry.csv?${q}`, `telemetry_${psn}.csv`);
-      });
       document.getElementById("plan-body").addEventListener("change", (e) => {
         const t = e.target;
         // `change` chứ không `input`: computePlan() vẽ lại cả tbody, nên lưu theo

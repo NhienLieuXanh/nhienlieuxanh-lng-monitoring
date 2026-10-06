@@ -916,26 +916,35 @@ class PlanSettingsOut(BaseModel):
 PLAN_EXPORT_MAX_ROWS = 400
 
 
+#: Trần độ dài kỳ báo cáo — bằng trần số ngày của trang Kế hoạch.
+PLAN_EXPORT_MAX_DAYS = 366
+
+
 class PlanExportRowIn(BaseModel):
-    """Một lần nạp trên file xuất — lần nạp thật đã qua, hoặc lần nạp theo kế hoạch."""
+    """Một lần nạp KẾ HOẠCH do trang tính. Lần nạp THẬT server tự đọc từ số đo."""
 
     day: date
     #: m³ như trên trang Kế hoạch. Trần 1.000 như số đo tay (xem FALLBACK_MAX_L).
     m3: Decimal = Field(gt=0, le=1000)
-    note: str | None = Field(None, max_length=200)
+    #: Người dùng tích "Nạp chỉ định" cho ngày này.
+    forced: bool = False
 
 
 class PlanExportIn(BaseModel):
-    """Các ngày nạp của khung đang xem trên trang Kế hoạch, do trang tự tính."""
+    """Kỳ báo cáo và các lần nạp kế hoạch trong kỳ, do trang tự tính."""
 
     from_day: date
     to_day: date
+    #: Một dòng nói kế hoạch tính theo thông số nào — in ở đầu sheet Lịch nạp.
+    basis: str | None = Field(None, max_length=300)
     rows: list[PlanExportRowIn] = Field(max_length=PLAN_EXPORT_MAX_ROWS)
 
     @model_validator(mode="after")
     def _rows_in_window(self) -> PlanExportIn:
         if self.from_day > self.to_day:
             raise ValueError("from_day phải <= to_day")
+        if (self.to_day - self.from_day).days + 1 > PLAN_EXPORT_MAX_DAYS:
+            raise ValueError(f"kỳ báo cáo tối đa {PLAN_EXPORT_MAX_DAYS} ngày")
         for r in self.rows:
             if not self.from_day <= r.day <= self.to_day:
                 raise ValueError(f"ngày {r.day} nằm ngoài khung {self.from_day}..{self.to_day}")

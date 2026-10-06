@@ -17,12 +17,13 @@ số của thiết bị. Nhờ vậy không có chỗ nào trong hệ thống ph
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.api.deps import SessionDep, UserDep
+from app.api.deps import SessionDep, SettingsDep, UserDep
 from app.api.schemas import (
     PlanDayFlagIn,
     PlanDayFlagOut,
@@ -32,7 +33,9 @@ from app.api.schemas import (
     PlanSettingsIn,
     PlanSettingsOut,
 )
+from app.domain import forecast as fc
 from app.repositories import plan_readings as pr_repo
+from app.repositories import telemetry as tel_repo
 from app.repositories import terminals as term_repo
 from app.services import plan_export
 
@@ -199,30 +202,118 @@ def put_plan_settings(
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+def _actuals(
+    session: SessionDep,
+    psn: str,
+    *,
+    capacity_l: float | None,
+    from_day: date,
+    to_day: date,
+    now: datetime,
+    tz: ZoneInfo,
+    rest: set[date],
+) -> tuple[list[plan_export.ActualRefill], list[plan_export.DayRow]]:
+    """Phần THẬT của báo cáo, đọc thẳng từ số đo: các lần nạp và từng ngày đã qua.
+
+    Lần nạp dùng đúng ``detect_refills`` của dự báo và nhật ký nạp, trên chuỗi gộp
+    30 phút như ở đó — ba chỗ không thể ra ba con số khác nhau cho cùng một xe.
+    Đầu ngày là ``daily_open`` — cùng nguồn với cột "đo thật" của trang Kế hoạch.
+    """
+    today = now.date()
+    if from_day > today:
+        return [], []
+    end_day = min(to_day, today)
+    start = datetime.combine(from_day, time(), tz)
+    end = min(datetime.combine(end_day + timedelta(days=1), time(), tz), now)
+    rows = tel_repo.series_with_gas(
+        session, psn, start - timedelta(hours=12), end, bucket_minutes=30
+    )
+    samples = [
+        fc.Sample(at=at, volume_l=v, pressure_mpa=p, totalizer_nm3=g) for at, v, p, g in rows
+    ]
+    refills = [
+        plan_export.ActualRefill(
+            at=e.at.astimezone(tz), before_m3=e.before_l / 1000, after_m3=e.after_l / 1000
+        )
+        for e in fc.detect_refills(samples, capacity_l=capacity_l)
+        if from_day <= e.at.astimezone(tz).date() <= end_day
+    ]
+    refill_by_day: dict[date, float] = {}
+    for a in refills:
+        refill_by_day[a.at.date()] = refill_by_day.get(a.at.date(), 0.0) + a.m3
+    opens = {
+        d: v / 1000
+        for d, _, v in tel_repo.daily_open(
+            session, psn, from_day, end_day + timedelta(days=1), tz_name=str(tz)
+        )
+    }
+    # Cuối ngày khi hôm sau không có lần đo đầu ngày (bồn im qua đêm): lần đo cuối
+    # cùng của chính ngày đó.
+    last_of_day: dict[date, float] = {}
+    for smp in samples:
+        if smp.volume_l is not None:
+            last_of_day[smp.at.astimezone(tz).date()] = smp.volume_l / 1000
+
+    days: list[plan_export.DayRow] = []
+    d = from_day
+    while d <= end_day:
+        nxt = d + timedelta(days=1)
+        close = None if d >= today else opens.get(nxt, last_of_day.get(d))
+        notes = []
+        if d in rest:
+            notes.append("Ngày nghỉ")
+        if d not in opens:
+            notes.append("Không có số đo")
+        elif d >= today:
+            notes.append("Hôm nay — chưa hết ngày")
+        days.append(
+            plan_export.DayRow(
+                day=d, open_m3=opens.get(d), close_m3=close,
+                refill_m3=refill_by_day.get(d, 0.0), rest=d in rest, note="; ".join(notes),
+            )
+        )
+        d = nxt
+    return refills, days
+
+
 @router.post("/export/{psn}", response_class=Response)
 def export_refills_xlsx(
-    psn: str, body: PlanExportIn, session: SessionDep, _: UserDep
+    psn: str, body: PlanExportIn, session: SessionDep, settings: SettingsDep, _: UserDep
 ) -> Response:
-    """File Excel CHỈ gồm các ngày nạp của khung đang xem trên trang Kế hoạch.
+    """Báo cáo Excel 3 sheet: Lịch nạp, Nhật ký nạp thật, Tiêu thụ theo ngày.
 
-    POST vì các dòng do trang gửi lên: lịch được tính ở trình duyệt, từ đúng những
-    ô tích và số đo mà người dùng đang nhìn. Server thêm đơn vị cung cấp, khách
-    hàng, địa điểm (lưu theo bồn) và quy đổi tấn.
+    POST vì lịch KẾ HOẠCH do trang gửi lên: nó được tính ở trình duyệt, từ đúng
+    những ô tích và số đo mà người dùng đang nhìn. Phần THẬT — lần nạp đã qua,
+    thể tích từng ngày, ngày nghỉ — server tự đọc, không tin trang.
     """
-    _require_terminal(session, psn)
+    term = term_repo.get_by_psn(session, psn)
+    if term is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Terminal not found")
+    tz = ZoneInfo(settings.app_tz)
+    now = datetime.now(tz)
     st = pr_repo.get_settings_for(session, psn)
-    ratio = (
-        st.m3_per_tonne
-        if st is not None and st.m3_per_tonne is not None
-        else plan_export.DEFAULT_M3_PER_TONNE
+    rest = {
+        f.flag_date
+        for f in pr_repo.list_flags(session, psn, start=body.from_day, end=body.to_day)
+        if f.rest or f.no_delivery
+    }
+    refills, days = _actuals(
+        session, psn,
+        capacity_l=None if term.capacity_l is None else float(term.capacity_l),
+        from_day=body.from_day, to_day=body.to_day, now=now, tz=tz, rest=rest,
     )
-    content = plan_export.build_xlsx(
-        [plan_export.ExportRow(day=r.day, m3=r.m3, note=r.note) for r in body.rows],
-        supplier=st.supplier_name if st is not None else None,
+    schedule = plan_export.build_schedule(
+        [plan_export.PlannedRow(day=r.day, m3=float(r.m3), forced=r.forced) for r in body.rows],
+        refills, sorted(rest),
+        from_day=body.from_day, to_day=body.to_day, today=now.date(),
+    )
+    meta = plan_export.ReportMeta(
+        tank_name=term.name or psn, psn=psn,
         customer=st.customer_name if st is not None else None,
-        site=st.site_name if st is not None else None,
-        m3_per_tonne=ratio,
+        from_day=body.from_day, to_day=body.to_day,
+        generated_at=now.replace(tzinfo=None), basis=body.basis,
     )
+    content = plan_export.build_report(schedule, refills, days, meta)
     # Tên file chỉ ASCII: PSN là chuỗi từ URL, và header Content-Disposition
     # không phải chỗ để thử xem trình duyệt nào chịu ký tự lạ.
     safe = re.sub(r"[^A-Za-z0-9_-]", "_", psn)
