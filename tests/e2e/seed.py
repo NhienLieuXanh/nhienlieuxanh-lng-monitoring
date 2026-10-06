@@ -59,12 +59,16 @@ def seed(engine: Engine) -> dict[str, object]:
         s.add_all([ykh, fuji])
         s.flush()
 
-        # 30 ngày, mỗi 30 phút, kết thúc 5 phút trước.
-        at = now - timedelta(days=30)
+        # 30 ngày, mỗi 30 phút, căn về :00/:30. Không căn thì mốc rơi vào phút lẻ,
+        # điều kiện "14:00" không bao giờ đúng, xe không bao giờ tới và thể tích trôi
+        # xuống ÂM — lần CI đầu tiên lộ ra (06/10/2026), máy dev không thấy vì chạy
+        # đúng lúc test so "rỗng == rỗng".
+        last = now - timedelta(minutes=5)
+        at = (now - timedelta(days=30)).replace(minute=0)
         vol = 40_000.0
         step = USE_L_PER_DAY / 48
         rows = []
-        while at <= now - timedelta(minutes=5):
+        while at <= last:
             local = at.astimezone(VN)
             if local.weekday() != 6:                      # Chủ Nhật nhà máy nghỉ
                 vol -= step
@@ -79,6 +83,10 @@ def seed(engine: Engine) -> dict[str, object]:
                 source="e2e", raw_payload={},
             ))
             at += timedelta(minutes=30)
+        # Bộ test dựa vào dữ liệu này: nó PHẢI có xe tới và không bao giờ âm.
+        assert len(refills) >= 3, f"dữ liệu mẫu chỉ có {len(refills)} lần nạp"
+        assert min(float(r.volume_l) for r in rows) > 0, "dữ liệu mẫu có thể tích âm"
+        ykh.last_seen_at = rows[-1].sampled_at
         rows.append(Telemetry(
             terminal_id=fuji.id, psn=FUJI, sampled_at=now - timedelta(days=69),
             volume_l=Decimal("61"), volume_percent=Decimal("0.59"), pressure_mpa=Decimal("0.07"),

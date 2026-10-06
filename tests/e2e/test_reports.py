@@ -44,6 +44,7 @@ def test_bao_cao_excel_ba_sheet_dung_so_lieu_that(app_page: Page, world: dict[st
     real = [r for r in body if r[5] == "Đã nạp"]
     planned = [r for r in body if r[5] == "Kế hoạch"]
     seeded = {a.astimezone(VN).date() for a in world["refills"] if a.astimezone(VN).date() >= frm}
+    assert seeded, "dữ liệu mẫu phải có lần nạp trong kỳ — không thì phép so dưới đây vô nghĩa"
     assert {r[2].date() for r in real} == seeded, (body, seeded)
     assert planned and all(r[2].date() >= today for r in planned)
     assert all(r[1] == CUSTOMER for r in body)

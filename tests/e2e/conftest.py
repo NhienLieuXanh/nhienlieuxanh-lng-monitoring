@@ -154,6 +154,17 @@ def server(world: dict[str, Any], tmp_path_factory: pytest.TempPathFactory) -> I
                 proc.kill()
 
 
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args: dict[str, Any]) -> dict[str, Any]:
+    """Trình duyệt ở múi giờ và ngôn ngữ của người dùng thật.
+
+    Trang tính "ngày" theo giờ của trình duyệt; máy CI để UTC thì ngày 01/10 của
+    trang lệch 7 giờ với ngày của server (APP_TZ) — lần CI đầu tiên thấy đúng thế.
+    Người dùng đều ở Việt Nam, nên bộ test phải đứng ở Việt Nam.
+    """
+    return {**browser_context_args, "timezone_id": "Asia/Ho_Chi_Minh", "locale": "vi-VN"}
+
+
 def session_cookie(user: str = USER) -> str:
     """Cookie ``nlx_session`` đúng định dạng SessionMiddleware của Starlette."""
     data = base64.b64encode(json.dumps({"user": user}).encode("utf-8"))

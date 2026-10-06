@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import io
 import struct
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -324,6 +325,15 @@ def _total(ws: Worksheet, row: int, ncols: int, label_to: int, label: str,
     ws.row_dimensions[row].height = 22
 
 
+def _sum2(values: Iterable[float]) -> float:
+    """Tổng của CHÍNH các số đang hiện (mỗi số đã làm tròn 2 chữ số).
+
+    Cộng số chưa làm tròn rồi mới làm tròn thì ô Tổng cộng có thể lệch 0,01 với
+    tổng mà người nhận tự cộng cột trong Excel — e2e bắt được 346,25 so với 346,26.
+    """
+    return round(sum(round(v, 2) for v in values), 2)
+
+
 def _empty(ws: Worksheet, ncols: int, msg: str) -> int:
     r = HEADER_ROW + 1
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ncols)
@@ -376,7 +386,7 @@ def _sheet_schedule(ws: Worksheet, rows: list[ScheduleRow], meta: ReportMeta) ->
         r = _empty(ws, n, "Không có lần nạp nào trong kỳ.")
 
     _total(ws, r + 1, n, 4, "Tổng cộng",
-           {5: round(sum(s.m3 for s in rows), 2), 6: f"{len(rows)} lần"})
+           {5: _sum2(s.m3 for s in rows), 6: f"{len(rows)} lần"})
     _print_setup(ws, meta)
 
 
@@ -404,7 +414,7 @@ def _sheet_refills(ws: Worksheet, refills: list[ActualRefill], meta: ReportMeta)
     if not refills:
         r = _empty(ws, n, "Không có lần nạp nào trong kỳ.")
     _total(ws, r + 1, n, 5, f"Tổng cộng · {len(refills)} lần",
-           {6: round(sum(a.m3 for a in refills), 2)})
+           {6: _sum2(a.m3 for a in refills)})
     _print_setup(ws, meta)
 
 
@@ -466,8 +476,8 @@ def _sheet_days(ws: Worksheet, days: list[DayRow], meta: ReportMeta) -> None:
 
     uses = [d.use_m3 for d in days if d.use_m3 is not None]
     _total(ws, r + 1, n, 4, "Tổng cộng", {
-        5: round(sum(d.refill_m3 for d in days), 2),
-        6: round(sum(uses), 2),
+        5: _sum2(d.refill_m3 for d in days),
+        6: _sum2(uses),
     })
     # Bình quân những ngày CÓ tiêu thụ — cùng cách tính "khi nhà máy chạy" của trang
     # Kế hoạch. Gộp cả ngày nghỉ (tiêu thụ 0) thì số bị kéo thấp và lệch với mức
