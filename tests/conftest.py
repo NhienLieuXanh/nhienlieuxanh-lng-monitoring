@@ -22,6 +22,10 @@ from sqlalchemy.orm import Session, sessionmaker
 FIXTURES = Path(__file__).parent / "fixtures" / "xingke"
 TEST_DB_URL = os.getenv("TEST_DATABASE_URL")
 
+# E2E trình duyệt (tests/e2e) chỉ được thu thập khi E2E=1: nó dựng DB riêng, chạy
+# server thật và cần Chromium — không phải thứ một lần `pytest` thường được kéo theo.
+collect_ignore = [] if os.getenv("E2E") == "1" else ["e2e"]
+
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list) -> None:
     if TEST_DB_URL:

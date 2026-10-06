@@ -1,0 +1,79 @@
+# E2E trình duyệt thật + toàn bộ test unit, trên Postgres thật (service tạm của CI).
+#
+# Không đụng production ở bất kỳ đâu: DB là container Postgres sống đúng một lần
+# chạy, server e2e chạy với scheduler/email/nguồn dữ liệu tắt, và đăng nhập bằng
+# cookie phiên tự ký với SESSION_SECRET riêng của bộ test (xem tests/e2e/conftest.py).
+#
+# Chỉ chạy khi code thật sự đổi (app/, tests/, migrations/...) và khi bấm tay:
+# workflow ingest đã dùng ~1.440 phút Actions/tháng, và repo private chỉ có 2.000.
+
+name: e2e
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "tests/**", "migrations/**", "requirements*.txt", ".github/workflows/e2e.yml"]
+  pull_request:
+    paths: ["app/**", "tests/**", "migrations/**", "requirements*.txt", ".github/workflows/e2e.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xingke_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/xingke_test
+      E2E_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/xingke_e2e
+      # Token giả: scheduler tắt nên không bao giờ được dùng, chỉ để app khởi tạo
+      # adapter mà không ghi log lỗi.
+      XINGKE_TOKEN: e2e-khong-dung
+      APP_TZ: Asia/Ho_Chi_Minh
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cài thư viện
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Test unit (có DB)
+        run: python -m pytest -q -p no:warnings
+
+      - name: Test e2e (trình duyệt thật)
+        env:
+          E2E: "1"
+        run: python -m pytest tests/e2e -q -p no:warnings --screenshot only-on-failure --output test-results
+
+      - name: Ảnh chụp khi test e2e hỏng
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failures
+          path: test-results/
+          retention-days: 14

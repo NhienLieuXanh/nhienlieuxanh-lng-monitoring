@@ -5,3 +5,5 @@ respx==0.22.0
 freezegun==1.5.5
 ruff==0.15.1
 mypy==1.19.1
+playwright==1.63.0
+pytest-playwright==0.9.0
