@@ -143,17 +143,19 @@ def health(
     mig = CheckOut(ok=True)
     if db.ok:
         try:
-            current = session.execute(
-                text("SELECT version_num FROM alembic_version")
-            ).scalar_one_or_none()
+            # SAVEPOINT riêng: query lỗi làm abort transaction của Postgres, và chỉ
+            # được lùi đúng phần của nó. Bản trước gọi session.rollback() — lùi CẢ
+            # phiên; trong test (phiên dựng trên savepoint) nó xoá luôn dữ liệu test
+            # và health đếm ra 0 bồn, lộ ra ở lần CI đầu tiên trên DB mới tinh.
+            with session.begin_nested():
+                current = session.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).scalar_one_or_none()
             head = getattr(request.app.state, "alembic_head", None)
             if head and current != head:
                 mig = CheckOut(ok=False, detail=f"DB ở {current}, code cần {head}")
                 overall = "degraded" if overall == "ok" else overall
         except Exception:
-            # Query lỗi làm abort transaction của Postgres; rollback để các check
-            # sau (counts_by_status) không dính InFailedSqlTransaction rồi 500.
-            session.rollback()
             mig = CheckOut(ok=False, detail="chưa có bảng alembic_version")
             overall = "degraded" if overall == "ok" else overall
 

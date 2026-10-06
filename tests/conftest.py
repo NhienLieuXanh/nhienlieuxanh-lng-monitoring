@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 FIXTURES = Path(__file__).parent / "fixtures" / "xingke"
@@ -47,6 +47,11 @@ def engine() -> Iterator[Engine]:
 
     eng = create_engine(TEST_DB_URL, future=True)
     Base.metadata.drop_all(eng)
+    # alembic_version KHÔNG nằm trong metadata nên drop_all bỏ sót nó; để sót thì DB
+    # test trên máy dev khác DB mới tinh của CI (đúng cách 4 test health đỏ trên CI
+    # mà xanh ở local, 06/10/2026).
+    with eng.begin() as c:
+        c.execute(text("DROP TABLE IF EXISTS alembic_version"))
     Base.metadata.create_all(eng)
     try:
         yield eng
