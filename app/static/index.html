@@ -1105,6 +1105,9 @@
     .set-step { margin-top: 10px; }
     .set-grid label.set-prov { grid-column: 1 / -1; max-width: 380px; }
     .set-grid .field { width: 100%; }
+    /* Ô nhập giữ chiều cao tự nhiên: hàng lưới cao theo ô có dòng giải thích dài
+       nhất, và ô chọn bên cạnh bị kéo giãn theo (đo trên trang Cài đặt mới). */
+    .set-grid label > .field { flex: none; }
     /* Nhãn cho biết giá trị đang lấy từ đâu — câu hỏi đầu tiên của bất kỳ ai mở
        một trang cấu hình có hai nguồn (app và biến môi trường). */
     .src { font-size: var(--fs-micro); font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
@@ -1117,6 +1120,29 @@
     .set-lbl { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
     .set-note { font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; }
     .set-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    .set-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .set-pill { font-size: var(--fs-sm); font-weight: 700; padding: 4px 12px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); background: var(--surface-2); }
+    .set-pill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+    .set-pill.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+    .set-pill.bad { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
+    .set-when { margin: 8px 0 4px; padding: 10px 14px; border-radius: var(--r-sm); background: var(--surface-2);
+      font-size: var(--fs-prose); line-height: 1.6; color: var(--fg); }
+    .set-when ul { margin: 4px 0 0 18px; padding: 0; }
+    .set-step2 { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding-top: 16px;
+      margin-top: 16px; border-top: 1px solid var(--line); }
+    .set-num { width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: #fff;
+      display: grid; place-items: center; font-weight: 700; font-size: var(--fs-sm); }
+    .set-step-body { min-width: 0; }
+    .set-step-body h3, .set-more h3 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin: 2px 0 8px; }
+    .set-more h3 { margin-top: 16px; }
+    .set-help { font-size: var(--fs-sm); color: var(--muted); font-weight: 400; line-height: 1.5; }
+    .set-pass-state { font-size: var(--fs-micro); font-weight: 600; color: var(--muted); }
+    .set-pass-state.app { color: var(--ok); }
+    .set-more > summary { cursor: pointer; list-style: none; font-size: var(--fs-body); color: var(--fg); }
+    .set-more > summary::-webkit-details-marker { display: none; }
+    .set-more > summary::before { content: "▸ "; color: var(--brand); }
+    .set-more[open] > summary::before { content: "▾ "; }
     .set-msg { font-size: var(--fs-body); padding: 8px 11px; border-radius: var(--r-sm); border: 1px solid var(--line);
                background: var(--surface-2); overflow-wrap: anywhere; }
     .set-msg.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
@@ -1706,62 +1732,66 @@
           <span class="meta" id="set-meta">Thay đổi có hiệu lực ngay cho toàn hệ thống</span>
         </div>
         <div class="set-scroll">
-          <p class="set-note">
-            Các thông số dưới đây chi phối cách hệ thống giám sát bồn, dự báo tiêu thụ và
-            gửi cảnh báo. Mỗi ô ghi rõ giá trị đang là <b>Tuỳ chỉnh</b> (do người vận hành
-            đặt) hay <b>Mặc định</b> (theo cấu hình triển khai).
-          </p>
-
-          <div class="rep-card">
-            <h2>Người nhận cảnh báo</h2>
-            <p class="hint">
-              Hệ thống gửi cảnh báo tới các địa chỉ này khi bồn sắp cạn, thời gian giữ áp
-              còn ngắn, mức chứa xuống thấp, hoặc thiết bị ngoại tuyến.
-            </p>
-            <div class="set-grid">
-              <label class="wide">
-                <span class="set-lbl">Địa chỉ nhận · phân tách bằng dấu phẩy
-                  <span class="src" data-src="alert_email_to">Mặc định</span></span>
-                <input type="text" id="s-emails" class="field" placeholder="ten@congty.com, ten2@congty.com" maxlength="1000" />
-              </label>
-              <label>
-                <span class="set-lbl">Trạng thái gửi cảnh báo <span class="src" data-src="notify_enabled">Mặc định</span></span>
-                <select id="s-notify" class="field"><option value="true">Đang bật</option><option value="false">Đang tắt</option></select>
-              </label>
-              <label>
-                <span class="set-lbl">Chu kỳ nhắc lại (giờ) <span class="src" data-src="alert_resend_hours">Mặc định</span></span>
-                <input type="number" id="s-resend" class="field num" min="1" max="168" step="1" />
-              </label>
+          <!-- Trang Cài đặt làm lại 06/10/2026: người dùng thấy các thông số kỹ thuật
+               "vô dụng, dở hơi" và không biết cấu hình email cho đúng. Giờ chỉ MỘT thẻ
+               mở sẵn — Email cảnh báo, ba bước — còn thông số tính toán gấp vào
+               "Nâng cao" kèm một câu giải thích cho mỗi ô. -->
+          <div class="rep-card set-mail">
+            <div class="set-head">
+              <h2>Email cảnh báo</h2>
+              <span class="set-pill" id="set-mail-pill">Đang tải…</span>
             </div>
-            <div class="set-actions">
-              <button type="button" class="btn-primary-sm" id="s-save-recipients">Lưu</button>
-              <span class="set-note" id="s-msg0"></span>
-            </div>
-          </div>
-
-          <!-- Thẻ cấu hình máy chủ thư điện tử: tối giản cho nhân viên vận hành,
-               tự động hoá các thông số kỹ thuật (host, port, bảo mật, địa chỉ gửi) -->
-          <div class="rep-card">
-            <h2>Máy chủ thư điện tử</h2>
-            <p class="hint">
-              Hệ thống dùng tài khoản này để tự động gửi thư cảnh báo khi bồn LNG có sự cố hoặc sắp cạn.
-            </p>
             <p class="set-note" id="set-smtp-state"></p>
-
-            <!-- Bước 1: Chọn nhà cung cấp dịch vụ thư -->
-            <div class="set-grid set-step">
-              <label class="set-prov">
-                <span class="set-lbl">1. Nhà cung cấp thư</span>
-                <select id="s-provider" class="field">
-                  <option value="gmail">Gmail</option>
-                  <option value="outlook">Outlook.com · Hotmail (thư cá nhân)</option>
-                  <option value="m365">Microsoft 365 (thư công ty)</option>
-                  <option value="brevo">Brevo (dịch vụ gửi thư miễn phí)</option>
-                  <option value="custom">Khác (máy chủ riêng của công ty)</option>
-                </select>
-              </label>
+            <div class="set-when">
+              <b>Hệ thống chỉ gửi email trong hai trường hợp:</b>
+              <ul>
+                <li><b>Bồn sắp chạm mức dự trữ</b> — còn 3 ngày trở xuống. Thư ghi luôn nên
+                    đặt bao nhiêu m³, đặt trước lúc nào và xe giao lúc nào.</li>
+                <li><b>Nhà máy phát báo động</b> — báo động thiết bị tại nhà máy, đã gộp theo việc.</li>
+              </ul>
             </div>
 
+            <div class="set-step2">
+              <span class="set-num">1</span>
+              <div class="set-step-body">
+                <h3>Ai nhận cảnh báo?</h3>
+                <div class="set-grid">
+                  <label class="wide">
+                    <span class="set-lbl">Địa chỉ email nhận</span>
+                    <input type="text" id="s-emails" class="field" placeholder="ten@congty.com, ten2@congty.com" maxlength="1000" />
+                    <small class="set-help">Nhiều người thì cách nhau bằng dấu phẩy.</small>
+                  </label>
+                  <label>
+                    <span class="set-lbl">Gửi cảnh báo</span>
+                    <select id="s-notify" class="field"><option value="true">Bật</option><option value="false">Tắt</option></select>
+                  </label>
+                  <label>
+                    <span class="set-lbl">Nhắc lại cùng một việc sau (giờ)</span>
+                    <input type="number" id="s-resend" class="field num" min="1" max="168" step="1" />
+                    <small class="set-help">Việc chưa được xử lý thì gửi lại sau chừng ấy giờ.</small>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-step2">
+              <span class="set-num">2</span>
+              <div class="set-step-body">
+                <h3>Gửi từ hộp thư nào?</h3>
+                <p class="set-help">Hệ thống cần một hộp thư để gửi đi. Chưa biết chọn gì thì dùng
+                  <b>Brevo</b>: miễn phí 300 thư/ngày, tự đăng ký được, không cần nhờ quản trị viên.</p>
+                <div class="set-grid">
+                  <label class="set-prov">
+                    <span class="set-lbl">Dịch vụ thư</span>
+                    <select id="s-provider" class="field">
+                      <option value="brevo">Brevo — khuyên dùng (miễn phí, không cần quản trị viên)</option>
+                      <option value="gmail">Gmail</option>
+                      <option value="outlook">Outlook.com · Hotmail (thư cá nhân)</option>
+                      <option value="m365">Microsoft 365 (thư công ty)</option>
+                      <option value="custom">Khác (máy chủ riêng của công ty)</option>
+                    </select>
+                  </label>
+                </div>
             <!-- Hướng dẫn lấy mật khẩu ứng dụng Gmail: chỉ hiện khi đang chọn Gmail -->
             <div id="s-guide-gmail" class="smtp-guide">
               <b>Cách lấy Mật khẩu ứng dụng Gmail (16 chữ cái):</b>
@@ -1789,8 +1819,8 @@
             <div id="s-guide-m365" class="smtp-guide" hidden>
               <b>Thư công ty trên Microsoft 365:</b>
               <ol>
-                <li>Nhập địa chỉ thư công ty và mật khẩu của chính hộp thư đó ở Bước 2.</li>
-                <li>Bấm <b>Lưu và gửi thư kiểm tra</b> để biết tổ chức có cho gửi hay không.</li>
+                <li>Nhập địa chỉ thư công ty và mật khẩu của chính hộp thư đó ở ngay bên dưới.</li>
+                <li>Bấm <b>Lưu và gửi thư thử</b> để biết tổ chức có cho gửi hay không.</li>
               </ol>
               <span class="gnote">
                 Microsoft <b>khoá gửi thư qua SMTP theo mặc định</b>. Nếu thư kiểm tra
@@ -1813,8 +1843,8 @@
                     nhập địa chỉ thư của bạn rồi bấm liên kết xác minh trong hộp thư.</li>
                 <li>Vào <b>Transactional → Settings → SMTP</b>, bấm
                     <b>Generate a new SMTP key</b>.</li>
-                <li>Ở Bước 2: điền <b>đăng nhập SMTP</b> (Brevo hiện ngay trên trang đó)
-                    và dán <b>khoá SMTP</b> vào ô mật khẩu.</li>
+                <li>Ngay bên dưới: điền <b>đăng nhập SMTP</b> (Brevo hiện ngay trên trang đó)
+                    vào ô <b>Tài khoản đăng nhập</b>, và dán <b>khoá SMTP</b> vào ô mật khẩu.</li>
                 <li>Mở <b>Thiết lập nâng cao</b> bên dưới, điền
                     <b>Địa chỉ gửi (From)</b> = đúng địa chỉ vừa xác minh ở bước 2.</li>
               </ol>
@@ -1823,42 +1853,39 @@
                 đăng nhập Brevo — ba thứ này khác nhau và là chỗ hay nhầm nhất.
                 Nếu tên miền chưa được xác minh bằng bản ghi DNS, Brevo sẽ đổi địa chỉ
                 người gửi sang tên miền của họ và thư <b>có thể rơi vào Thư rác</b>.
-                Bấm <b>Lưu và gửi thư kiểm tra</b> rồi xem thư có vào Hộp thư đến thật
+                Bấm <b>Lưu và gửi thư thử</b> rồi xem thư có vào Hộp thư đến thật
                 không — đó là câu trả lời duy nhất đáng tin.
               </span>
             </div>
-
-            <!-- Bước 2: Chỉ nhập địa chỉ thư và mật khẩu ứng dụng -->
-            <div class="set-grid set-step">
-              <label>
-                <span class="set-lbl">2. Địa chỉ thư gửi cảnh báo <span class="src" data-src="smtp_user">Mặc định</span></span>
-                <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" placeholder="vidu@gmail.com" />
-              </label>
-              <label>
-                <span class="set-lbl">Mật khẩu ứng dụng <span class="src" id="s-pass-state">Chưa thiết lập</span></span>
-                <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="Bỏ trống để giữ nguyên" />
-              </label>
-            </div>
-
+                <div class="set-grid set-step">
+                  <label>
+                    <span class="set-lbl">Tài khoản đăng nhập</span>
+                    <input type="text" id="s-user" class="field" autocomplete="off" maxlength="255" placeholder="vidu@gmail.com" />
+                  </label>
+                  <label>
+                    <span class="set-lbl">Mật khẩu ứng dụng <span class="set-pass-state" id="s-pass-state">chưa có</span></span>
+                    <input type="password" id="s-pass" class="field" autocomplete="new-password" maxlength="255" placeholder="Bỏ trống để giữ mật khẩu đã lưu" />
+                  </label>
+                </div>
             <!-- Thiết lập nâng cao: bọc trong details, chỉ hiện khi chọn "Khác" -->
             <details id="s-advanced" class="set-adv" hidden>
               <summary>Thiết lập nâng cao (máy chủ, cổng, bảo mật, địa chỉ gửi)</summary>
               <div class="set-adv-body">
                 <div class="set-grid">
                   <label>
-                    <span class="set-lbl">Địa chỉ máy chủ <span class="src" data-src="smtp_host">Mặc định</span></span>
+                    <span class="set-lbl">Địa chỉ máy chủ</span>
                     <input type="text" id="s-host" class="field" placeholder="smtp.gmail.com" maxlength="255" />
                   </label>
                   <label>
-                    <span class="set-lbl">Cổng kết nối <span class="src" data-src="smtp_port">Mặc định</span></span>
+                    <span class="set-lbl">Cổng kết nối</span>
                     <input type="number" id="s-port" class="field num" min="1" max="65535" step="1" />
                   </label>
                   <label>
-                    <span class="set-lbl">Địa chỉ gửi (From) <span class="src" data-src="smtp_from">Mặc định</span></span>
+                    <span class="set-lbl">Địa chỉ gửi (From)</span>
                     <input type="text" id="s-from" class="field" maxlength="255" placeholder="canhbao@congty.com" />
                   </label>
                   <label>
-                    <span class="set-lbl">Bảo mật kết nối <span class="src" data-src="smtp_starttls">Mặc định</span></span>
+                    <span class="set-lbl">Bảo mật kết nối</span>
                     <select id="s-tls" class="field">
                       <option value="true">STARTTLS · cổng 587</option>
                       <option value="false">SSL/TLS · cổng 465</option>
@@ -1867,102 +1894,101 @@
                 </div>
               </div>
             </details>
+              </div>
+            </div>
 
+            <div class="set-step2">
+              <span class="set-num">3</span>
+              <div class="set-step-body">
+                <h3>Lưu và gửi thư thử</h3>
+                <p class="set-help">Thư thử tới được Hộp thư đến là cách duy nhất chắc chắn mọi thứ đã đúng.</p>
+                <div class="set-actions">
+                  <button type="button" class="btn-primary-sm" id="s-save-test">Lưu và gửi thư thử</button>
+                  <button type="button" class="btn-dl" id="s-save">Chỉ lưu</button>
+                </div>
+                <p class="set-msg" id="s-msg" hidden></p>
+              </div>
+            </div>
+          </div>
+
+          <details class="rep-card set-more" id="set-more">
+            <summary><b>Nâng cao</b> — thông số tính toán và ngưỡng cảnh báo trên màn hình
+              <span class="set-help">(thường không cần sửa)</span></summary>
+            <h3>Thông số bồn</h3>
+            <div class="set-grid">
+                <label>
+                  <span class="set-lbl">Áp suất van an toàn (MPa)</span>
+                  <input type="number" id="s-relief" class="field num" min="0.01" max="10" step="0.01" />
+                  <small class="set-help">Áp suất mà van an toàn của bồn mở ra. Dùng để tính bồn còn giữ áp được bao lâu — lấy theo thông số kỹ thuật của bồn.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Mức nạp tối đa (% dung tích)</span>
+                  <input type="number" id="s-maxfill" class="field num" min="1" max="100" step="1" />
+                  <small class="set-help">Nạp tới bao nhiêu phần trăm dung tích. Bồn lạnh phải chừa khoảng trống cho hơi — thường 90%.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Mức dự trữ (% dung tích)</span>
+                  <input type="number" id="s-reserve" class="field num" min="0" max="100" step="1" />
+                  <small class="set-help">Dưới mức này coi là sắp cạn. Email "bồn sắp chạm mức dự trữ" tính theo con số này.</small>
+                </label>
+            </div>
+            <h3>Đặt hàng</h3>
+            <div class="set-grid">
+                <label>
+                  <span class="set-lbl">Thời gian giao hàng (ngày)</span>
+                  <input type="number" id="s-lead" class="field num" min="0" max="30" step="0.5" />
+                  <small class="set-help">Từ lúc đặt tới lúc xe tới. Hệ thống nhắc đặt hàng sớm đúng chừng ấy.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Mức an toàn khi đặt hàng</span>
+                  <select id="s-service" class="field"><option value="50">50% · không dự phòng</option><option value="80">80%</option><option value="90">90%</option><option value="95">95% · thông dụng</option><option value="99">99% · rất an toàn</option></select>
+                  <small class="set-help">Càng cao càng đặt sớm, phòng khi nhà máy chạy mạnh hơn bình thường. 95% là mức thông dụng.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Số ngày dữ liệu để tính tiêu thụ</span>
+                  <input type="number" id="s-window" class="field num" min="1" max="365" step="1" />
+                  <small class="set-help">Mức tiêu thụ trung bình lấy từ bao nhiêu ngày gần nhất.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Sức chứa một xe (m³)</span>
+                  <input type="number" id="s-truck" class="field num" min="0.5" step="0.5" />
+                  <small class="set-help">Một xe chở được bao nhiêu m³ (20 tấn ≈ 44 m³). Dùng để chia chuyến ở Lịch giao hàng.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Số liệu cũ sau (giờ)</span>
+                  <input type="number" id="s-age" class="field num" min="1" max="8760" step="1" />
+                  <small class="set-help">Thiết bị không gửi số quá chừng này thì ngừng dự báo cho bồn đó — tránh dự báo từ số đã chết.</small>
+                </label>
+            </div>
+            <h3>Cảnh báo trên bảng điều khiển</h3>
+            <p class="set-help">Các ngưỡng dưới đây chỉ hiện cảnh báo trên màn hình, không gửi email.</p>
+            <div class="set-grid">
+                <label>
+                  <span class="set-lbl">Mất liên lạc sau (phút)</span>
+                  <input type="number" id="s-stale" class="field num" min="1" step="1" />
+                  <small class="set-help">Thiết bị im quá chừng này thì hiện "Ngoại tuyến".</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Mức chứa thấp (%)</span>
+                  <input type="number" id="s-lowvol" class="field num" min="0" max="100" step="0.5" />
+                  <small class="set-help">Bồn dưới mức phần trăm này thì tô đỏ.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Pin yếu (V)</span>
+                  <input type="number" id="s-lowbat" class="field num" min="0" step="0.01" />
+                  <small class="set-help">Pin thiết bị dưới mức này thì nhắc thay pin.</small>
+                </label>
+                <label>
+                  <span class="set-lbl">Tín hiệu yếu (%)</span>
+                  <input type="number" id="s-lowsig" class="field num" min="0" max="100" step="1" />
+                  <small class="set-help">Sóng di động dưới mức này thì nhắc kiểm tra ăng-ten.</small>
+                </label>
+            </div>
             <div class="set-actions">
-              <button type="button" class="btn-primary-sm" id="s-save-test">Lưu và gửi thư kiểm tra</button>
-              <button type="button" class="btn-dl" id="s-save">Lưu</button>
-            </div>
-            <p class="set-msg" id="s-msg" hidden></p>
-          </div>
-
-          <div class="rep-card">
-            <h2>Thông số bồn</h2>
-            <p class="hint">
-              <b>Áp suất van an toàn</b> là cơ sở tính thời gian giữ áp. Giá trị này phải khớp
-              thông số kỹ thuật của bồn thực tế.
-            </p>
-            <div class="set-grid">
-              <label>
-                <span class="set-lbl">Áp suất van an toàn (MPa) <span class="src" data-src="lng_relief_pressure_mpa">Mặc định</span></span>
-                <input type="number" id="s-relief" class="field num" min="0.01" max="10" step="0.01" />
-              </label>
-              <label>
-                <span class="set-lbl">Mức nạp tối đa (% dung tích) <span class="src" data-src="lng_max_fill_percent">Mặc định</span></span>
-                <input type="number" id="s-maxfill" class="field num" min="1" max="100" step="1" />
-              </label>
-              <label>
-                <span class="set-lbl">Mức dự trữ (% dung tích) <span class="src" data-src="forecast_reserve_percent">Mặc định</span></span>
-                <input type="number" id="s-reserve" class="field num" min="0" max="100" step="1" />
-              </label>
-            </div>
-          </div>
-
-          <div class="rep-card">
-            <h2>Chính sách đặt hàng</h2>
-            <p class="hint">
-              Hệ thống dùng các thông số này để xác định điểm đặt hàng lại và lượng đặt
-              khuyến nghị cho từng bồn.
-            </p>
-            <div class="set-grid">
-              <label>
-                <span class="set-lbl">Thời gian giao hàng (ngày) <span class="src" data-src="forecast_lead_time_days">Mặc định</span></span>
-                <input type="number" id="s-lead" class="field num" min="0" max="30" step="0.5" />
-              </label>
-              <label>
-                <span class="set-lbl">Mức phục vụ (%) <span class="src" data-src="forecast_service_level">Mặc định</span></span>
-                <select id="s-service" class="field">
-                  <option value="50">50 · không dự trữ an toàn</option>
-                  <option value="80">80</option>
-                  <option value="90">90</option>
-                  <option value="95">95 · thông dụng</option>
-                  <option value="99">99 · an toàn cao</option>
-                </select>
-              </label>
-              <label>
-                <span class="set-lbl">Phạm vi dữ liệu lịch sử (ngày) <span class="src" data-src="forecast_window_days">Mặc định</span></span>
-                <input type="number" id="s-window" class="field num" min="1" max="365" step="1" />
-              </label>
-              <label>
-                <span class="set-lbl">Sức chứa xe (m³) <span class="src" data-src="truck_capacity_l">Mặc định</span></span>
-                <input type="number" id="s-truck" class="field num" min="0.5" step="0.5" />
-              </label>
-              <label>
-                <span class="set-lbl">Ngưỡng số liệu cũ (giờ) <span class="src" data-src="forecast_max_reading_age_hours">Mặc định</span></span>
-                <input type="number" id="s-age" class="field num" min="1" max="8760" step="1" />
-              </label>
-            </div>
-          </div>
-
-          <div class="rep-card">
-            <h2>Ngưỡng cảnh báo</h2>
-            <p class="hint">
-              Vượt các ngưỡng này, hệ thống phát cảnh báo trên bảng điều khiển và gửi tới
-              địa chỉ nhận đã khai báo.
-            </p>
-            <div class="set-grid">
-              <label>
-                <span class="set-lbl">Ngưỡng ngoại tuyến (phút) <span class="src" data-src="online_stale_minutes">Mặc định</span></span>
-                <input type="number" id="s-stale" class="field num" min="1" step="1" />
-              </label>
-              <label>
-                <span class="set-lbl">Ngưỡng mức chứa thấp (%) <span class="src" data-src="alert_low_volume_percent">Mặc định</span></span>
-                <input type="number" id="s-lowvol" class="field num" min="0" max="100" step="0.5" />
-              </label>
-              <label>
-                <span class="set-lbl">Ngưỡng pin yếu (V) <span class="src" data-src="alert_low_battery_v">Mặc định</span></span>
-                <input type="number" id="s-lowbat" class="field num" min="0" step="0.01" />
-              </label>
-              <label>
-                <span class="set-lbl">Ngưỡng tín hiệu yếu (%) <span class="src" data-src="alert_low_signal_percent">Mặc định</span></span>
-                <input type="number" id="s-lowsig" class="field num" min="0" max="100" step="1" />
-              </label>
-            </div>
-            <div class="set-actions">
-              <button type="button" class="btn-primary-sm" id="s-save2">Lưu</button>
+              <button type="button" class="btn-primary-sm" id="s-save2">Lưu phần nâng cao</button>
               <span class="set-note" id="s-msg2"></span>
             </div>
-          </div>
-
+          </details>
         </div>
       </section>
     </main>
@@ -4613,7 +4639,9 @@
     // cấu hình lưu từ trước không bị hạ về "Khác" rồi lộ nguyên khối kỹ thuật.
     function smtpProviderFromHost(host) {
       const h = (host || "").trim().toLowerCase();
-      if (h === "" || h === "smtp.gmail.com") return "gmail";
+      // Chưa cấu hình gì: gợi ý Brevo — tự đăng ký được, không cần quản trị viên.
+      if (h === "") return "brevo";
+      if (h === "smtp.gmail.com") return "gmail";
       if (h === "smtp-mail.outlook.com" || h === "smtp.live.com" || h === "smtp.outlook.com") return "outlook";
       if (h === "smtp.office365.com") return "m365";
       // Nhận cả tên miền cũ: một cấu hình lưu từ thời Sendinblue không được rơi
@@ -4654,14 +4682,27 @@
           tag.classList.toggle("app", src === "app");
         });
         const ps = document.getElementById("s-pass-state");
-        ps.textContent = d.smtp_password_set ? "Đã thiết lập" : "Chưa thiết lập";
+        ps.textContent = d.smtp_password_set ? "đã lưu" : "chưa có";
         ps.classList.toggle("app", !!d.smtp_password_set);
 
+        // Một nhãn trạng thái nhìn là hiểu, và lý do bằng lời thường ngay bên dưới.
+        const pill = document.getElementById("set-mail-pill");
         const state = document.getElementById("set-smtp-state");
-        state.textContent = d.smtp_ready
-          ? "Cấu hình đầy đủ. Gửi thư kiểm tra để xác nhận kết nối."
-          : "Chưa gửi được cảnh báo — " + (d.smtp_blocked_reason || "thiếu cấu hình");
-        state.style.color = d.smtp_ready ? "var(--ok)" : "var(--warn)";
+        const on = !!d.values.notify_enabled;
+        let cls, label, why;
+        if (!on) {
+          cls = ""; label = "Đang tắt"; why = "Bật ở Bước 1 để hệ thống gửi email.";
+        } else if (d.smtp_ready && !d.smtp_blocked_reason) {
+          cls = "ok"; label = "✓ Sẵn sàng gửi"; why = "Bấm \"Lưu và gửi thư thử\" để chắc thư tới được Hộp thư đến.";
+        } else if (d.smtp_ready) {
+          cls = "warn"; label = "⚠ Có thể gửi được"; why = d.smtp_blocked_reason;
+        } else {
+          cls = "bad"; label = "✕ Chưa gửi được"; why = d.smtp_blocked_reason || "Cấu hình chưa đầy đủ.";
+        }
+        pill.className = "set-pill" + (cls ? " " + cls : "");
+        pill.textContent = label;
+        state.textContent = why;
+        state.style.color = cls === "bad" ? "var(--crit)" : cls === "warn" ? "var(--warn)" : "";
 
         const meta = document.getElementById("set-meta");
         meta.textContent = d.updated_at
@@ -4698,10 +4739,11 @@
       return patch;
     }
 
-    // Hai nhóm khoá RIÊNG, khớp đúng hai thẻ trên giao diện: mỗi nút Lưu chỉ ghi
-    // phần nó phụ trách, nên người dùng luôn biết mình vừa lưu cái gì.
+    // Hai nhóm khoá, khớp đúng hai khối trên giao diện: thẻ Email cảnh báo (người
+    // nhận + hộp thư gửi, MỘT nút lưu) và mục Nâng cao.
     const RECIPIENT_KEYS = ["alert_email_to", "notify_enabled", "alert_resend_hours"];
     const SMTP_KEYS = ["smtp_host", "smtp_port", "smtp_user", "smtp_from", "smtp_starttls"];
+    const MAIL_KEYS = RECIPIENT_KEYS.concat(SMTP_KEYS);
     const PARAM_KEYS = ["lng_relief_pressure_mpa", "lng_max_fill_percent",
       "forecast_reserve_percent", "forecast_lead_time_days", "forecast_service_level",
       "forecast_window_days", "truck_capacity_l", "forecast_max_reading_age_hours",
@@ -4712,7 +4754,7 @@
       const patch = collectSettings(keys);
       // Mật khẩu: ô trống nghĩa là GIỮ NGUYÊN, không phải xoá. Nếu gửi null khi
       // trống thì mỗi lần lưu một thay đổi nhỏ sẽ xoá mất mật khẩu đã lưu.
-      if (keys === SMTP_KEYS) {
+      if (keys.includes("smtp_host")) {
         const pass = document.getElementById("s-pass").value;
         if (pass) patch.smtp_password = pass;
       }
@@ -4730,25 +4772,13 @@
       return d;
     }
 
-    async function onSaveRecipients() {
-      const btn = document.getElementById("s-save-recipients");
-      btn.disabled = true;
-      try {
-        await saveSettings(RECIPIENT_KEYS, "s-msg0", "Đã lưu danh sách người nhận.");
-      } catch (e) {
-        if (e.name !== "AuthError") document.getElementById("s-msg0").textContent = e.message;
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
     async function onSaveEmail(alsoTest) {
       const btns = ["s-save", "s-save-test"].map(i => document.getElementById(i));
       btns.forEach(b => b.disabled = true);
       try {
-        await saveSettings(SMTP_KEYS, "s-msg");
-        if (!alsoTest) { setMsg("s-msg", "Đã lưu cấu hình máy chủ.", "ok"); return; }
-        setMsg("s-msg", "Đã lưu. Đang gửi thư kiểm tra…", "");
+        await saveSettings(MAIL_KEYS, "s-msg");
+        if (!alsoTest) { setMsg("s-msg", "Đã lưu.", "ok"); return; }
+        setMsg("s-msg", "Đã lưu. Đang gửi thư thử…", "");
         const r = await api("/api/settings/test-email", { method: "POST" });
         setMsg("s-msg", r.message, r.ok ? "ok" : "bad");
       } catch (e) {
@@ -5266,7 +5296,6 @@
       });
 
       // Cài đặt
-      document.getElementById("s-save-recipients").addEventListener("click", onSaveRecipients);
       document.getElementById("s-save").addEventListener("click", () => onSaveEmail(false));
       document.getElementById("s-provider").addEventListener("change", (e) => applySmtpProvider(e.target.value, true));
       document.getElementById("s-user").addEventListener("input", syncSmtpUserToFrom);

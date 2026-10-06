@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import smtplib
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from decimal import Decimal
 from email.message import EmailMessage
 from zoneinfo import ZoneInfo
@@ -46,12 +46,13 @@ from app.services.appconfig import ConfigLike, load_config
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
 
-#: Chỉ những mã này được gửi ra ngoài. Cảnh báo hạ tầng như WEAK_SIGNAL hay
-#: PERCENT_MISMATCH là việc của người vận hành platform, không phải việc khiến
-#: ai đó phải thức dậy — để chúng vào email sẽ làm loãng những mã thật sự gấp.
-NOTIFY_CODES = frozenset(
-    {"RUNOUT", "HOLD_TIME", "LOW_VOLUME", "OFFLINE", "BOIL_OFF_HIGH", "LOW_BATTERY"}
-)
+#: Chỉ những mã này được gửi ra ngoài — cùng với báo động của nhà máy (tiền tố
+#: ``VENDOR_CODE_PREFIX``). Người vận hành chốt 06/10/2026: email chỉ cho hai việc
+#: phải làm — "bồn sắp chạm mức dự trữ" (RUNOUT, kèm lượng nên đặt) và "nhà máy
+#: báo động". Mọi cảnh báo khác (mất liên lạc, pin, sóng, giữ áp, bay hơi, mức
+#: thấp) vẫn hiện trên bảng điều khiển, nhưng không gửi email: chúng làm loãng
+#: hộp thư đến mức người nhận bỏ qua cả thư thật sự gấp.
+NOTIFY_CODES = frozenset({"RUNOUT"})
 
 #: Tiền tố mã cho báo động do NGUỒN phát. Không nằm trong ``NOTIFY_CODES`` vì mã
 #: mang theo định danh của việc (thiết bị + hash thông điệp) — cửa chặn gửi lại
@@ -164,7 +165,10 @@ def collect_notices(
             calendar=pr_repo.delivery_calendar(session, t.psn, tz=settings.tzinfo, today=now),
         )
         for fa in f.alerts:
-            out.append(Notice(t.psn, t.name, fa.code, fa.severity, fa.message))
+            msg = fa.message
+            if fa.code == "RUNOUT":
+                msg += _order_hint(f.suggestion, settings.tzinfo)
+            out.append(Notice(t.psn, t.name, fa.code, fa.severity, msg))
 
     out.extend(_vendor_notices(session, settings, now))
 
@@ -175,6 +179,22 @@ def collect_notices(
     ]
     picked.sort(key=lambda n: (_SEV_ORDER.get(n.severity, 9), n.psn, n.code))
     return picked
+
+
+def _order_hint(s: fc.OrderSuggestion, tz: tzinfo) -> str:
+    """Việc phải làm, viết luôn trong thư: đặt bao nhiêu, trước lúc nào, giao lúc nào.
+
+    Thư "còn 2 ngày tới mức dự trữ" mà không nói đặt bao nhiêu thì người nhận phải
+    mở trang ra tính lại — đúng việc hệ thống đã tính sẵn.
+    """
+    if not s.order_l:
+        return ""
+    hint = f". Nên đặt {s.order_l / 1000:.1f} m³"
+    if s.order_at is not None:
+        hint += f", đặt trước {s.order_at.astimezone(tz):%H:%M %d/%m}"
+    if s.deliver_at is not None:
+        hint += f", xe giao {s.deliver_at.astimezone(tz):%H:%M %d/%m}"
+    return hint
 
 
 def _vendor_notices(

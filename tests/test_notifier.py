@@ -88,11 +88,12 @@ def test_notify_codes_exclude_infrastructure_noise() -> None:
     Để chúng vào email sẽ làm loãng RUNOUT và HOLD_TIME — hai mã thật sự cần
     người ta hành động ngay.
     """
-    assert "RUNOUT" in NOTIFY_CODES
-    assert "HOLD_TIME" in NOTIFY_CODES
-    assert "LOW_VOLUME" in NOTIFY_CODES
-    assert "WEAK_SIGNAL" not in NOTIFY_CODES
-    assert "PERCENT_MISMATCH" not in NOTIFY_CODES
+    # Người vận hành chốt 06/10/2026: email CHỈ cho "bồn sắp chạm mức dự trữ"
+    # (RUNOUT) và báo động nhà máy (tiền tố VENDOR:). Mọi mã khác chỉ hiện trên màn hình.
+    assert NOTIFY_CODES == frozenset({"RUNOUT"})
+    for code in ("HOLD_TIME", "LOW_VOLUME", "OFFLINE", "BOIL_OFF_HIGH", "LOW_BATTERY",
+                 "WEAK_SIGNAL", "PERCENT_MISMATCH"):
+        assert code not in NOTIFY_CODES
 
 
 def test_severity_rank_orders_critical_first() -> None:
@@ -147,3 +148,20 @@ def test_stats_summary_readable() -> None:
         considered=1, failed=1, reason="SMTPAuthenticationError: sai mật khẩu"
     )
     assert "SMTPAuthenticationError" in s2.summary()
+
+
+def test_thu_sap_can_ghi_luon_nen_dat_bao_nhieu_va_luc_nao() -> None:
+    """Thư "sắp chạm mức dự trữ" phải nói việc cần làm, không bắt người nhận tự tính."""
+    from dataclasses import replace
+
+    from app.domain import forecast as fc
+    from app.services.notifier import _order_hint
+
+    vn = ZoneInfo("Asia/Ho_Chi_Minh")
+    f = fc.build_forecast([], psn="X", volume_l=20000.0, capacity_l=60000.0,
+                          pressure_mpa=0.4, now=datetime(2026, 10, 6, 1, 0, tzinfo=vn))
+    s = replace(f.suggestion, order_l=41180.0,
+                order_at=datetime(2026, 10, 7, 8, 0, tzinfo=vn),
+                deliver_at=datetime(2026, 10, 8, 8, 0, tzinfo=vn))
+    assert _order_hint(s, vn) == ". Nên đặt 41.2 m³, đặt trước 08:00 07/10, xe giao 08:00 08/10"
+    assert _order_hint(replace(s, order_l=None), vn) == ""

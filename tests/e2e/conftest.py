@@ -123,6 +123,10 @@ def server(world: dict[str, Any], tmp_path_factory: pytest.TempPathFactory) -> I
         "NOTIFY_ENABLED": "false",
         "YOKOHAMA_ENABLED": "false",
         "XINGKE_ALLOWED_PSNS": "",
+        # Xoá trắng cấu hình thư lấy từ .env của máy dev: kết quả giống hệt CI, và
+        # nút "gửi thư thử" trong test không bao giờ chạm một hộp thư thật.
+        "SMTP_HOST": "", "SMTP_USER": "", "SMTP_FROM": "", "SMTP_PASSWORD": "",
+        "ALERT_EMAIL_TO": "",
         "PYTHONIOENCODING": "utf-8",
     }
     with log_path.open("w", encoding="utf-8") as log:
