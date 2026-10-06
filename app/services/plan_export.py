@@ -13,36 +13,53 @@ tích và số đo tay người dùng đang thấy) và gửi lên; một bản 
 là cách chắc chắn nhất để file lệch với màn hình. Phần THẬT — lần nạp, thể tích
 từng ngày, ngày nghỉ — server tự đọc từ dữ liệu, không tin trang gửi lên.
 
+Mọi ô tổng là SỐ, không phải công thức. openpyxl không lưu sẵn kết quả công thức,
+và Excel mở file tải về ở Protected View — chế độ không tính lại — nên ô SUM hiện
+TRỐNG: dòng "Tổng cộng" trống trơn trên máy người dùng (06/10/2026).
+
 Module này thuần: nhận dữ liệu đã chuẩn bị, trả bytes. Không đọc DB.
 """
 
 from __future__ import annotations
 
 import io
+import struct
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.cell.cell import Cell
 from openpyxl.chart import BarChart, LineChart, Reference
+from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 WEEKDAY_VI = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
 
-# Bảng màu: xanh thương hiệu cho tiêu đề, xanh lá nhạt = đã xảy ra, vàng = tổng
-# (giữ đúng thói quen của mẫu gốc), xám = ngày nghỉ / không có số đo.
+#: Logo chữ của công ty — cùng file trang web dùng ở màn đăng nhập.
+LOGO_PATH = Path(__file__).resolve().parents[1] / "static" / "logo-nlx.png"
+
+# Bảng màu: xanh thương hiệu cho tiêu đề; xanh lá nhạt = đã xảy ra; vàng = tổng
+# (giữ đúng thói quen của mẫu gốc); xám rất nhạt = sọc dòng; cam = ngày nghỉ.
 _BRAND = "1F4E79"
+_GREEN = "375623"
+_ORANGE = "C55A11"
+_GREY = "595959"
 _HEAD_FILL = PatternFill("solid", fgColor=_BRAND)
 _DONE_FILL = PatternFill("solid", fgColor="E2F0D9")
+_ZEBRA_FILL = PatternFill("solid", fgColor="F5F8FC")
 _TOTAL_FILL = PatternFill("solid", fgColor="FFF2CC")
 _MUTED_FILL = PatternFill("solid", fgColor="F2F2F2")
 _THIN = Side(style="thin", color="BFBFBF")
+_EDGE = Side(style="medium", color=_BRAND)
 _BOX = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
 _M3 = "#,##0.00"
 _DATE = "dd/mm/yyyy"
 _DT = "dd/mm/yyyy hh:mm"
+#: Hàng tiêu đề bảng ở mọi sheet — cố định để người đọc (và test) không phải dò.
+HEADER_ROW = 7
 
 
 # --------------------------------------------------------------------------- #
@@ -160,8 +177,36 @@ def build_schedule(
 
 
 # --------------------------------------------------------------------------- #
-# Dựng workbook
+# Khung trình bày dùng chung
 # --------------------------------------------------------------------------- #
+
+
+class _PngImage(Image):
+    """Ảnh PNG cho openpyxl mà KHÔNG cần Pillow.
+
+    ``openpyxl.drawing.image.Image`` mở ảnh bằng Pillow chỉ để đọc kích thước —
+    thêm một thư viện xử lý ảnh vào bản deploy cho đúng một việc đó là không
+    đáng. PNG ghi kích thước ngay trong khối IHDR (byte 16–24).
+    """
+
+    def __init__(self, data: bytes, *, height_px: int) -> None:
+        if data[:8] != b"\x89PNG\r\n\x1a\n":
+            raise ValueError("logo phải là PNG")
+        w, h = struct.unpack(">II", data[16:24])
+        self.ref = data
+        self.format = "png"
+        self.height = height_px
+        self.width = round(w * height_px / h)
+
+    def _data(self) -> bytes:
+        return self.ref
+
+
+def _logo(height_px: int = 46) -> _PngImage | None:
+    try:
+        return _PngImage(LOGO_PATH.read_bytes(), height_px=height_px)
+    except (OSError, ValueError):
+        return None   # thiếu logo không được làm hỏng báo cáo
 
 
 def _text(cell: Cell, value: str | None) -> None:
@@ -175,65 +220,80 @@ def _text(cell: Cell, value: str | None) -> None:
     cell.data_type = "s"
 
 
-def _title_block(ws: Worksheet, title: str, meta: ReportMeta, ncols: int, extra: str | None = None) -> int:
-    """Ba dòng đầu trang. Trả về số dòng của hàng tiêu đề bảng."""
+def _band(ws: Worksheet, title: str, meta: ReportMeta, ncols: int, extra: str | None) -> None:
+    """Đầu trang: logo trái, tên báo cáo + kỳ phải, đường kẻ thương hiệu, thông tin bồn.
+
+    Hàng 1–2: logo | tên báo cáo / kỳ. Hàng 3: đường kẻ. Hàng 4: bồn · khách hàng.
+    Hàng 5: dòng giải thích (nếu có). Hàng 6: khoảng trống. Hàng 7: tiêu đề bảng.
+    """
     last = get_column_letter(ncols)
-    ws.merge_cells(f"A1:{last}1")
-    ws["A1"] = title
-    ws["A1"].font = Font(bold=True, size=15, color=_BRAND)
+    right = get_column_letter(max(3, ncols - 2))
     ws.row_dimensions[1].height = 24
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 6
+    logo = _logo()
+    if logo is not None:
+        ws.add_image(logo, "A1")
 
-    ws.merge_cells(f"A2:{last}2")
-    who = f"Bồn: {meta.tank_name} ({meta.psn})"
+    ws.merge_cells(f"{right}1:{last}1")
+    c = ws[f"{right}1"]
+    c.value = title
+    c.font = Font(bold=True, size=16, color=_BRAND)
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    ws.merge_cells(f"{right}2:{last}2")
+    c = ws[f"{right}2"]
+    _text(c, f"Kỳ báo cáo: {meta.from_day:%d/%m/%Y} – {meta.to_day:%d/%m/%Y}")
+    c.font = Font(size=10, color=_GREY)
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    for col in range(1, ncols + 1):
+        ws.cell(3, col).border = Border(bottom=_EDGE)
+
+    ws.merge_cells(f"A4:{last}4")
+    who = f"Bồn: {meta.tank_name}"
     if meta.customer:
-        who += f"   ·   Khách hàng: {meta.customer}"
-    _text(ws["A2"], who)
-    ws["A2"].font = Font(bold=True, size=11)
-
-    ws.merge_cells(f"A3:{last}3")
-    line = (
-        f"Kỳ: {meta.from_day:%d/%m/%Y} – {meta.to_day:%d/%m/%Y}   ·   "
-        f"Xuất lúc {meta.generated_at:%d/%m/%Y %H:%M}"
-    )
-    _text(ws["A3"], line)
-    ws["A3"].font = Font(size=10, color="595959")
-    row = 4
+        who += f"     ·     Khách hàng: {meta.customer}"
+    _text(ws["A4"], who)
+    ws["A4"].font = Font(bold=True, size=11, color="262626")
+    ws["A4"].alignment = Alignment(vertical="center")
+    ws.row_dimensions[4].height = 20
     if extra:
-        ws.merge_cells(f"A4:{last}4")
-        _text(ws["A4"], extra)
-        ws["A4"].font = Font(italic=True, size=9, color="595959")
-        ws["A4"].alignment = Alignment(wrap_text=True, vertical="top")
-        ws.row_dimensions[4].height = 28
-        row = 5
-    return row + 1
+        ws.merge_cells(f"A5:{last}5")
+        _text(ws["A5"], extra)
+        ws["A5"].font = Font(italic=True, size=9, color=_GREY)
+        ws["A5"].alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[5].height = 26
 
 
-def _header(ws: Worksheet, row: int, labels: list[str], widths: list[float]) -> None:
+def _header(ws: Worksheet, labels: list[str], widths: list[float]) -> None:
     for i, (lbl, w) in enumerate(zip(labels, widths, strict=True), start=1):
-        c = ws.cell(row, i, lbl)
+        c = ws.cell(HEADER_ROW, i, lbl)
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = _HEAD_FILL
-        c.border = _BOX
+        c.border = Border(left=_THIN, right=_THIN, top=_EDGE, bottom=_EDGE)
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         ws.column_dimensions[get_column_letter(i)].width = w
-    ws.row_dimensions[row].height = 30
-    ws.freeze_panes = ws.cell(row + 1, 1)
-    ws.print_title_rows = f"{row}:{row}"
+    ws.row_dimensions[HEADER_ROW].height = 30
+    ws.freeze_panes = ws.cell(HEADER_ROW + 1, 1)
+    ws.print_title_rows = f"{HEADER_ROW}:{HEADER_ROW}"
 
 
-def _print_setup(ws: Worksheet, landscape: bool = False) -> None:
+def _print_setup(ws: Worksheet, meta: ReportMeta, landscape: bool = False) -> None:
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.orientation = "landscape" if landscape else "portrait"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_margins.left = ws.page_margins.right = 0.5
+    ws.page_margins.top = 0.6
     ws.print_options.horizontalCentered = True
+    ws.sheet_view.showGridLines = False
+    ws.oddFooter.left.text = f"Xuất lúc {meta.generated_at:%d/%m/%Y %H:%M}"
+    ws.oddFooter.left.size = 8
     ws.oddFooter.center.text = "Trang &P / &N"
     ws.oddFooter.center.size = 8
 
 
-def _row_style(ws: Worksheet, row: int, ncols: int, fill: PatternFill | None) -> None:
+def _row(ws: Worksheet, row: int, ncols: int, fill: PatternFill | None) -> None:
     for col in range(1, ncols + 1):
         c = ws.cell(row, col)
         c.border = _BOX
@@ -241,102 +301,111 @@ def _row_style(ws: Worksheet, row: int, ncols: int, fill: PatternFill | None) ->
             c.fill = fill
         if not c.alignment.horizontal:
             c.alignment = Alignment(vertical="center")
+    ws.row_dimensions[row].height = 18
+
+
+def _total(ws: Worksheet, row: int, ncols: int, label_to: int, label: str,
+           values: dict[int, object]) -> None:
+    """Dòng tổng: nền vàng như mẫu gốc, chữ đậm, viền đậm. Giá trị là SỐ."""
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=label_to)
+    ws.cell(row, 1, label).alignment = Alignment(horizontal="center", vertical="center")
+    for col, v in values.items():
+        c = ws.cell(row, col, v)
+        if isinstance(v, float):
+            c.number_format = _M3
+            c.alignment = Alignment(vertical="center")
+        else:
+            c.alignment = Alignment(horizontal="center", vertical="center")
+    for col in range(1, ncols + 1):
+        c = ws.cell(row, col)
+        c.font = Font(bold=True)
+        c.fill = _TOTAL_FILL
+        c.border = Border(left=_THIN, right=_THIN, top=_EDGE, bottom=_EDGE)
+    ws.row_dimensions[row].height = 22
+
+
+def _empty(ws: Worksheet, ncols: int, msg: str) -> int:
+    r = HEADER_ROW + 1
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ncols)
+    _text(ws.cell(r, 1), msg)
+    ws.cell(r, 1).font = Font(italic=True, color=_GREY)
+    ws.cell(r, 1).alignment = Alignment(horizontal="center")
+    return r
+
+
+# --------------------------------------------------------------------------- #
+# Ba sheet
+# --------------------------------------------------------------------------- #
 
 
 def _sheet_schedule(ws: Worksheet, rows: list[ScheduleRow], meta: ReportMeta) -> None:
     ws.title = "Lịch nạp"
     labels = ["STT", "Khách hàng", "Ngày nạp", "Thứ", "Lượng (m³)", "Trạng thái", "Ghi chú"]
     n = len(labels)
-    head = _title_block(ws, "LỊCH NẠP LNG", meta, n, meta.basis)
-    _header(ws, head, labels, [6, 24, 13, 11, 13, 12, 46])
+    _band(ws, "LỊCH NẠP LNG", meta, n, meta.basis)
+    _header(ws, labels, [6, 24, 13, 11, 13, 13, 44])
 
-    r = head
+    customer = meta.customer or meta.tank_name
+    r = HEADER_ROW
+    planned_i = 0
     for i, s in enumerate(rows, start=1):
-        r = head + i
-        ws.cell(r, 1, i).alignment = Alignment(horizontal="center")
-        _text(ws.cell(r, 2), meta.customer or meta.tank_name)
+        r = HEADER_ROW + i
+        ws.cell(r, 1, i).alignment = Alignment(horizontal="center", vertical="center")
+        _text(ws.cell(r, 2), customer)
         c = ws.cell(r, 3, s.day)
         c.number_format = _DATE
-        c.alignment = Alignment(horizontal="center")
+        c.alignment = Alignment(horizontal="center", vertical="center")
         _text(ws.cell(r, 4), WEEKDAY_VI[s.day.weekday()])
         ws.cell(r, 5, round(s.m3, 2)).number_format = _M3
-        _text(ws.cell(r, 6), "Đã nạp" if s.actual else "Kế hoạch")
-        ws.cell(r, 6).alignment = Alignment(horizontal="center")
-        _text(ws.cell(r, 7), "; ".join(s.notes))
-        ws.cell(r, 7).alignment = Alignment(wrap_text=True, vertical="center")
-        _row_style(ws, r, n, _DONE_FILL if s.actual else None)
-
-    first, last = head + 1, max(head + 1, r)
-    t = r + 1
-    ws.merge_cells(start_row=t, start_column=1, end_row=t, end_column=4)
-    ws.cell(t, 1, "Tổng cộng").alignment = Alignment(horizontal="center")
-    # Công thức chứ không ghi số: người nhận hay sửa tay một dòng, và tổng phải theo.
-    ws.cell(t, 5, f"=SUM(E{first}:E{last})" if rows else 0).number_format = _M3
-    ws.cell(t, 6, f'=COUNTA(F{first}:F{last})&" lần"' if rows else "0 lần")
-    ws.cell(t, 6).alignment = Alignment(horizontal="center")
-    for col in range(1, n + 1):
-        c = ws.cell(t, col)
-        c.font = Font(bold=True)
-        c.fill = _TOTAL_FILL
-        c.border = _BOX
-
-    # Tách tổng thành "đã nạp" và "kế hoạch" — câu hỏi đầu tiên của người đọc.
-    for k, (lbl, key) in enumerate((("Trong đó đã nạp", "Đã nạp"), ("Trong đó kế hoạch", "Kế hoạch")), start=1):
-        rr = t + k
-        ws.merge_cells(start_row=rr, start_column=1, end_row=rr, end_column=4)
-        ws.cell(rr, 1, lbl).alignment = Alignment(horizontal="right")
-        ws.cell(rr, 1).font = Font(italic=True, color="595959")
-        if rows:
-            ws.cell(rr, 5, f'=SUMIF(F{first}:F{last},"{key}",E{first}:E{last})')
-            ws.cell(rr, 6, f'=COUNTIF(F{first}:F{last},"{key}")&" lần"')
+        st = ws.cell(r, 6)
+        _text(st, "Đã nạp" if s.actual else "Kế hoạch")
+        st.font = Font(bold=True, color=_GREEN if s.actual else _BRAND)
+        st.alignment = Alignment(horizontal="center", vertical="center")
+        note = ws.cell(r, 7)
+        _text(note, "; ".join(s.notes))
+        note.alignment = Alignment(wrap_text=True, vertical="center")
+        if any(x.startswith("Nghỉ") for x in s.notes):
+            note.font = Font(italic=True, color=_ORANGE)
+        if s.actual:
+            fill: PatternFill | None = _DONE_FILL
         else:
-            ws.cell(rr, 5, 0)
-            ws.cell(rr, 6, "0 lần")
-        ws.cell(rr, 5).number_format = _M3
-        ws.cell(rr, 6).alignment = Alignment(horizontal="center")
-        if key == "Đã nạp":
-            for col in (5, 6):
-                ws.cell(rr, col).fill = _DONE_FILL
+            fill = _ZEBRA_FILL if planned_i % 2 else None
+            planned_i += 1
+        _row(ws, r, n, fill)
+    if not rows:
+        r = _empty(ws, n, "Không có lần nạp nào trong kỳ.")
 
-    _print_setup(ws)
+    _total(ws, r + 1, n, 4, "Tổng cộng",
+           {5: round(sum(s.m3 for s in rows), 2), 6: f"{len(rows)} lần"})
+    _print_setup(ws, meta)
 
 
 def _sheet_refills(ws: Worksheet, refills: list[ActualRefill], meta: ReportMeta) -> None:
     ws.title = "Nhật ký nạp thật"
     labels = ["STT", "Thời điểm", "Thứ", "Trước khi nạp (m³)", "Sau khi nạp (m³)", "Lượng nạp (m³)"]
     n = len(labels)
-    head = _title_block(
-        ws, "NHẬT KÝ NẠP THẬT", meta, n,
-        "Hệ thống tự nhận diện lần nạp từ bước tăng của thể tích đo được — không nhập tay.",
-    )
-    _header(ws, head, labels, [6, 18, 11, 16, 16, 15])
-    r = head
+    _band(ws, "NHẬT KÝ NẠP THẬT", meta, n,
+          "Hệ thống tự nhận diện lần nạp từ bước tăng của thể tích đo được — không nhập tay.")
+    _header(ws, labels, [6, 18, 11, 17, 17, 16])
+    r = HEADER_ROW
     for i, a in enumerate(sorted(refills, key=lambda x: x.at), start=1):
-        r = head + i
-        ws.cell(r, 1, i).alignment = Alignment(horizontal="center")
+        r = HEADER_ROW + i
+        ws.cell(r, 1, i).alignment = Alignment(horizontal="center", vertical="center")
         c = ws.cell(r, 2, a.at.replace(tzinfo=None))
         c.number_format = _DT
-        c.alignment = Alignment(horizontal="center")
+        c.alignment = Alignment(horizontal="center", vertical="center")
         _text(ws.cell(r, 3), WEEKDAY_VI[a.at.weekday()])
         ws.cell(r, 4, round(a.before_m3, 2)).number_format = _M3
         ws.cell(r, 5, round(a.after_m3, 2)).number_format = _M3
-        ws.cell(r, 6, round(a.m3, 2)).number_format = _M3
-        _row_style(ws, r, n, None)
+        amt = ws.cell(r, 6, round(a.m3, 2))
+        amt.number_format = _M3
+        amt.font = Font(bold=True, color=_GREEN)
+        _row(ws, r, n, _ZEBRA_FILL if i % 2 == 0 else None)
     if not refills:
-        ws.merge_cells(start_row=head + 1, start_column=1, end_row=head + 1, end_column=n)
-        _text(ws.cell(head + 1, 1), "Không có lần nạp nào trong kỳ.")
-        ws.cell(head + 1, 1).font = Font(italic=True, color="595959")
-        r = head + 1
-    t = r + 1
-    ws.merge_cells(start_row=t, start_column=1, end_row=t, end_column=5)
-    ws.cell(t, 1, f"Tổng cộng · {len(refills)} lần").alignment = Alignment(horizontal="center")
-    ws.cell(t, 6, f"=SUM(F{head + 1}:F{r})" if refills else 0).number_format = _M3
-    for col in range(1, n + 1):
-        c = ws.cell(t, col)
-        c.font = Font(bold=True)
-        c.fill = _TOTAL_FILL
-        c.border = _BOX
-    _print_setup(ws)
+        r = _empty(ws, n, "Không có lần nạp nào trong kỳ.")
+    _total(ws, r + 1, n, 5, f"Tổng cộng · {len(refills)} lần",
+           {6: round(sum(a.m3 for a in refills), 2)})
+    _print_setup(ws, meta)
 
 
 def _chart_style(chart: LineChart | BarChart, title: str, cats: Reference) -> None:
@@ -356,7 +425,6 @@ def _chart_style(chart: LineChart | BarChart, title: str, cats: Reference) -> No
     chart.y_axis.delete = False
     chart.x_axis.number_format = "dd/mm"
     chart.y_axis.number_format = "0"
-    chart.y_axis.majorGridlines.spPr = None
 
 
 def _sheet_days(ws: Worksheet, days: list[DayRow], meta: ReportMeta) -> None:
@@ -364,72 +432,80 @@ def _sheet_days(ws: Worksheet, days: list[DayRow], meta: ReportMeta) -> None:
     labels = ["Ngày", "Thứ", "Đầu ngày (m³)", "Cuối ngày (m³)", "Nạp trong ngày (m³)",
               "Tiêu thụ (m³)", "Ghi chú"]
     n = len(labels)
-    head = _title_block(
-        ws, "TIÊU THỤ THEO NGÀY", meta, n,
-        "Tiêu thụ = đầu ngày + nạp trong ngày − cuối ngày. Đầu ngày là lần đo đầu tiên "
-        "của ngày; cuối ngày là đầu ngày hôm sau. Chỉ gồm những ngày đã qua.",
-    )
-    _header(ws, head, labels, [13, 11, 14, 14, 16, 14, 28])
-    r = head
+    _band(ws, "TIÊU THỤ THEO NGÀY", meta, n,
+          "Tiêu thụ = đầu ngày + nạp trong ngày − cuối ngày. Đầu ngày là lần đo đầu tiên "
+          "của ngày; cuối ngày là đầu ngày hôm sau. Chỉ gồm những ngày đã qua.")
+    _header(ws, labels, [13, 11, 14, 14, 16, 14, 26])
+    r = HEADER_ROW
     for i, d in enumerate(days, start=1):
-        r = head + i
+        r = HEADER_ROW + i
         c = ws.cell(r, 1, d.day)
         c.number_format = _DATE
-        c.alignment = Alignment(horizontal="center")
+        c.alignment = Alignment(horizontal="center", vertical="center")
         _text(ws.cell(r, 2), WEEKDAY_VI[d.day.weekday()])
         for col, v in ((3, d.open_m3), (4, d.close_m3), (5, d.refill_m3 or None), (6, d.use_m3)):
             cell = ws.cell(r, col, None if v is None else round(v, 2))
             cell.number_format = _M3
-        _text(ws.cell(r, 7), d.note)
-        fill = _DONE_FILL if d.refill_m3 > 0 else (_MUTED_FILL if d.rest or d.open_m3 is None else None)
-        _row_style(ws, r, n, fill)
-    if days:
-        t = r + 1
-        ws.merge_cells(start_row=t, start_column=1, end_row=t, end_column=4)
-        ws.cell(t, 1, "Tổng cộng").alignment = Alignment(horizontal="center")
-        ws.cell(t, 5, f"=SUM(E{head + 1}:E{r})").number_format = _M3
-        ws.cell(t, 6, f"=SUM(F{head + 1}:F{r})").number_format = _M3
-        for col in range(1, n + 1):
-            c = ws.cell(t, col)
-            c.font = Font(bold=True)
-            c.fill = _TOTAL_FILL
-            c.border = _BOX
-        avg = t + 1
-        ws.merge_cells(start_row=avg, start_column=1, end_row=avg, end_column=5)
-        # Bình quân những ngày CÓ tiêu thụ — cùng cách tính "khi nhà máy chạy" của
-        # trang Kế hoạch. Gộp cả ngày nghỉ (tiêu thụ 0) thì số bị kéo thấp và lệch
-        # với mức tiêu thụ người vận hành đang lập kế hoạch.
-        ws.cell(avg, 1, "Bình quân ngày nhà máy chạy (bỏ ngày tiêu thụ 0)").alignment = Alignment(horizontal="right")
-        ws.cell(avg, 1).font = Font(italic=True, color="595959")
-        ws.cell(avg, 6, f'=IFERROR(AVERAGEIF(F{head + 1}:F{r},">0"),"")').number_format = _M3
+        if d.refill_m3:
+            ws.cell(r, 5).font = Font(bold=True, color=_GREEN)
+        note = ws.cell(r, 7)
+        _text(note, d.note)
+        if d.rest:
+            note.font = Font(italic=True, color=_ORANGE)
+        if d.refill_m3 > 0:
+            fill: PatternFill | None = _DONE_FILL
+        elif d.rest or d.open_m3 is None:
+            fill = _MUTED_FILL
+        else:
+            fill = _ZEBRA_FILL if i % 2 == 0 else None
+        _row(ws, r, n, fill)
+    if not days:
+        _empty(ws, n, "Kỳ này chưa có ngày nào đã qua.")
+        _print_setup(ws, meta, landscape=True)
+        return
 
-        # Hai biểu đồ cạnh bảng: thể tích đầu ngày (thấy được nhịp nạp) và tiêu thụ
-        # mỗi ngày (thấy được ngày nghỉ, ngày chạy mạnh). Nhìn một lần là hiểu kỳ.
-        cats = Reference(ws, min_col=1, min_row=head + 1, max_row=r)
-        line = LineChart()
-        line.add_data(Reference(ws, min_col=3, min_row=head, max_row=r), titles_from_data=True)
-        _chart_style(line, "Thể tích đầu ngày (m³)", cats)
-        s = line.series[0]
-        s.smooth = False          # đường gãy: nạp là một bước nhảy, không phải đường cong
-        s.marker.symbol = "circle"
-        s.marker.size = 5
-        s.marker.graphicalProperties.solidFill = _BRAND
-        s.marker.graphicalProperties.line.solidFill = _BRAND
-        s.graphicalProperties.line.solidFill = _BRAND
-        s.graphicalProperties.line.width = 22000
-        ws.add_chart(line, f"{get_column_letter(n + 2)}{head}")
-        bar = BarChart()
-        bar.add_data(Reference(ws, min_col=6, min_row=head, max_row=r), titles_from_data=True)
-        _chart_style(bar, "Tiêu thụ mỗi ngày (m³)", cats)
-        bar.gapWidth = 60
-        bar.series[0].graphicalProperties.solidFill = "5B9BD5"
-        bar.series[0].graphicalProperties.line.solidFill = "5B9BD5"
-        ws.add_chart(bar, f"{get_column_letter(n + 2)}{head + 17}")
-    else:
-        ws.merge_cells(start_row=head + 1, start_column=1, end_row=head + 1, end_column=n)
-        _text(ws.cell(head + 1, 1), "Kỳ này chưa có ngày nào đã qua.")
-        ws.cell(head + 1, 1).font = Font(italic=True, color="595959")
-    _print_setup(ws, landscape=True)
+    uses = [d.use_m3 for d in days if d.use_m3 is not None]
+    _total(ws, r + 1, n, 4, "Tổng cộng", {
+        5: round(sum(d.refill_m3 for d in days), 2),
+        6: round(sum(uses), 2),
+    })
+    # Bình quân những ngày CÓ tiêu thụ — cùng cách tính "khi nhà máy chạy" của trang
+    # Kế hoạch. Gộp cả ngày nghỉ (tiêu thụ 0) thì số bị kéo thấp và lệch với mức
+    # tiêu thụ người vận hành đang lập kế hoạch.
+    running = [u for u in uses if u > 0]
+    avg = r + 2
+    ws.merge_cells(start_row=avg, start_column=1, end_row=avg, end_column=5)
+    ws.cell(avg, 1, "Bình quân ngày nhà máy chạy").alignment = Alignment(horizontal="right")
+    ws.cell(avg, 1).font = Font(italic=True, color=_GREY)
+    if running:
+        a = ws.cell(avg, 6, round(sum(running) / len(running), 2))
+        a.number_format = _M3
+        a.font = Font(bold=True, color=_BRAND)
+
+    # Hai biểu đồ cạnh bảng: thể tích đầu ngày (thấy được nhịp nạp) và tiêu thụ
+    # mỗi ngày (thấy được ngày nghỉ, ngày chạy mạnh). Nhìn một lần là hiểu kỳ.
+    first = HEADER_ROW + 1
+    cats = Reference(ws, min_col=1, min_row=first, max_row=r)
+    line = LineChart()
+    line.add_data(Reference(ws, min_col=3, min_row=HEADER_ROW, max_row=r), titles_from_data=True)
+    _chart_style(line, "Thể tích đầu ngày (m³)", cats)
+    s = line.series[0]
+    s.smooth = False          # đường gãy: nạp là một bước nhảy, không phải đường cong
+    s.marker.symbol = "circle"
+    s.marker.size = 5
+    s.marker.graphicalProperties.solidFill = _BRAND
+    s.marker.graphicalProperties.line.solidFill = _BRAND
+    s.graphicalProperties.line.solidFill = _BRAND
+    s.graphicalProperties.line.width = 22000
+    ws.add_chart(line, f"{get_column_letter(n + 2)}{HEADER_ROW}")
+    bar = BarChart()
+    bar.add_data(Reference(ws, min_col=6, min_row=HEADER_ROW, max_row=r), titles_from_data=True)
+    _chart_style(bar, "Tiêu thụ mỗi ngày (m³)", cats)
+    bar.gapWidth = 60
+    bar.series[0].graphicalProperties.solidFill = "5B9BD5"
+    bar.series[0].graphicalProperties.line.solidFill = "5B9BD5"
+    ws.add_chart(bar, f"{get_column_letter(n + 2)}{HEADER_ROW + 17}")
+    _print_setup(ws, meta, landscape=True)
 
 
 def build_report(

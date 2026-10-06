@@ -309,7 +309,8 @@ def export_refills_xlsx(
     )
     meta = plan_export.ReportMeta(
         tank_name=term.name or psn, psn=psn,
-        customer=st.customer_name if st is not None else None,
+        customer=(body.customer or "").strip()
+        or (st.customer_name if st is not None else None),
         from_day=body.from_day, to_day=body.to_day,
         generated_at=now.replace(tzinfo=None), basis=body.basis,
     )

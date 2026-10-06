@@ -937,6 +937,10 @@ class PlanExportIn(BaseModel):
     to_day: date
     #: Một dòng nói kế hoạch tính theo thông số nào — in ở đầu sheet Lịch nạp.
     basis: str | None = Field(None, max_length=300)
+    #: Tên khách hàng đang gõ trên trang. Gửi kèm thay vì chỉ đọc từ thông số đã
+    #: lưu: bấm "Xuất" ngay sau khi gõ thì lần lưu chưa kịp xong, và file ra không
+    #: có tên khách hàng (06/10/2026). Không gửi -> dùng tên đã lưu của bồn.
+    customer: str | None = Field(None, max_length=200)
     rows: list[PlanExportRowIn] = Field(max_length=PLAN_EXPORT_MAX_ROWS)
 
     @model_validator(mode="after")

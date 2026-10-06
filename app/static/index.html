@@ -3194,11 +3194,11 @@
         + (planLive ? ` · tính từ số đo thật lúc ${fmtDT(planLive.at)}.`
                     : " · bồn không có số đo mới, tính từ thể tích nhập tay.");
     }
-    async function postPlanXlsx(psn, from, to, rows, basis) {
+    async function postPlanXlsx(psn, from, to, rows, basis, customer) {
       await dlCsv(`/api/plan/export/${encodeURIComponent(psn)}`, `lich_nap_${psn}.xlsx`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from_day: from, to_day: to, basis, rows }),
+        body: JSON.stringify({ from_day: from, to_day: to, basis, rows, customer: (customer || "").trim() || null }),
       });
     }
     function planExportState() {
@@ -3223,7 +3223,8 @@
       if (!planPsn || !rows.length) return;
       const psn = planPsn;
       if (planSavePending) await planSavePending;
-      await postPlanXlsx(psn, rows[0].key, rows[rows.length - 1].key, planExportRows(rows), planBasis());
+      await postPlanXlsx(psn, rows[0].key, rows[rows.length - 1].key, planExportRows(rows), planBasis(),
+                         document.getElementById("p-x-customer").value);
     }
 
     // Báo cáo Excel ở trang Báo cáo: chạy ĐÚNG bộ tính của trang Kế hoạch cho bồn
@@ -3241,6 +3242,9 @@
       const days = planDayDiff(from, to) + 1;
       if (days > PLAN_MAX_DAYS) { showError(`Kỳ báo cáo tối đa ${PLAN_MAX_DAYS} ngày.`); return; }
       const btn = document.getElementById("rep-xlsx");
+      // Đọc ô Khách hàng NGAY lúc bấm (rồi gửi kèm), và lưu nó cho lần sau.
+      const customer = document.getElementById("rep-customer").value;
+      saveRepCustomer();
       const ids = ["p-tank", "p-date", "p-days", "p-start"];
       const keep = Object.fromEntries(ids.map(id => [id, document.getElementById(id).value]));
       btn.disabled = true;
@@ -3256,7 +3260,7 @@
         if (planLive) await planEnsureOpen();
         computePlan();
         btn.lastChild.textContent = " Đang tạo file…";
-        await postPlanXlsx(psn, from, to, planExportRows(planLastRows), planBasis());
+        await postPlanXlsx(psn, from, to, planExportRows(planLastRows), planBasis(), customer);
       } finally {
         for (const id of ids) document.getElementById(id).value = keep[id];
         btn.disabled = false;
