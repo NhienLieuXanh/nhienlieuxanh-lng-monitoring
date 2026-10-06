@@ -676,6 +676,11 @@
     .ps-tile b { font-size: var(--fs-xl); font-family: var(--mono); font-weight: 700; color: var(--fg); letter-spacing: -.02em; }
     .ps-tile.hi b { color: var(--brand); }
     .ps-tile b.tight { font-size: var(--fs-body); }
+    .plan-guide > summary { cursor: pointer; list-style: none; }
+    .plan-guide > summary::-webkit-details-marker { display: none; }
+    .plan-guide > summary::before { content: "▸ "; color: var(--brand); }
+    .plan-guide[open] > summary::before { content: "▾ "; }
+    .plan-guide ul { margin: 8px 0 0 18px; padding: 0; display: grid; gap: 4px; }
     .plan-help { margin: 0; font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; box-shadow: var(--shadow-sm); }
     .plan-warn { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); border-radius: var(--r-sm); padding: 10px 14px; display: grid; gap: 6px; }
     .plan-warn[hidden] { display: none; }
@@ -1468,7 +1473,7 @@
             <label>Thể tích ban đầu (m³)<input type="number" id="p-start" class="field num" value="52" step="0.01" min="0" />
               <span class="plan-anchor" id="plan-anchor"></span></label>
             <label>Ngày bắt đầu<input type="date" id="p-date" class="field" /></label>
-            <label>Giờ nạp<input type="time" id="p-time" class="field" step="1" value="08:00:00" /></label>
+            <label>Giờ nạp<input type="time" id="p-time" class="field" step="60" value="08:00" /></label>
             <label>Số ngày lập kế hoạch<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="366" /></label>
             <label>Thể tích sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
           </form>
@@ -1478,32 +1483,22 @@
                chạy trên số liệu THẬT của bồn đang chọn. Luôn kèm phần "vì sao" —
                một đề xuất không giải thích được thì không ai dám dùng. -->
           <div id="plan-assist"></div>
-          <p class="plan-help">
-            <b>Nguyên tắc lập kế hoạch.</b> Hệ thống xếp lịch nạp khi thể tích đầu ngày rơi vào
-            <b>ngưỡng kích hoạt</b> (từ mức dự trữ đến mức dự trữ cộng một ngày tiêu thụ), trừ
-            Chủ Nhật không giao hàng. Thứ Bảy được nạp sớm một nhịp để không tụt dưới mức dự trữ
-            vào Chủ Nhật.
-            Ô <span class="lg lg-trig">vàng</span>: đang ở ngưỡng kích hoạt.
-            Ô <span class="lg lg-low">đỏ</span>: dưới mức dự trữ.
-            <span class="lg lg-from">vạch xanh</span>: ngày đang tính từ một số thực tế bạn đã nhập.
-            Cột <b>Ngày nghỉ</b>: nhà máy không tiêu thụ và cũng không nhận hàng (ngày lễ, Tết) — như
-            Chủ Nhật, lần nạp tự dời sớm lên ngày giao được trước đó. Cột <b>Nạp chỉ định</b>: buộc nạp ngày đó
-            bất kể thể tích.
-          </p>
-          <p class="plan-help">
-            <b>Ước tính và thực tế.</b> Cột <b>Thể tích đầu ngày</b> là số <i>ước tính</i>: lấy thể
-            tích hôm trước trừ mức tiêu thụ/ngày. Mức tiêu thụ là con số bình quân nên chuỗi này
-            trượt khỏi thực tế ngay ngày thứ hai. Gõ số <i>đo được</i> vào cột
-            <b>Thực tế đo được</b> của ngày bạn đo — từ ngày đó trở đi kế hoạch tính lại từ số
-            thực tế, và ô đó hiện luôn độ lệch so với ước tính. Mọi ngày <b>sau</b> ngày đó mang
-            một <b>vạch xanh</b> ở cột Thể tích đầu ngày kèm dòng <i>ước tính gốc</i> — con số kế
-            hoạch sẽ có nếu bạn không nhập gì; đó là cách thấy số bạn nhập ảnh hưởng tới đâu.
-            Mức tiêu thụ/ngày
-            <b>không</b> bị tính lại: một ngày dùng ít bất thường không được phép kéo lệch cả kỳ.
-            Xoá trắng ô là quay về dùng số ước tính. Số này lưu theo từng bồn nên phải
-            <b>chọn bồn</b> trước; nó chỉ dùng cho trang này, không ảnh hưởng số đo trên
-            Bảng điều khiển hay Dự báo.
-          </p>
+          <!-- Hai đoạn hướng dẫn dài (≈ nửa màn hình, đọc như sách) gộp thành một mục
+               gấp sẵn, mỗi ý một dòng — người dùng 06/10/2026: "chưa friendly". -->
+          <details class="plan-help plan-guide" id="plan-guide">
+            <summary><b>Cách đọc bảng</b> <span class="set-help">— bấm để xem</span></summary>
+            <ul>
+              <li>Ô <span class="lg lg-trig">vàng</span>: sắp tới lúc phải nạp. Ô <span class="lg lg-low">đỏ</span>:
+                  dưới mức dự trữ. <span class="lg lg-from">Vạch xanh</span>: ngày đang tính lại từ một số bạn đo.</li>
+              <li>Hệ thống xếp xe tới trước khi bồn xuống dưới mức dự trữ. <b>Chủ Nhật</b> và <b>ngày nghỉ</b>
+                  không giao hàng — lần nạp tự dời sớm lên ngày giao được trước đó.</li>
+              <li><b>Ngày nghỉ</b>: nhà máy không chạy và không nhận hàng (lễ, Tết).
+                  <b>Nạp chỉ định</b>: buộc xe tới ngày đó, bất kể bồn còn bao nhiêu.</li>
+              <li><b>Thực tế đo được</b>: có số đo đầu ngày thì gõ vào — kế hoạch từ ngày đó tính lại theo
+                  số thật. Xoá trắng ô là quay về số ước tính.</li>
+              <li><b>Ngày đã qua</b> là số đo thật của thiết bị nên bị khoá, không sửa được.</li>
+            </ul>
+          </details>
           <p class="set-msg" id="plan-msg" hidden></p>
           <!-- File gửi đối tác: CHỈ các ngày nạp, không phải cả bảng. Ba ô chữ là
                hằng số của bồn nên lưu theo bồn như các thông số khác. -->
@@ -2985,7 +2980,8 @@
     const WD_VI = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
     const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
     const pad2 = (n) => String(n).padStart(2, "0");
-    const fmtDT = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    // Không có giây: "08:00:00" chỉ thêm nhiễu cho một lịch xe tới theo giờ.
+    const fmtDT = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 
     function planParams() {
       const num = (id, d) => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : d; };
@@ -3382,12 +3378,12 @@
       // Ngưỡng tính tới GIỜ XE TỚI của ngày giao được kế tiếp, nên cộng thêm phần
       // dùng từ nửa đêm tới giờ nạp (h ngày). Thứ Bảy cộng thêm một ngày Chủ Nhật.
       const hh = planRefillHour(p);
-      const band = `≤ ${round2(R + (1 + hh) * U)} m³` + (U > 0 ? ` · T7: ≤ ${round2(R + (2 + hh) * U)}` : "");
+      const band = `≤ ${round2(R + (1 + hh) * U)} m³` + (U > 0 ? ` · thứ Bảy ≤ ${round2(R + (2 + hh) * U)} m³` : "");
       document.getElementById("plan-summary").innerHTML =
         `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
         `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
-        `<div class="ps-tile"><span>Ngưỡng kích hoạt nạp</span><b class="num tight">${band}</b></div>` +
+        `<div class="ps-tile" title="Thứ Bảy cao hơn vì Chủ Nhật không có xe"><span>Nạp khi đầu ngày còn</span><b class="num tight">${band}</b></div>` +
         planDeviationTile(rows);
       const warn = document.getElementById("plan-warn");
       const msgs = [];
@@ -3550,7 +3546,7 @@
             document.getElementById(f.id).value = f.fromApi(Number(st[f.key]));
           }
         }
-        if (st.refill_time) document.getElementById("p-time").value = st.refill_time;
+        if (st.refill_time) document.getElementById("p-time").value = String(st.refill_time).slice(0, 5);
         planLoading = false;
       } catch (e) {
         planLoading = false;

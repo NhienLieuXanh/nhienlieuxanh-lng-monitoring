@@ -97,3 +97,20 @@ def test_xuat_excel_tu_trang_ke_hoach(app_page: Page) -> None:
     assert CUSTOMER in ws["A4"].value
     assert [c.value for c in ws[7]][:3] == ["STT", "Khách hàng", "Ngày nạp"]
     assert ws.cell(8, 6).value in ("Đã nạp", "Kế hoạch")
+
+
+def test_huong_dan_gon_va_loi_thuong(app_page: Page) -> None:
+    """06/10/2026: hai đoạn hướng dẫn dài và "Ngưỡng kích hoạt … T7" khó hiểu."""
+    _open_tank(app_page)
+    guide = app_page.locator("#plan-guide")
+    expect(guide).not_to_have_attribute("open", "")
+    expect(guide.locator("ul")).to_be_hidden()
+    guide.locator("summary").click()
+    expect(guide).to_contain_text("Ngày đã qua")
+    summary = app_page.locator("#plan-summary")
+    expect(summary).to_contain_text("Nạp khi đầu ngày còn")
+    expect(summary).to_contain_text("thứ Bảy")
+    expect(summary).not_to_contain_text("T7")
+    expect(app_page.locator("#p-time")).to_have_value("08:00")
+    first = next(r for r in _rows(app_page) if "Nạp LNG" in r["act"])
+    assert first["when"].count(":") == 1, f"còn giây: {first['when']}"
