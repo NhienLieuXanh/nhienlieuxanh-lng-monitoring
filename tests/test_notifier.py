@@ -90,7 +90,7 @@ def test_notify_codes_exclude_infrastructure_noise() -> None:
     """
     # Người vận hành chốt 06/10/2026: email CHỈ cho "bồn sắp chạm mức dự trữ"
     # (RUNOUT) và báo động nhà máy (tiền tố VENDOR:). Mọi mã khác chỉ hiện trên màn hình.
-    assert NOTIFY_CODES == frozenset({"RUNOUT"})
+    assert frozenset({"RUNOUT"}) == NOTIFY_CODES
     for code in ("HOLD_TIME", "LOW_VOLUME", "OFFLINE", "BOIL_OFF_HIGH", "LOW_BATTERY",
                  "WEAK_SIGNAL", "PERCENT_MISMATCH"):
         assert code not in NOTIFY_CODES
