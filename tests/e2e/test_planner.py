@@ -64,7 +64,9 @@ def test_khung_khuyen_nghi_khop_bang(app_page: Page) -> None:
     first = next(r for r in _rows(app_page) if "Nạp LNG" in r["act"])
     box = app_page.locator("#plan-assist")
     expect(box).to_contain_text(f"giao lúc {first['when'][:5]}")
-    expect(box).to_contain_text(f"{float(first['order']):.2f} m³")
+    # Cùng một chuỗi số (vi-VN, dấu phẩy thập phân) ở bảng và ở khung.
+    assert "." not in first["order"], first["order"]
+    expect(box).to_contain_text(f"{first['order']} m³")
 
 
 def test_danh_dau_ngay_nghi_duoc_luu_va_bo_duoc(app_page: Page, server: str) -> None:

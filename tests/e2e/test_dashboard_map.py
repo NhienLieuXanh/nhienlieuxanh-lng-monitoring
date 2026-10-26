@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import go
@@ -22,6 +24,18 @@ def test_chon_bon_thay_so_lieu_va_bieu_do(app_page: Page) -> None:
     expect(detail).to_contain_text(YKH)
     expect(detail).to_contain_text("Trực tuyến")
     expect(detail).to_contain_text("m³")
+
+
+def test_so_thap_phan_viet_theo_kieu_viet_nam(app_page: Page) -> None:
+    """Soát UI 26/10/2026: thể tích in toFixed(3) thành "52.340 m³" — người Việt đọc
+    là năm mươi hai NGHÌN. Mọi số thập phân dùng dấu phẩy, dấu chấm chỉ để nhóm
+    hàng nghìn."""
+    expect(app_page.locator("#stat-volume")).to_have_text(re.compile(r"^\d{1,3}(\.\d{3})*,\d m³"))
+    pcts = app_page.locator("#tank-list td.r .num").all_inner_texts()
+    assert pcts and all(re.fullmatch(r"\d{1,3}(,\d)?%", p) for p in pcts), pcts
+    app_page.locator(f'#tank-list tr[data-psn="{YKH}"]').click()
+    detail = app_page.locator("#tank-detail").inner_text()
+    assert not re.search(r"\d\.\d{3}(?!\d)", detail), detail
 
 
 def test_nhan_truc_bieu_do_7_va_30_ngay_luon_co_ngay(app_page: Page) -> None:

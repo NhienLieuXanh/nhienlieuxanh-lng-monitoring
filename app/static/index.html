@@ -64,32 +64,37 @@
       --muted: #475569;
       --faint: #64748b;
 
-      /* 3 MÀU CHỦ ĐẠO THƯƠNG HIỆU: TRẮNG, XANH DƯƠNG (GAS), XANH LÁ (NHIÊN LIỆU XANH)
-         Các token dưới đây đậm hơn một nấc so với màu gốc vì chúng dùng làm CHỮ và
-         NỀN NÚT: #0284c7 trên nền trắng chỉ đạt 4,10:1, dưới ngưỡng 4,5. Màu sáng
-         gốc vẫn được giữ nguyên ở --chart-* vì đồ hoạ chỉ cần 3,0 và đang đạt. */
-      --brand: #0369a1;        /* Xanh dương GAS */
-      --brand-strong: #075985; /* Xanh dương đậm */
-      --brand-solid: #0369a1;  /* Xanh dương nền nút */
-      --on-brand: #ffffff;     /* Trắng */
+      /* MÀU THƯƠNG HIỆU LẤY TỪ LOGO, không phải bảng màu mặc định của Tailwind
+         (bản trước dùng sky #0369a1 và emerald #047857 — logo không có màu nào
+         trong hai màu đó). Xanh dương logo #1060B0 đạt 6,32:1 trên nền trắng nên
+         dùng thẳng làm chữ và nền nút. Xanh lá logo #00A050 chỉ đạt 3,42:1: đủ cho
+         chấm, thanh, đường biểu đồ (ngưỡng 3,0) nhưng KHÔNG đủ cho chữ — chữ xanh
+         lá dùng bản đậm #007A3D (5,45:1). */
+      --brand: #1060B0;        /* Xanh dương GAS (logo) */
+      --brand-strong: #0c4d8f; /* Xanh dương đậm */
+      --brand-solid: #1060B0;  /* Nền nút chính */
+      --brand-hover: #0c4d8f;  /* Nền nút chính khi rê chuột */
+      --on-brand: #ffffff;
 
-      --nlx: #047857;          /* Xanh lá Nhiên Liệu Xanh */
-      --nlx-strong: #065f46;
-      --nlx-bg: #ecfdf5;       /* Nền xanh lá nhạt */
+      --nlx: #007A3D;          /* Xanh lá Nhiên Liệu Xanh — bản đậm dùng làm chữ */
+      --nlx-strong: #00602f;
+      --nlx-bg: #e8f5ee;
 
-      --ok: #047857;      --ok-bg: #ecfdf5;   --ok-line: #a7f3d0;  /* Xanh lá chuẩn */
+      --ok: #007A3D;      --ok-bg: #e8f5ee;   --ok-line: #a6d9bd;
       --warn: #b45309;    --warn-bg: #fffbeb;  --warn-line: #fde68a;
       --crit: #be123c;    --crit-bg: #fff1f2;  --crit-line: #fecdd3;
       --on-crit: #ffffff;
-      --sel: #f0f9ff;     /* Xanh dương nhạt cho hàng được chọn */
-      --ring: #0369a1;    /* Viền focus xanh dương */
+      --sel: #edf3fa;     /* Xanh dương nhạt cho hàng được chọn */
+      --ring: #1060B0;    /* Viền focus */
+      --ring-soft: rgba(16, 96, 176, 0.18);
 
-      --shadow: 0 12px 30px -6px rgba(2, 132, 199, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+      /* Bóng TRUNG TÍNH: bóng nhuộm xanh là một lớp màu trang trí không mang nghĩa. */
+      --shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
       --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-      --shadow-glass: 0 10px 32px rgba(2, 132, 199, 0.06);
+      --shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.06);
 
-      --chart-vol: #0284c7; /* Cột thể tích: Xanh dương GAS */
-      --chart-pres: #059669; /* Đường áp suất: Xanh lá Nhiên Liệu Xanh */
+      --chart-vol: #1060B0; /* Đường thể tích: xanh dương logo */
+      --chart-pres: #00A050; /* Đường áp suất: xanh lá logo (đồ hoạ, ngưỡng 3,0) */
       --grid: rgba(15, 23, 42, 0.06);
       --axis: #64748b;
       --chart-anom: #e11d48;
@@ -113,12 +118,10 @@
       --fs-2xl: 22px;
       --fs-3xl: 28px;
 
-      /* Token bổ sung khi chuyển màu viết cứng sang token. Giá trị SÁNG đặt đúng
-         bằng literal đang có, nên giao diện sáng không đổi một pixel nào. */
       --line-strong: #cbd5e1;
       --fg-soft: #334155;
-      --sel-line: #bae6fd;
-      --dot-ok: #10b981;
+      --sel-line: #c3d7ee;
+      --dot-ok: #00A050;
       --dot-warn: #f59e0b;
       --dot-bad: #ef4444;
       --accent-warn: #d97706;
@@ -127,7 +130,7 @@
       --crit-line-2: #fda4af;
       --scroll-2: #94a3b8;
       --hover-veil: rgba(255, 255, 255, 0.6);
-      --tag-fill-fg: #0369a1;
+      --tag-fill-fg: #1060B0;
 
       --z-rail: 30; --z-header: 40; --z-pop: 60; --z-login: 1000;
     }
@@ -142,28 +145,30 @@
       --fg: #0f172a;
       --muted: #475569;
       --faint: #64748b;
-      --brand: #0369a1;
-      --brand-strong: #075985;
-      --brand-solid: #0369a1;
+      --brand: #1060B0;
+      --brand-strong: #0c4d8f;
+      --brand-solid: #1060B0;
+      --brand-hover: #0c4d8f;
       --on-crit: #ffffff;
-      --nlx: #047857;
-      --ok: #047857;   --ok-bg: #ecfdf5;   --ok-line: #a7f3d0;
+      --nlx: #007A3D;
+      --nlx-strong: #00602f;
+      --nlx-bg: #e8f5ee;
+      --ok: #007A3D;   --ok-bg: #e8f5ee;   --ok-line: #a6d9bd;
       --warn: #b45309; --warn-bg: #fffbeb; --warn-line: #fde68a;
       --crit: #be123c; --crit-bg: #fff1f2; --crit-line: #fecdd3;
-      --sel: #f0f9ff;
-      --ring: #0369a1;
-      --shadow: 0 12px 30px -6px rgba(2, 132, 199, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+      --sel: #edf3fa;
+      --ring: #1060B0;
+      --ring-soft: rgba(16, 96, 176, 0.18);
+      --shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
       --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-      --shadow-glass: 0 10px 32px rgba(2, 132, 199, 0.06);
-      --chart-vol: #0284c7; --chart-pres: #059669; --grid: rgba(15,23,42,.06); --axis: #64748b;
+      --shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.06);
+      --chart-vol: #1060B0; --chart-pres: #00A050; --grid: rgba(15,23,42,.06); --axis: #64748b;
       --chart-anom: #e11d48;
       --scrim: rgba(15,23,42,.45);
-      /* Token bổ sung khi chuyển màu viết cứng sang token. Giá trị SÁNG đặt đúng
-         bằng literal đang có, nên giao diện sáng không đổi một pixel nào. */
       --line-strong: #cbd5e1;
       --fg-soft: #334155;
-      --sel-line: #bae6fd;
-      --dot-ok: #10b981;
+      --sel-line: #c3d7ee;
+      --dot-ok: #00A050;
       --dot-warn: #f59e0b;
       --dot-bad: #ef4444;
       --accent-warn: #d97706;
@@ -172,7 +177,7 @@
       --crit-line-2: #fda4af;
       --scroll-2: #94a3b8;
       --hover-veil: rgba(255, 255, 255, 0.6);
-      --tag-fill-fg: #0369a1;
+      --tag-fill-fg: #1060B0;
     }
     /* Nền tối cho phòng điều khiển ban đêm. Giá trị lấy lại từ bảng màu đã được đo
        trước đây (mỗi ngoại lệ dưới đây đều có lý do ghi kèm), không phải chọn mới.
@@ -192,39 +197,41 @@
 
       /* --brand dùng làm CHỮ trên nền tối nên phải SÁNG; nhưng chữ trắng trên
          chính nó chỉ đạt 3,18 nên nút cần một token nền riêng, đậm hơn. */
-      --brand: #4f8ff7;
-      --brand-strong: #3b82f6;
-      --brand-solid: #2563eb;
+      --brand: #5b9be0;        /* xanh logo sáng lên: 5,95:1 trên nền thẻ tối */
+      --brand-strong: #7fb1e8;
+      --brand-solid: #1060B0;  /* nút giữ đúng màu logo: chữ trắng 6,32:1 */
+      --brand-hover: #0c4d8f;
       --on-brand: #ffffff;
 
-      --nlx: #34d399;
-      --nlx-strong: #6ee7b7;
-      --nlx-bg: rgba(52, 211, 153, .13);
+      --nlx: #3ecf85;
+      --nlx-strong: #7ddcaa;
+      --nlx-bg: rgba(62, 207, 133, .13);
 
-      --ok: #34d399;   --ok-bg: rgba(52, 211, 153, .13);   --ok-line: rgba(52, 211, 153, .30);
+      --ok: #3ecf85;   --ok-bg: rgba(62, 207, 133, .13);   --ok-line: rgba(62, 207, 133, .30);
       --warn: #fbbf24; --warn-bg: rgba(251, 191, 36, .13); --warn-line: rgba(251, 191, 36, .30);
       --crit: #f87171; --crit-bg: rgba(248, 113, 113, .13); --crit-line: rgba(248, 113, 113, .32);
       /* Chữ TỐI trên huy hiệu đỏ: --crit ở nền tối sáng nên chữ trắng chỉ đạt
          2,77, còn chữ tối đạt 6,6 và giữ được độ nổi của huy hiệu. */
       --on-crit: #0b1120;
 
-      --sel: rgba(79, 143, 247, .15);
-      --ring: #4f8ff7;
+      --sel: rgba(91, 155, 224, .15);
+      --ring: #5b9be0;
+      --ring-soft: rgba(91, 155, 224, .28);
 
       --shadow: 0 10px 30px rgba(0, 0, 0, .45);
       --shadow-sm: 0 2px 8px rgba(0, 0, 0, .30);
       --shadow-glass: 0 10px 32px rgba(0, 0, 0, .40);
 
-      --chart-vol: #4f8ff7;
-      --chart-pres: #34d399;
+      --chart-vol: #5b9be0;
+      --chart-pres: #3ecf85;
       --grid: rgba(147, 161, 184, .10);
       --axis: #93a1b8;
       --chart-anom: #ef4444;
       --scrim: rgba(4, 8, 16, .62);
       --line-strong: #2b3b57;
       --fg-soft: #cbd5e1;
-      --sel-line: rgba(79, 143, 247, .34);
-      --dot-ok: #34d399;
+      --sel-line: rgba(91, 155, 224, .34);
+      --dot-ok: #2fbf71;
       --dot-warn: #fbbf24;
       --dot-bad: #f87171;
       --accent-warn: #fbbf24;
@@ -233,9 +240,9 @@
       --crit-line-2: rgba(248, 113, 113, .45);
       --scroll-2: #3d5075;
       --hover-veil: rgba(255, 255, 255, 0.06);
-      /* Chữ nhãn "Nạp LNG": --brand (#4f8ff7) trên nền --sel của dòng nạp chỉ đạt
-         4,39 ở nền tối — đo trên bảng thật. Nhãn người vận hành đọc nhiều nhất. */
-      --tag-fill-fg: #93c5fd;
+      /* Chữ nhãn "Nạp LNG" nằm trên nền --sel của dòng nạp: dùng bản sáng hơn
+         --brand để giữ trên 7:1 — nhãn người vận hành đọc nhiều nhất. */
+      --tag-fill-fg: #9cc3ee;
     }
     /* Dòng nguồn của điểm neo: nằm ngay dưới ô "Thể tích ban đầu" vì nó nói con số
        trong ô đó từ đâu ra. Cỡ nhỏ, màu phụ — nó là chú thích, không tranh chỗ với
@@ -253,8 +260,8 @@
     ::-webkit-scrollbar-thumb:hover { background: var(--scroll-2); }
 
     @keyframes pulse-live {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-      50% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0, 160, 80, 0.55); }
+      50% { box-shadow: 0 0 0 7px rgba(0, 160, 80, 0); }
     }
     @keyframes pulse-crit {
       0%, 100% { box-shadow: 0 0 0 0 rgba(190, 18, 60, 0.6); }
@@ -281,29 +288,26 @@
       border: 1px solid var(--line); background: var(--surface);
       min-height: 40px; padding: 0 14px; border-radius: var(--r-sm);
       display: inline-flex; align-items: center; gap: 8px; font-weight: 500;
-      transition: all .16s cubic-bezier(0.4, 0, 0.2, 1);
+      transition-property: background-color, border-color, color, box-shadow, transform;
+      transition-duration: .16s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     }
     :where(button, .btn):hover { border-color: var(--line-strong); background: var(--surface-2); color: var(--fg); }
     button:active, .btn:active { transform: translateY(1px); }
     button:focus-visible, .btn:focus-visible, .field:focus-visible,
     tr.tank:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     button:disabled { opacity: .45; cursor: not-allowed; }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--brand-solid) 0%, var(--brand-strong) 100%); border: 1px solid var(--brand-solid);
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25); color: var(--on-brand); font-weight: 600;
-    }
-    .btn-primary:hover {
-      filter: brightness(1.06); background: linear-gradient(135deg, var(--brand-strong), var(--brand-solid));
-      border-color: var(--brand-strong); box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); transform: translateY(-1px);
-    }
+    /* Nền PHẲNG màu logo: gradient + bóng xanh + nhích lên là ba lớp trang trí
+       chồng lên một việc duy nhất là "đây là nút chính". */
+    .btn-primary { background: var(--brand-solid); border: 1px solid var(--brand-solid); color: var(--on-brand); font-weight: 600; }
+    .btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); color: var(--on-brand); }
     .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
     .btn-quiet:hover { background: var(--surface-2); color: var(--fg); }
     .icon-btn {
       min-height: 40px; width: 40px; flex: 0 0 auto; padding: 0; justify-content: center;
       border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface);
-      color: var(--muted); transition: all .16s ease;
+      color: var(--muted);
     }
-    .icon-btn:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line-strong); transform: translateY(-1px); }
+    .icon-btn:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line-strong); }
     .icon-btn svg { width: 17px; height: 17px; }
     svg { flex: 0 0 auto; }
 
@@ -348,19 +352,21 @@
       display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
       min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-sm);
       background: transparent; color: var(--muted); font-weight: 500; font-size: var(--fs-md); white-space: nowrap;
-      transition: all .16s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: background-color .16s ease, color .16s ease;
     }
     .nav-item svg { width: 18px; height: 18px; stroke-width: 1.9; color: var(--faint); transition: color .16s ease; }
     .nav-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .nav-item:hover { background: var(--nlx-bg); color: var(--nlx); transform: translateX(2px); }
-    .nav-item:hover svg { color: var(--nlx); }
+    /* Rê chuột: xám trung tính. Bản trước rê thì XANH LÁ, chọn thì XANH DƯƠNG —
+       hai màu cho cùng một việc "đây là mục menu". */
+    .nav-item:hover { background: var(--surface-2); color: var(--fg); }
+    .nav-item:hover svg { color: var(--fg); }
     .nav-item.active {
       background: var(--sel); color: var(--brand); font-weight: 600;
       border-left: 3px solid var(--brand-solid); padding-left: 9px;
     }
     .nav-item.active svg { color: var(--brand); }
     .nav-item.soon { opacity: .55; cursor: default; }
-    .nav-item.soon:hover { background: transparent; color: var(--muted); transform: none; }
+    .nav-item.soon:hover { background: transparent; color: var(--muted); }
     .nav-item .badge {
       margin-left: auto; min-width: 20px; height: 19px; padding: 0 6px; border-radius: 999px;
       background: var(--crit); color: var(--on-crit); font-size: var(--fs-tiny); font-weight: 700;
@@ -402,9 +408,7 @@
       display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
       height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px;
       background: var(--bg); font-size: 12px; color: var(--muted); font-weight: 500;
-      transition: all .15s ease;
     }
-    .kpi:hover { transform: translateY(-1px); border-color: var(--line-strong); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05); }
     .kpi b { font-size: 12.5px; font-weight: 700; font-family: var(--mono); color: var(--fg); line-height: 1; }
     .kpi-btn { cursor: pointer; font-family: inherit; }
     .kpi-btn:hover { filter: brightness(0.98); }
@@ -420,7 +424,7 @@
     .head-right { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
     .meta-chip { min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
     .head-right .icon-btn { flex: 0 0 auto; width: 36px; min-height: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
-    .head-right .icon-btn:hover { background: var(--bg); border-color: var(--line-strong); color: var(--brand); transform: translateY(-1px); }
+    .head-right .icon-btn:hover { background: var(--bg); border-color: var(--line-strong); color: var(--brand); }
     .meta-chip[hidden] { display: none; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
     .dot.ok { background: var(--dot-ok); animation: pulse-live 2.5s infinite; }
@@ -513,7 +517,7 @@
     @media (max-width: 1365px) { table.tanks .lvl-bar { display: none; } }
     table.tanks td:first-child { max-width: 220px; }
     table.tanks td:last-child { white-space: nowrap; }
-    tr.tank { cursor: pointer; transition: all .12s ease; }
+    tr.tank { cursor: pointer; transition: background-color .12s ease; }
     tr.tank:hover { background: var(--bg); }
     tr.tank.is-selected { background: var(--sel); }
     tr.tank.is-selected td:first-child { box-shadow: inset 4px 0 0 var(--brand); }
@@ -527,8 +531,9 @@
       overflow: hidden; padding: 0 !important; margin: 0 !important;
       box-sizing: border-box; display: inline-block; vertical-align: middle; flex: 0 0 auto;
     }
-    .lvl-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-solid), var(--dot-ok)); border-radius: 999px; transition: width .3s ease; }
-    .lvl-bar.low > i { background: linear-gradient(90deg, var(--accent-warn), var(--bar-warn)); }
+    /* MỘT màu; chỉ đổi màu khi chạm ngưỡng — màu ở đây là thông tin, không trang trí. */
+    .lvl-bar > i { display: block; height: 100%; background: var(--chart-vol); border-radius: 999px; transition: width .3s ease; }
+    .lvl-bar.low > i { background: var(--accent-warn); }
     .lvl-bar.empty > i { background: var(--dot-bad); min-width: 3px; }
     .st {
       display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
@@ -568,20 +573,9 @@
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
-      transition: all .16s ease;
       display: flex; flex-direction: column; justify-content: space-between;
-      min-height: 104px; position: relative; overflow: hidden;
+      min-height: 104px;
     }
-    .readout::before {
-      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: var(--brand-solid); border-radius: 4px 4px 0 0;
-    }
-    .readout:nth-child(1)::before { background: var(--brand-solid); }
-    .readout:nth-child(2)::before { background: var(--chart-pres); }
-    .readout:nth-child(3)::before { background: var(--brand-solid); }
-    .readout:nth-child(4)::before { background: var(--accent-warn); }
-    .readout:hover { transform: translateY(-2px); border-color: var(--sel-line); box-shadow: 0 6px 18px -2px rgba(2, 132, 199, 0.10); }
     .readout dt {
       color: var(--faint); font-size: 11px; margin: 0 0 6px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .06em;
@@ -594,7 +588,6 @@
     }
     .readout dd small { font-size: 13px; color: var(--faint); font-weight: 600; letter-spacing: 0; font-family: var(--font); }
     .readout.bad { background: var(--crit-bg); border-color: var(--crit-line); }
-    .readout.bad::before { background: var(--dot-bad); }
     .readout.bad dd { color: var(--crit); }
     .readout-footer {
       margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line);
@@ -660,8 +653,8 @@
     .rename { display: grid; gap: 7px; }
     .rename label { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
     .rename-row { display: flex; gap: 8px; }
-    .field { flex: 1; min-height: 44px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 0 12px; font: inherit; border-radius: var(--r-sm); transition: all .14s ease; }
-    .field:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18); }
+    .field { flex: 1; min-height: 44px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 0 12px; font: inherit; border-radius: var(--r-sm); transition: border-color .14s ease, box-shadow .14s ease; }
+    .field:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring-soft); }
     .hint { margin: 0; color: var(--faint); font-size: var(--fs-sm); }
 
     [id^="view-"][hidden] { display: none !important; }
@@ -676,7 +669,7 @@
     .plan-params .field { min-height: 44px; align-self: start; }
     .p-out { display: flex; align-items: center; font-family: var(--mono); font-weight: 700; color: var(--brand); background: var(--surface-2); }
     .plan-summary { display: flex; gap: 14px; flex-wrap: wrap; }
-    .ps-tile { flex: 1; min-width: 150px; background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--brand-solid); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm); }
+    .ps-tile { flex: 1; min-width: 150px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm); }
     .ps-tile span { font-size: var(--fs-micro); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
     .ps-tile b { font-size: var(--fs-xl); font-family: var(--mono); font-weight: 700; color: var(--fg); letter-spacing: -.02em; }
     .ps-tile.hi b { color: var(--brand); }
@@ -712,7 +705,7 @@
     .plan-table input[type="checkbox"]::before {
       content: ""; width: 18px; height: 18px; border-radius: 5px;
       border: 1.5px solid var(--line-strong); background: var(--surface);
-      transition: all .14s ease;
+      transition: border-color .14s ease, background-color .14s ease;
     }
     .plan-table input[type="checkbox"]:hover::before { border-color: var(--brand); }
     .plan-table input[type="checkbox"]:checked::before {
@@ -737,28 +730,29 @@
       color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 6px;
     }
     .p-act:hover { border-color: var(--line); background: var(--surface-2); }
-    .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.18); }
+    .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 2px var(--ring-soft); }
     .p-act.has { font-weight: 700; color: var(--brand); }
 
     /* ============ LOGIN GATE ============ */
     .login-gate {
       position: fixed; inset: 0; z-index: var(--z-login); display: grid; place-items: center; padding: 24px;
-      background-color: #f8fafc;
-      background-image:
-        radial-gradient(circle at 15% 25%, rgba(2, 132, 199, 0.12) 0%, transparent 50%),
-        radial-gradient(circle at 85% 75%, rgba(16, 185, 129, 0.14) 0%, transparent 50%),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(240, 253, 244, 0.82) 50%, rgba(224, 242, 254, 0.92) 100%),
-        url("login-bg.jpg");
+      background-color: var(--bg);
+      /* Lớp phủ PHẲNG một màu để ảnh chỉ còn là chất liệu nền, không phải các
+         mảng màu loang trang trí như bản trước. */
+      background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url("login-bg.jpg");
       background-size: cover; background-position: center;
+    }
+    :root[data-theme="dark"] .login-gate {
+      background-image: linear-gradient(rgba(11, 17, 32, 0.9), rgba(11, 17, 32, 0.9)), url("login-bg.jpg");
     }
     .login-gate[hidden] { display: none; }
     .login-card {
       width: min(420px, 100%);
-      background: #ffffff;
-      border: 1px solid rgba(2, 132, 199, 0.18);
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: calc(var(--r) + 4px);
       padding: 36px 32px 30px;
-      box-shadow: 0 20px 45px -12px rgba(2, 132, 199, 0.15), 0 0 0 1px rgba(5, 150, 105, 0.12);
+      box-shadow: var(--shadow);
     }
     .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-bottom: 24px; }
     .login-brand img { width: 64px; height: 64px; object-fit: contain; }
@@ -766,14 +760,14 @@
     .login-brand h1 .gas { color: var(--brand); } .login-brand h1 .nlx { color: var(--nlx); }
     .login-brand p { margin: 0; color: var(--muted); font-size: var(--fs-body); max-width: 34ch; }
     .login-form { display: grid; gap: 14px; }
-    .login-form label { display: grid; gap: 6px; font-size: var(--fs-body); color: #334155; font-weight: 600; }
+    .login-form label { display: grid; gap: 6px; font-size: var(--fs-body); color: var(--fg-soft); font-weight: 600; }
     .pass-wrap { position: relative; display: flex; align-items: center; }
     .pass-wrap .field { width: 100%; padding-right: 54px; min-height: 44px; }
     .login-form .field {
       min-height: 44px;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      color: #0f172a;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      color: var(--fg);
       border-radius: var(--r-sm);
       padding: 0 12px;
       font-size: var(--fs-md);
@@ -782,25 +776,13 @@
     .login-form .field:focus {
       outline: none;
       border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+      box-shadow: 0 0 0 3px var(--ring-soft);
     }
     .pass-toggle { position: absolute; right: 4px; top: 4px; bottom: 4px; width: 46px; border: 0; background: transparent; color: var(--muted); font-size: var(--fs-sm); min-height: 0; cursor: pointer; border-radius: var(--r-sm); }
     .pass-toggle:hover { color: var(--fg); background: var(--surface-2); }
     .login-form .btn-primary {
       width: 100%; min-height: 44px; margin-top: 8px; justify-content: center;
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      border: 1px solid #0284c7;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
-      color: #ffffff;
-      font-weight: 600;
       font-size: var(--fs-md);
-      border-radius: var(--r-sm);
-      transition: all .16s ease;
-    }
-    .login-form .btn-primary:hover {
-      background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.38);
-      transform: translateY(-1px);
     }
     .login-error { display: none; margin: 0; padding: 10px 12px; background: var(--crit-bg); border: 1px solid var(--crit-line); color: var(--crit); font-size: var(--fs-body); border-radius: var(--r-sm); font-weight: 500; }
     .login-error.show { display: block; }
@@ -1164,7 +1146,7 @@
     .set-when ul { margin: 4px 0 0 18px; padding: 0; }
     .set-step2 { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding-top: 16px;
       margin-top: 16px; border-top: 1px solid var(--line); }
-    .set-num { width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: #fff;
+    .set-num { width: 28px; height: 28px; border-radius: 50%; background: var(--brand-solid); color: var(--on-brand);
       display: grid; place-items: center; font-weight: 700; font-size: var(--fs-sm); }
     .set-step-body { min-width: 0; }
     .set-step-body h3, .set-more h3 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin: 2px 0 8px; }
@@ -2041,6 +2023,9 @@
     // Chart.js vẽ chữ lên canvas, mà ctx.font KHÔNG hiểu var(). Phải là font stack
     // đã resolve; giữ khớp với --font để legend không lệch chữ với phần còn lại.
     const CHART_FONT = '"Plus Jakarta Sans", "IBM Plex Sans", system-ui, sans-serif';
+    // Trục và tooltip của mọi biểu đồ dùng cùng quy ước số với phần còn lại của
+    // trang, không phụ thuộc ngôn ngữ của trình duyệt.
+    if (window.Chart) Chart.defaults.locale = "vi-VN";
 
     // FastAPI trả `detail` là CHUỖI cho HTTPException nhưng là MẢNG OBJECT
     // ({loc, msg, type}) cho lỗi validate 422. Nối chuỗi thẳng vào sẽ ra
@@ -2209,8 +2194,27 @@
       const v = tank.fill_percent ?? tank.volume_percent;
       return (v === null || v === undefined) ? null : Number(v);
     }
-    function fmtPct(p) { return p === null ? "--" : p.toFixed(2); }
-    function fmtNum(v, unit) { return (v === null || v === undefined) ? "--" : `${Number(v)} ${unit}`; }
+    // MỘT quy ước số cho cả trang: vi-VN, dấu phẩy thập phân, dấu chấm hàng nghìn.
+    // Bản trước in toFixed(3) nên thể tích hiện "52.340 m³" — người Việt đọc là năm
+    // mươi hai NGHÌN — trong khi trục biểu đồ ngay bên dưới in "1.234" là một nghìn.
+    // `max` = số chữ số thập phân tối đa; `min` mặc định bằng `max` để cột số thẳng
+    // hàng, truyền 0 khi muốn bỏ số 0 thừa ("34,5" thay vì "34,50").
+    const NF_CACHE = {};
+    function fmtN(v, max, min) {
+      if (v === null || v === undefined || v === "" || !Number.isFinite(Number(v))) return "--";
+      const lo = min === undefined ? max : min;
+      const k = `${max}:${lo}`;
+      const nf = NF_CACHE[k] || (NF_CACHE[k] = new Intl.NumberFormat("vi-VN",
+        { minimumFractionDigits: lo, maximumFractionDigits: max }));
+      return nf.format(Number(v));
+    }
+    // Số m³ của trang Kế hoạch: tới 2 chữ số như file Excel, bỏ số 0 thừa.
+    const nf2 = (x) => fmtN(x, 2, 0);
+    // Giá trị đặt VÀO Ô NHẬP: dấu phẩy nhưng KHÔNG có dấu chấm hàng nghìn — bộ đọc
+    // ô nhập chỉ đổi "," thành ".", nên "1.234,5" sẽ đọc sai.
+    const numIn = (x) => String(x).replace(".", ",");
+    function fmtPct(p) { return fmtN(p, 1); }
+    function fmtNum(v, unit) { return (v === null || v === undefined) ? "--" : `${fmtN(v, 3, 0)} ${unit}`; }
     function fmtTime(iso) { return iso ? new Date(iso).toLocaleString("vi-VN") : "chưa bao giờ"; }
     // Bỏ chữ "trước": tiêu đề cột là "Cập nhật" nên đã hàm ý khoảng đã trôi, và
     // "79 ngày trước" trong cột hẹp (sau khi thêm cột "Còn lại") gãy thành 3 dòng
@@ -2229,15 +2233,14 @@
     // Server trả mọi thể tích bằng LÍT (đơn vị canonical của DB); UI luôn hiện m³.
     const m3 = (l) => (l === null || l === undefined ? null : Number(l) / 1000);
     function fmtM3(l, nd) {
-      const v = m3(l);
-      return v === null ? "--" : v.toFixed(nd === undefined ? 2 : nd);
+      return fmtN(m3(l), nd === undefined ? 1 : nd);
     }
-    // Dưới 1 ngày thì đổi sang giờ: "0.4 ngày" không ai hành động được, "9.6 giờ" thì có.
+    // Dưới 1 ngày thì đổi sang giờ: "0,4 ngày" không ai hành động được, "9,6 giờ" thì có.
     function fmtDays(d) {
       if (d === null || d === undefined) return "--";
       const n = Number(d);
-      if (n < 1) return (n * 24).toFixed(1) + " giờ";
-      return n.toFixed(1) + " ngày";
+      if (n < 1) return fmtN(n * 24, 1) + " giờ";
+      return fmtN(n, 1) + " ngày";
     }
     // Tự dựng chuỗi thay vì toLocaleString: Chrome với locale vi-VN trả
     // "00:43 26-08" (giờ trước ngày, dấu gạch) — đọc lên là sai quy ước Việt Nam
@@ -2327,7 +2330,7 @@
       const cu = summary.online === 0 && newest;
       volEl.textContent = (vol === null || vol === undefined)
         ? "--"
-        : `${(Number(vol) / 1000).toFixed(3)} m³` + (cu ? ` · cũ ${fmtAgo(newest)}` : "");
+        : `${fmtN(Number(vol) / 1000, 1)} m³` + (cu ? ` (cũ ${fmtAgo(newest)})` : "");
       volEl.parentElement.title = cu
         ? `Tổng các lần đọc cuối. Bồn mới nhất cũng đã ${fmtAgo(newest)} không báo — `
           + `đây KHÔNG phải thể tích hiện tại.`
@@ -2457,7 +2460,7 @@
       const g = (fcByPsn[psn] || {}).gas;
       if (!g) return "";
       const v = XCHECK[g.verdict] || XCHECK.insufficient;
-      const n = (x, digits) => x === null || x === undefined ? "--" : Number(x).toFixed(digits);
+      const n = (x, digits) => fmtN(x, digits);
       const band = `${n(g.reference_ratio_nm3_per_m3, 0)} (dải ${n(g.band_lo_nm3_per_m3, 0)}…${n(g.band_hi_nm3_per_m3, 0)})`;
       return `
         <div class="spec-group">
@@ -2465,11 +2468,11 @@
           <span class="st ${v.cls}">${esc(v.txt)}</span>
         </div>
         <div class="meta-grid">
-          ${row("Rút từ mức lỏng", esc(`${g.liquid_net_l == null ? "--" : (Number(g.liquid_net_l) / 1000).toFixed(2)} m³`))}
+          ${row("Rút từ mức lỏng", esc(`${fmtM3(g.liquid_net_l, 2)} m³`))}
           ${row("Đếm ở đồng hồ khí", esc(`${n(g.gas_nm3, 0)} Nm³`))}
           ${row("Tỉ lệ hoá khí", esc(`${n(g.ratio_nm3_per_m3, 0)} Nm³/m³`))}
           ${row("Mốc đối chứng", esc(band))}
-          ${row("Số đoạn dùng được", esc(`${g.segments} · ${Number(g.active_days).toFixed(2)} ngày`))}
+          ${row("Số đoạn dùng được", esc(`${g.segments} đoạn, ${fmtN(g.active_days, 1)} ngày`))}
           ${row("Bộ đếm bị reset", esc(String(g.counter_resets)))}
         </div>
         <p class="xcheck">${esc(g.detail)}</p>`;
@@ -2550,7 +2553,7 @@
       const urg = s.urgency || "unknown";
       const reasons = (s.reasons || []).map(r => `<li>${esc(r)}</li>`).join("");
       const lead = s.order_l != null
-        ? `<b>${esc(fmtM3(s.order_l))} m³</b><span>đặt lúc ${esc(fmtWhen(s.order_at))}</span>`
+        ? `<b>${esc(nf2(m3(s.order_l)))} m³</b><span>đặt lúc ${esc(fmtWhen(s.order_at))}</span>`
           + (s.deliver_at ? `<span class="fc-sub">giao lúc ${esc(fmtWhen(s.deliver_at))}</span>` : "")
         : `<b>--</b><span>Chưa đủ dữ liệu để đề xuất lượng đặt</span>`;
       return `
@@ -2590,10 +2593,10 @@
         : "";
       const pctClass = p !== null && p < 15 ? " bad" : "";
 
-      const cap = detail.capacity_l == null ? "--" : (Number(detail.capacity_l) / 1000).toFixed(3);
-      const vol = detail.volume_l == null ? "--" : (Number(detail.volume_l) / 1000).toFixed(3);
-      const pres = detail.pressure_mpa == null ? "--" : Number(detail.pressure_mpa);
-      const temp = detail.temperature_c == null ? "--" : Number(detail.temperature_c);
+      const cap = fmtM3(detail.capacity_l);
+      const vol = fmtM3(detail.volume_l);
+      const pres = fmtN(detail.pressure_mpa, 3, 0);
+      const temp = fmtN(detail.temperature_c, 1, 0);
       // Ba dòng chân thẻ chỉ được nói thứ ĐO ĐƯỢC hoặc CẤU HÌNH ĐƯỢC. "Bình thường"
       // khi chưa có số liệu, một ngưỡng áp suất không tồn tại trong hệ thống, và
       // môi chất viết cứng bất kể nguồn khai gì — cả ba đều là lời khẳng định mà
@@ -2834,7 +2837,7 @@
                 font: { size: 11.5, weight: '600', family: CHART_FONT }
               }
             },
-            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y}` } },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtN(c.parsed.y, 3, 0)}` } },
           },
           scales: {
             y:  { type: "linear", position: "left",
@@ -3211,7 +3214,7 @@
     function computePlan() {
       const p = planParams();
       const postFill = round2((p.pct / 100) * p.cap);           // = B4
-      document.getElementById("p-postfill").textContent = postFill + " m³";
+      document.getElementById("p-postfill").textContent = nf2(postFill) + " m³";
       const tp = p.time.split(":").map(Number);
       const base = p.date ? new Date(p.date + "T00:00:00") : new Date();
       base.setHours(tp[0] || 0, tp[1] || 0, tp[2] || 0, 0);      // giờ:phút:giây nạp
@@ -3239,8 +3242,8 @@
     function planBasis() {
       const p = planParams();
       const postFill = round2((p.pct / 100) * p.cap);
-      return `Kế hoạch tính theo: tiêu thụ ${round2(p.use)} m³/ngày · dự trữ ${round2(p.res)} m³ · `
-        + `nạp tới ${postFill} m³ · giờ nạp ${p.time.slice(0, 5)}`
+      return `Kế hoạch tính theo: tiêu thụ ${nf2(p.use)} m³/ngày · dự trữ ${nf2(p.res)} m³ · `
+        + `nạp tới ${nf2(postFill)} m³ · giờ nạp ${p.time.slice(0, 5)}`
         + (planLive ? ` · tính từ số đo thật lúc ${fmtDT(planLive.at)}.`
                     : " · bồn không có số đo mới, tính từ thể tích nhập tay.");
     }
@@ -3397,11 +3400,11 @@
       // Ngưỡng tính tới GIỜ XE TỚI của ngày giao được kế tiếp, nên cộng thêm phần
       // dùng từ nửa đêm tới giờ nạp (h ngày). Thứ Bảy cộng thêm một ngày Chủ Nhật.
       const hh = planRefillHour(p);
-      const band = `≤ ${round2(R + (1 + hh) * U)} m³` + (U > 0 ? ` · thứ Bảy ≤ ${round2(R + (2 + hh) * U)} m³` : "");
+      const band = `≤ ${nf2(R + (1 + hh) * U)} m³` + (U > 0 ? ` · thứ Bảy ≤ ${nf2(R + (2 + hh) * U)} m³` : "");
       document.getElementById("plan-summary").innerHTML =
-        `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${total} m³</b></div>` +
+        `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${nf2(total)} m³</b></div>` +
         `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
-        `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${postFill} m³</b></div>` +
+        `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${nf2(postFill)} m³</b></div>` +
         `<div class="ps-tile" title="Thứ Bảy cao hơn vì Chủ Nhật không có xe"><span>Nạp khi đầu ngày còn</span><b class="num tight">${band}</b></div>` +
         planDeviationTile(rows);
       const warn = document.getElementById("plan-warn");
@@ -3422,12 +3425,12 @@
       const cur = rows.find(r => !r.past);
       const curLvl = cur ? (cur.anchor ? cur.anchor.m3 : cur.level) : null;
       if (curLvl !== null && curLvl < R) {
-        msgs.push(`${cur.anchor ? "Thể tích hiện tại" : "Thể tích ban đầu"} ${round2(curLvl)} m³ thấp hơn mức dự trữ ${round2(R)} m³ — cần nạp ngay.`);
+        msgs.push(`${cur.anchor ? "Thể tích hiện tại" : "Thể tích ban đầu"} ${nf2(curLvl)} m³ thấp hơn mức dự trữ ${nf2(R)} m³ — cần nạp ngay.`);
       }
       // Mức đích không được nằm dưới ngưỡng kích hoạt: nạp xong mà vẫn dưới ngưỡng
       // thì ngày nào cũng "phải nạp" với lượng đặt bằng 0 — một lịch vô nghĩa.
       if (postFill <= R + U) {
-        msgs.push(`Nạp tới ${round2(postFill)} m³ nhưng ngưỡng kích hoạt là ${round2(R + U)} m³ — `
+        msgs.push(`Nạp tới ${nf2(postFill)} m³ nhưng ngưỡng kích hoạt là ${nf2(R + U)} m³ — `
           + `nạp xong vẫn ở dưới ngưỡng nên kế hoạch sẽ đòi nạp mỗi ngày. Giảm "Mức dự trữ" hoặc tăng "Nạp tới mức".`);
       }
       // Dung tích lưu trong hệ thống lệch xa dung tích đang lập kế hoạch. Đây KHÔNG
@@ -3440,23 +3443,23 @@
       if (capStored != null) {
         const cs = round2(Number(capStored) / 1000);
         if (cs > 0 && Math.abs(cs - p.cap) / Math.max(cs, p.cap) > 0.1) {
-          msgs.push(`Dung tích lưu trong hệ thống cho bồn này là ${cs} m³, nhưng bạn đang lập kế hoạch với ${round2(p.cap)} m³. `
-            + `Khi chọn bồn, "Mức tiêu thụ/ngày" (${round2(U)} m³) và "Mức dự trữ" (${round2(R)} m³) được gợi ý theo số ĐÃ LƯU — `
-            + `kiểm lại cả hai. Hai số không thể cùng đúng: nếu ${round2(p.cap)} m³ là số đúng thì `
+          msgs.push(`Dung tích lưu trong hệ thống cho bồn này là ${nf2(cs)} m³, nhưng bạn đang lập kế hoạch với ${nf2(p.cap)} m³. `
+            + `Khi chọn bồn, "Mức tiêu thụ/ngày" (${nf2(U)} m³) và "Mức dự trữ" (${nf2(R)} m³) được gợi ý theo số ĐÃ LƯU — `
+            + `kiểm lại cả hai. Hai số không thể cùng đúng: nếu ${nf2(p.cap)} m³ là số đúng thì `
             + `bấm "Lưu vào bồn" cạnh ô Dung tích để hệ thống dùng nó ở mọi nơi.`);
         }
       }
       warn.innerHTML = msgs.map(m => `<span>${m}</span>`).join("");
       warn.hidden = !msgs.length;
       document.getElementById("plan-body").innerHTML = rows.map(r => {
-        const lvl = r.level === null ? "—" : round2(r.level);
+        const lvl = r.level === null ? null : round2(r.level);
         const hhmm = (t) => `${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
         // Nói ra con số trong ô là GÌ: số đo thật, ước tính cho ngày bồn im, hay dòng
         // neo — nơi thể tích đầu ngày là số đo được còn phép tính đi từ lần đo mới nhất.
         let luc = "";
         if (r.anchor) {
           luc = `<span class="p-goc" title="Dự báo tính từ lần đo mới nhất của thiết bị">`
-            + `${r.anchor.open ? "" : "đo "}lúc ${hhmm(r.anchor.at)}${r.anchor.open ? ": " + round2(r.anchor.m3) : ""}</span>`;
+            + `${r.anchor.open ? "" : "đo "}lúc ${hhmm(r.anchor.at)}${r.anchor.open ? ": " + nf2(r.anchor.m3) : ""}</span>`;
         } else if (r.past && r.noData) {
           luc = `<span class="p-goc">${planOpenLoading ? "đang tải…" : (r.level === null ? "không có số đo" : "không có số đo · ước tính")}</span>`;
         } else if (r.past) {
@@ -3476,23 +3479,23 @@
         const derived = r.fromKey !== null && round2(r.shadow) !== lvl;
         if (derived) cls += " fromact";
         const goc = derived
-          ? `<span class="p-goc" title="Nếu không nhập số thực tế ngày ${r.fromKey} thì ngày này là ${round2(r.shadow)} m³">ước tính gốc ${round2(r.shadow)}</span>`
+          ? `<span class="p-goc" title="Nếu không nhập số thực tế ngày ${r.fromKey} thì ngày này là ${nf2(r.shadow)} m³">ước tính gốc ${nf2(r.shadow)}</span>`
           : "";
         const thuc = planActualRefill(r.key);
         let res = r.fill ? `<span class="tag-fill">Nạp LNG</span>` : "";
         if (r.conflict) res = `<span class="tag-warn" title="Ngày không có xe — không xếp nạp được">Không giao được</span>`;
         if (thuc) {
-          res = `<span class="tag-done" title="Lần nạp thật, phát hiện từ số đo của thiết bị">Đã nạp ${thuc.hhmm} · +${thuc.m3} m³</span>`
+          res = `<span class="tag-done" title="Lần nạp thật, phát hiện từ số đo của thiết bị">Đã nạp ${thuc.hhmm}, +${nf2(thuc.m3)} m³</span>`
             + (res ? " " + res : "");
         }
         const when = r.fill ? fmtDT(r.d) : "";
-        const order = r.order === null ? "" : `<b>${r.order}</b>`;
+        const order = r.order === null ? "" : `<b>${nf2(r.order)}</b>`;
         // Ngày đã qua: đánh dấu không có tác dụng gì nữa, nên khoá lại thay vì để
         // người dùng tích rồi thấy bảng không đổi.
         const qua = r.past ? ' disabled title="Ngày đã qua"' : "";
         return `<tr${r.fill ? ' class="is-fill"' : r.past ? ' class="is-past"' : ""}>
           <td class="num">${pad2(r.d.getDate())}/${pad2(r.d.getMonth() + 1)}</td><td>${WD_VI[r.d.getDay()]}</td>
-          <td class="${cls}">${lvl}${luc}${goc}</td>
+          <td class="${cls}">${lvl === null ? "—" : nf2(lvl)}${luc}${goc}</td>
           ${planActCell(r)}
           <td class="c"><input type="checkbox" data-kind="rest" data-day="${r.key}"${r.rest ? " checked" : ""} aria-label="Ngày nghỉ"${qua}></td>
           <td class="c"><input type="checkbox" data-kind="force" data-day="${r.key}"${r.forced ? " checked" : ""} aria-label="Nạp chỉ định"${qua}></td>
@@ -3512,12 +3515,12 @@
         const diff = round2(r.act - r.est);
         // diff > 0: còn nhiều hơn ước tính, tức hôm đó dùng ÍT hơn dự kiến.
         const cls = diff >= 0 ? "up" : "dn";
-        est = `<span class="p-est">ước tính ${round2(r.est)} · <b class="${cls}">${diff > 0 ? "+" : ""}${diff}</b></span>`;
+        est = `<span class="p-est">ước tính ${nf2(r.est)}, lệch <b class="${cls}">${diff > 0 ? "+" : ""}${nf2(diff)}</b></span>`;
       }
       const off = planPsn ? "" : ' disabled title="Chọn bồn để nhập số thực tế"';
       return `<td class="r act">` +
         `<input type="text" inputmode="decimal" class="p-act" data-day="${r.key}" ` +
-        `value="${has ? round2(r.act) : ""}" placeholder="${planPsn ? "—" : "chọn bồn"}"${off} ` +
+        `value="${has ? numIn(round2(r.act)) : ""}" placeholder="${planPsn ? "—" : "chọn bồn"}"${off} ` +
         `aria-label="Thể tích thực tế ngày ${dd}, mét khối">` + est + `</td>`;
     }
 
@@ -3530,7 +3533,7 @@
       const dev = round2(acts.reduce((a, r) => a + (r.act - r.est), 0));
       return `<div class="ps-tile" title="Cộng dồn (thực tế − ước tính) của các ngày đã nhập. `
         + `Số dương nghĩa là dùng ít hơn kế hoạch."><span>Thực tế so với ước tính</span>`
-        + `<b class="num tight">${dev > 0 ? "+" : ""}${dev} m³ · ${acts.length} ngày</b></div>`;
+        + `<b class="num tight">${dev > 0 ? "+" : ""}${nf2(dev)} m³ trong ${acts.length} ngày</b></div>`;
     }
 
     // Ánh xạ ô trên form <-> field API. Đơn vị: API nói LÍT, form nói m³.
@@ -3641,7 +3644,7 @@
         });
         const i = tanks.findIndex(x => x.psn === psn);
         if (i >= 0) tanks[i].capacity_l = t.capacity_l;
-        setMsg("plan-msg", `Đã lưu dung tích ${m3} m³ cho bồn này. `
+        setMsg("plan-msg", `Đã lưu dung tích ${nf2(m3)} m³ cho bồn này. `
           + `Mức chứa %, cảnh báo và dự báo giờ tính theo số này.`, "ok");
         updateCapSaveBtn();
         computePlan();
@@ -3719,7 +3722,7 @@
     function planCapWarn(m3) {
       const cap = parseFloat(document.getElementById("p-cap").value);
       if (!Number.isFinite(cap) || cap <= 0 || m3 <= cap) return "";
-      return `Đã lưu ${m3} m³, nhưng lớn hơn Dung tích đang đặt (${round2(cap)} m³) — `
+      return `Đã lưu ${nf2(m3)} m³, nhưng lớn hơn Dung tích đang đặt (${nf2(cap)} m³) — `
         + `kiểm lại một trong hai số.`;
     }
 
@@ -3770,7 +3773,7 @@
       const L = planLiveCand;
       if (planLive) {
         el.innerHTML = `Ngày đã qua là <b>số đo thật</b>; dự báo tính từ lần đo mới nhất của thiết bị lúc `
-          + `<b>${esc(fmtDT(planLive.at))}</b> (${esc(String(planLive.m3))} m³)`
+          + `<b>${esc(fmtDT(planLive.at))}</b> (${esc(nf2(planLive.m3))} m³)`
           + (planLive.tayKey ? ` — mới hơn số đo tay ngày ${esc(planLive.tayKey)}.` : ".")
           + ` Gõ vào ô này để thử một con số khác.`;
         return;
@@ -3880,7 +3883,7 @@
           const v = round2(Number(row.volume_l) / 1000);
           planReadings.set(key, v);
           const warn = planCapWarn(v);
-          setMsg("plan-msg", warn || `Đã lưu ${v} m³ cho ngày ${key}.`, warn ? "warn" : "ok");
+          setMsg("plan-msg", warn || `Đã lưu ${nf2(v)} m³ cho ngày ${key}.`, warn ? "warn" : "ok");
         }
       } catch (e) {
         if (e.name !== "AuthError") planMarkInvalid(key, raw, e.message);
@@ -4000,13 +4003,13 @@
         ? Number(f.suggestion.lead_time_days) : 1;
       const postFill = round2((p.pct / 100) * p.cap);
       const reasons = [
-        `Tính đúng theo bảng bên dưới: mức tiêu thụ ${round2(p.use)} m³/ngày, mức dự trữ `
-          + `${round2(p.res)} m³, nạp tới ${postFill} m³, giờ nạp ${p.time.slice(0, 5)}; `
+        `Tính đúng theo bảng bên dưới: mức tiêu thụ ${nf2(p.use)} m³/ngày, mức dự trữ `
+          + `${nf2(p.res)} m³, nạp tới ${nf2(postFill)} m³, giờ nạp ${p.time.slice(0, 5)}; `
           + `Chủ Nhật và ngày nghỉ không giao.`,
       ];
       const meas = f.consumption && f.consumption.daily_use_l != null ? Number(f.consumption.daily_use_l) / 1000 : null;
       if (meas && Math.abs(meas - p.use) / meas > 0.05) {
-        reasons.push(`Số đo thực tế là ${round2(meas)} m³/ngày khi nhà máy chạy — bấm "Áp dụng số đo thực tế" `
+        reasons.push(`Số đo thực tế là ${nf2(meas)} m³/ngày khi nhà máy chạy — bấm "Áp dụng số đo thực tế" `
           + `nếu muốn kế hoạch dùng số này.`);
       }
       const next = rows.find(r => !r.past && r.fill && r.order > 0 && r.d.getTime() >= now - 60000);
@@ -4022,17 +4025,17 @@
       let urgency;
       if (curLvl !== null && curLvl < p.res) {
         urgency = "now";
-        reasons.push(`Thể tích hiện tại ${round2(curLvl)} m³ đã dưới mức dự trữ — cần đặt ngay.`);
+        reasons.push(`Thể tích hiện tại ${nf2(curLvl)} m³ đã dưới mức dự trữ — cần đặt ngay.`);
       } else if (daysToOrder <= 0) {
         urgency = "now";
         reasons.push(`Phải đặt ngay để kịp chuyến giao ${fmtWhen(deliverAt.toISOString())}.`);
       } else {
         urgency = daysToOrder <= 2 ? "soon" : "ok";
-        reasons.push(`Còn ${daysToOrder.toFixed(1)} ngày nữa phải đặt hàng.`);
+        reasons.push(`Còn ${fmtN(daysToOrder, 1)} ngày nữa phải đặt hàng.`);
       }
       reasons.push(`Lần nạp kế tiếp trong bảng: ${fmtWhen(deliverAt.toISOString())}, lúc xe tới bồn còn `
-        + `${round2(next.atRefill)} m³.`);
-      reasons.push(`Lượng đặt = mức sau nạp ${postFill} m³ trừ ${round2(next.atRefill)} m³ = ${next.order} m³.`);
+        + `${nf2(next.atRefill)} m³.`);
+      reasons.push(`Lượng đặt = mức sau nạp ${nf2(postFill)} m³ trừ ${nf2(next.atRefill)} m³ = ${nf2(next.order)} m³.`);
       reasons.push(`Đặt trước ${lead} ngày — thời gian giao hàng trong Cài đặt.`);
       return {
         urgency, order_l: next.order * 1000,
@@ -4131,7 +4134,7 @@
       const end = new Date(Math.max.apply(null, stamps));
       const ageDays = (Date.now() - end.getTime()) / 86400000;
       note.textContent = ageDays > 1
-        ? `Kỳ báo cáo kết ở lần đo cuối (${fmtWhen(end.toISOString())}), không phải hôm nay — số liệu đã cũ ${ageDays.toFixed(1)} ngày.`
+        ? `Kỳ báo cáo kết ở lần đo cuối (${fmtWhen(end.toISOString())}), không phải hôm nay — số liệu đã cũ ${fmtN(ageDays, 1)} ngày.`
         : `Kỳ báo cáo kết ở lần đo cuối (${fmtWhen(end.toISOString())}).`;
     }
 
@@ -4280,13 +4283,13 @@
                    q.expected_samples
                      ? `${q.samples ?? "--"} / ${q.expected_samples} lần đo`
                      : `${q.samples ?? 0} lần đo · chưa đủ để tính số kỳ vọng`)}
-          ${anTile("Pin", b.current_v == null ? "--" : esc(Number(b.current_v).toFixed(2)) + "<small>V</small>",
+          ${anTile("Pin", b.current_v == null ? "--" : esc(fmtN(b.current_v, 2)) + "<small>V</small>",
                    b.current_v == null
                      ? "Không có số đo pin"
                      : b.volts_per_day == null
                        ? "Chưa đo được xu hướng"
-                       : `${(b.volts_per_day * 1000).toFixed(1)} mV/ngày · tin cậy ${esc(b.confidence)}`)}
-          ${anTile("Sóng", s.current_percent == null ? "--" : esc(Number(s.current_percent).toFixed(0)) + "<small>%</small>",
+                       : `${fmtN(b.volts_per_day * 1000, 1)} mV/ngày · tin cậy ${esc(b.confidence)}`)}
+          ${anTile("Sóng", s.current_percent == null ? "--" : esc(fmtN(s.current_percent, 0)) + "<small>%</small>",
                    s.current_percent == null
                      ? "Không có số đo sóng"
                      : s.below_floor_ratio
@@ -4302,12 +4305,12 @@
                    esc(fmtM3(cons.daily_use_l)) + "<small>m³</small>",
                    cons.confidence ? esc(CONF_VI[cons.confidence] || "--") : "Chưa có dự báo")}
           ${anTile("Hao hụt do bay hơi",
-                   bor == null ? "--" : esc(Number(bor).toFixed(3)) + "<small>%/ngày</small>",
+                   bor == null ? "--" : esc(fmtN(bor, 3)) + "<small>%/ngày</small>",
                    fc.idle ? esc(METHOD_VI[fc.idle.method] || "--") : "Chưa có dự báo")}
           ${anTile("Còn giữ được áp", esc(fmtDays(hold.days)),
                    hold.days == null
                      ? "Chưa đo được tốc độ tăng áp"
-                     : `Tới van an toàn ${esc(Number(hold.relief_mpa).toFixed(2))} MPa`,
+                     : `Tới van an toàn ${esc(fmtN(hold.relief_mpa, 2))} MPa`,
                    hold.days != null && hold.days <= 5 ? "crit" : "")}
         </div>
         ${covBlock(a)}
@@ -4503,7 +4506,7 @@
         if (note) {
           note.textContent =
             `${out.raw_total} dòng thô → ${out.episodes_total} việc ` +
-            `(gộp ${Number(out.reduction_percent).toFixed(1)}%)`;
+            `(gộp ${fmtN(out.reduction_percent, 1)}%)`;
         }
         body.innerHTML = out.items.map(e => `<tr>
           <td>${esc(e.device_id)}</td>
