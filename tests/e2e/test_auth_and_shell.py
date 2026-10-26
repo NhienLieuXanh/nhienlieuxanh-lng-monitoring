@@ -20,10 +20,10 @@ def test_chua_dang_nhap_thay_man_dang_nhap_va_api_tu_choi(anon_page: Page, serve
 def test_da_dang_nhap_thay_khung_ung_dung_va_hai_bon(app_page: Page) -> None:
     expect(app_page.locator("#login-gate")).to_be_hidden()
     expect(app_page.get_by_text(USER)).to_be_visible()
-    rows = app_page.locator("#tank-list tr[data-psn]")
+    rows = app_page.locator("#tank-list [data-psn]")
     expect(rows).to_have_count(2)
-    expect(app_page.locator(f'#tank-list tr[data-psn="{YKH}"]')).to_contain_text("Trực tuyến")
-    expect(app_page.locator(f'#tank-list tr[data-psn="{FUJI}"]')).to_contain_text("Ngoại tuyến")
+    expect(app_page.locator(f'#tank-list [data-psn="{YKH}"]')).to_contain_text("Trực tuyến")
+    expect(app_page.locator(f'#tank-list [data-psn="{FUJI}"]')).to_contain_text("Ngoại tuyến")
 
 
 def test_moi_trang_trong_menu_mo_duoc(app_page: Page) -> None:

@@ -19,14 +19,14 @@
        env(safe-area-inset-*) cho tai thỏ và vạch home, mà tôi không có iPhone thật
        để kiểm. Không bật thì trình duyệt tự tránh vùng đó — mặc định an toàn. -->
   <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#f8fafc" />
+  <meta name="theme-color" content="#E5E7E9" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Giám sát LNG" />
   <link rel="apple-touch-icon" href="logo-gx.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script>
     // Đặt theme TRƯỚC khi vẽ để không nháy sáng/tối. Mặc định SÁNG (nhận diện
     // thương hiệu); nền tối là lựa chọn của người dùng, giữ trong localStorage.
@@ -52,59 +52,83 @@
   <style>
     /* ============ DESIGN SYSTEM: GAS NHIÊN LIỆU XANH (UI/UX PRO MAX) ============ */
     :root {
-      /* Mặc định: Trắng, Xanh Dương, Xanh Lá (chuẩn nhận diện thương hiệu GAS Nhiên Liệu Xanh) */
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --surface-solid: #ffffff;
-      --surface-2: #f1f5f9;
-      --surface-3: #e2e8f0;
-      --line: #e2e8f0;
-      --line-soft: #f1f5f9;
-      --fg: #0f172a;
-      --muted: #475569;
-      --faint: #64748b;
+      /* PHÒNG ĐIỀU KHIỂN (ISA-101): MÀU = BẤT THƯỜNG. Nền và mọi trạng thái bình
+         thường là XÁM — kể cả "trực tuyến", "ổn". Đỏ (ưu tiên 1) và hổ phách (ưu
+         tiên 2) chỉ xuất hiện khi có việc phải làm, luôn kèm hình (▲ ◆) và chữ, nên
+         một bồn có vấn đề nổi lên ngay giữa một màn hình đang im. Bản trước tô xanh
+         lá cho "bình thường" và hồng/xanh nhạt cho mọi huy hiệu: màn hình lúc nào cũng
+         đầy màu nên màu không còn báo được gì (soát UI 26/10/2026).
+         Xanh logo #1060B0 chỉ dành cho thứ BẤM ĐƯỢC: nút chính, mục đang chọn, liên
+         kết, viền focus. Tỉ lệ tương phản đã đo trên cả --surface lẫn --bg. */
+      --bg: #E5E7E9;
+      --surface: #F3F4F5;
+      --surface-solid: #F3F4F5;
+      --surface-2: #EAECEE;
+      --surface-3: #DCDFE2;
+      --panel-head: #E9EBED;
+      --line: #C4C9CE;
+      --line-soft: #D6D9DD;
+      --line-strong: #A3A9AF;
+      --fg: #1C2024;
+      --fg-soft: #33393F;
+      --muted: #555C63;
+      --faint: #5C646C;
 
-      /* MÀU THƯƠNG HIỆU LẤY TỪ LOGO, không phải bảng màu mặc định của Tailwind
-         (bản trước dùng sky #0369a1 và emerald #047857 — logo không có màu nào
-         trong hai màu đó). Xanh dương logo #1060B0 đạt 6,32:1 trên nền trắng nên
-         dùng thẳng làm chữ và nền nút. Xanh lá logo #00A050 chỉ đạt 3,42:1: đủ cho
-         chấm, thanh, đường biểu đồ (ngưỡng 3,0) nhưng KHÔNG đủ cho chữ — chữ xanh
-         lá dùng bản đậm #007A3D (5,45:1). */
-      --brand: #1060B0;        /* Xanh dương GAS (logo) */
-      --brand-strong: #0c4d8f; /* Xanh dương đậm */
-      --brand-solid: #1060B0;  /* Nền nút chính */
-      --brand-hover: #0c4d8f;  /* Nền nút chính khi rê chuột */
+      --brand: #1060B0;
+      --brand-strong: #0c4d8f;
+      --brand-solid: #1060B0;
+      --brand-hover: #0c4d8f;
       --on-brand: #ffffff;
+      --sel: #E1EAF4;
+      --sel-line: #9DBBDD;
+      --ring: #1060B0;
+      --ring-soft: rgba(16, 96, 176, 0.2);
+      --tag-fill-fg: #1C2024;
 
-      --nlx: #007A3D;          /* Xanh lá Nhiên Liệu Xanh — bản đậm dùng làm chữ */
+      /* Xanh lá logo chỉ còn ở logo và vùng Việt Nam trên bản đồ. */
+      --nlx: #007A3D;
       --nlx-strong: #00602f;
-      --nlx-bg: #e8f5ee;
+      --nlx-bg: #DCEBE2;
 
-      --ok: #007A3D;      --ok-bg: #e8f5ee;   --ok-line: #a6d9bd;
-      --warn: #b45309;    --warn-bg: #fffbeb;  --warn-line: #fde68a;
-      --crit: #be123c;    --crit-bg: #fff1f2;  --crit-line: #fecdd3;
+      /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
+      --ok: #3D4349;      --ok-bg: #EAECEE;   --ok-line: #C4C9CE;
+      --warn: #8A5A00;    --warn-bg: #FBF0D6; --warn-line: #E2BE6A;  --warn-fill: #E8A317;
+      --crit: #B3121F;    --crit-bg: #F9E1E3; --crit-line: #E09AA1;  --crit-fill: #D0202E;
       --on-crit: #ffffff;
-      --sel: #edf3fa;     /* Xanh dương nhạt cho hàng được chọn */
-      --ring: #1060B0;    /* Viền focus */
-      --ring-soft: rgba(16, 96, 176, 0.18);
+      --crit-bg-2: #F4CDD1;
+      --crit-line-2: #D8848C;
 
-      /* Bóng TRUNG TÍNH: bóng nhuộm xanh là một lớp màu trang trí không mang nghĩa. */
-      --shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
-      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-      --shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.06);
+      --shadow: 0 8px 24px rgba(28, 32, 36, 0.18);   /* chỉ cho lớp nổi: popover, drawer */
+      --shadow-sm: none;
+      --shadow-glass: none;
 
-      --chart-vol: #1060B0; /* Đường thể tích: xanh dương logo */
-      --chart-pres: #00A050; /* Đường áp suất: xanh lá logo (đồ hoạ, ngưỡng 3,0) */
-      --grid: rgba(15, 23, 42, 0.06);
-      --axis: #64748b;
-      --chart-anom: #e11d48;
-      --scrim: rgba(15, 23, 42, 0.45);
+      /* Cột mức trong ô bồn: thân xám, mặt chất lỏng là một vạch đậm nên mức đọc
+         được bất kể màu tô. */
+      --gauge: #6E777F;
+      --gauge-track: #F8F9FA;
+      --gauge-edge: #1C2024;
+
+      --chart-vol: #2F3539;   /* thể tích: nét liền đậm */
+      --chart-pres: #7C858D;  /* áp suất: nét đứt nhạt */
+      --chart-res: #E8A317;   /* mức dự trữ: giới hạn báo động ưu tiên 2 */
+      --chart-anom: #D0202E;
+      --grid: rgba(28, 32, 36, 0.07);
+      --axis: #5C646C;
+      --scrim: rgba(28, 32, 36, 0.45);
+
+      --dot-ok: #6E777F;
+      --dot-warn: #E8A317;
+      --dot-bad: #D0202E;
+      --accent-warn: #E8A317;
+      --bar-warn: #E8A317;
+      --scroll-2: #8A9299;
+      --hover-veil: rgba(255, 255, 255, 0.55);
 
       --header-h: 58px;
       --rail-w: 240px;
-      --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
-      --r: 12px; --r-sm: 8px;
+      --r: 0px; --r-sm: 3px;
 
       /* THANG CHỮ: 5 bậc 12 / 13 / 14 / 16 / 20, cộng 28 cho MỘT con số chính.
          Bản trước có 10 cỡ cách nhau nửa pixel (11 / 11,5 / 12,5 / 13 / 13,5…):
@@ -123,131 +147,148 @@
       --fs-2xl: 20px;
       --fs-3xl: 28px;
 
-      --line-strong: #cbd5e1;
-      --fg-soft: #334155;
-      --sel-line: #c3d7ee;
-      --dot-ok: #00A050;
-      --dot-warn: #f59e0b;
-      --dot-bad: #ef4444;
-      --accent-warn: #d97706;
-      --bar-warn: #fbbf24;
-      --crit-bg-2: #ffe4e6;
-      --crit-line-2: #fda4af;
-      --scroll-2: #94a3b8;
-      --hover-veil: rgba(255, 255, 255, 0.6);
-      --tag-fill-fg: #1060B0;
 
       --z-rail: 30; --z-header: 40; --z-pop: 60; --z-login: 1000;
     }
     :root[data-theme="light"] {
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --surface-solid: #ffffff;
-      --surface-2: #f1f5f9;
-      --surface-3: #e2e8f0;
-      --line: #e2e8f0;
-      --line-soft: #f1f5f9;
-      --fg: #0f172a;
-      --muted: #475569;
-      --faint: #64748b;
+      /* PHÒNG ĐIỀU KHIỂN (ISA-101): MÀU = BẤT THƯỜNG. Nền và mọi trạng thái bình
+         thường là XÁM — kể cả "trực tuyến", "ổn". Đỏ (ưu tiên 1) và hổ phách (ưu
+         tiên 2) chỉ xuất hiện khi có việc phải làm, luôn kèm hình (▲ ◆) và chữ, nên
+         một bồn có vấn đề nổi lên ngay giữa một màn hình đang im. Bản trước tô xanh
+         lá cho "bình thường" và hồng/xanh nhạt cho mọi huy hiệu: màn hình lúc nào cũng
+         đầy màu nên màu không còn báo được gì (soát UI 26/10/2026).
+         Xanh logo #1060B0 chỉ dành cho thứ BẤM ĐƯỢC: nút chính, mục đang chọn, liên
+         kết, viền focus. Tỉ lệ tương phản đã đo trên cả --surface lẫn --bg. */
+      --bg: #E5E7E9;
+      --surface: #F3F4F5;
+      --surface-solid: #F3F4F5;
+      --surface-2: #EAECEE;
+      --surface-3: #DCDFE2;
+      --panel-head: #E9EBED;
+      --line: #C4C9CE;
+      --line-soft: #D6D9DD;
+      --line-strong: #A3A9AF;
+      --fg: #1C2024;
+      --fg-soft: #33393F;
+      --muted: #555C63;
+      --faint: #5C646C;
+
       --brand: #1060B0;
       --brand-strong: #0c4d8f;
       --brand-solid: #1060B0;
       --brand-hover: #0c4d8f;
-      --on-crit: #ffffff;
+      --on-brand: #ffffff;
+      --sel: #E1EAF4;
+      --sel-line: #9DBBDD;
+      --ring: #1060B0;
+      --ring-soft: rgba(16, 96, 176, 0.2);
+      --tag-fill-fg: #1C2024;
+
+      /* Xanh lá logo chỉ còn ở logo và vùng Việt Nam trên bản đồ. */
       --nlx: #007A3D;
       --nlx-strong: #00602f;
-      --nlx-bg: #e8f5ee;
-      --ok: #007A3D;   --ok-bg: #e8f5ee;   --ok-line: #a6d9bd;
-      --warn: #b45309; --warn-bg: #fffbeb; --warn-line: #fde68a;
-      --crit: #be123c; --crit-bg: #fff1f2; --crit-line: #fecdd3;
-      --sel: #edf3fa;
-      --ring: #1060B0;
-      --ring-soft: rgba(16, 96, 176, 0.18);
-      --shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
-      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-      --shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.06);
-      --chart-vol: #1060B0; --chart-pres: #00A050; --grid: rgba(15,23,42,.06); --axis: #64748b;
-      --chart-anom: #e11d48;
-      --scrim: rgba(15,23,42,.45);
-      --line-strong: #cbd5e1;
-      --fg-soft: #334155;
-      --sel-line: #c3d7ee;
-      --dot-ok: #00A050;
-      --dot-warn: #f59e0b;
-      --dot-bad: #ef4444;
-      --accent-warn: #d97706;
-      --bar-warn: #fbbf24;
-      --crit-bg-2: #ffe4e6;
-      --crit-line-2: #fda4af;
-      --scroll-2: #94a3b8;
-      --hover-veil: rgba(255, 255, 255, 0.6);
-      --tag-fill-fg: #1060B0;
-    }
-    /* Nền tối cho phòng điều khiển ban đêm. Giá trị lấy lại từ bảng màu đã được đo
-       trước đây (mỗi ngoại lệ dưới đây đều có lý do ghi kèm), không phải chọn mới.
-       CHỈ khai token MÀU và BÓNG — thang chữ, bán kính, chiều rộng rail là quyết
-       định bố cục, không phụ thuộc sáng/tối, nên chúng thừa hưởng từ :root. */
-    :root[data-theme="dark"] {
-      --bg: #0b1120;
-      --surface: #111a2e;
-      --surface-solid: #111a2e;
-      --surface-2: #0d1526;
-      --surface-3: #17223a;
-      --line: #223049;
-      --line-soft: #1a2740;
-      --fg: #e8edf5;
-      --muted: #93a1b8;
-      --faint: #838fa3;
+      --nlx-bg: #DCEBE2;
 
-      /* --brand dùng làm CHỮ trên nền tối nên phải SÁNG; nhưng chữ trắng trên
-         chính nó chỉ đạt 3,18 nên nút cần một token nền riêng, đậm hơn. */
-      --brand: #5b9be0;        /* xanh logo sáng lên: 5,95:1 trên nền thẻ tối */
-      --brand-strong: #7fb1e8;
-      --brand-solid: #1060B0;  /* nút giữ đúng màu logo: chữ trắng 6,32:1 */
+      /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
+      --ok: #3D4349;      --ok-bg: #EAECEE;   --ok-line: #C4C9CE;
+      --warn: #8A5A00;    --warn-bg: #FBF0D6; --warn-line: #E2BE6A;  --warn-fill: #E8A317;
+      --crit: #B3121F;    --crit-bg: #F9E1E3; --crit-line: #E09AA1;  --crit-fill: #D0202E;
+      --on-crit: #ffffff;
+      --crit-bg-2: #F4CDD1;
+      --crit-line-2: #D8848C;
+
+      --shadow: 0 8px 24px rgba(28, 32, 36, 0.18);   /* chỉ cho lớp nổi: popover, drawer */
+      --shadow-sm: none;
+      --shadow-glass: none;
+
+      /* Cột mức trong ô bồn: thân xám, mặt chất lỏng là một vạch đậm nên mức đọc
+         được bất kể màu tô. */
+      --gauge: #6E777F;
+      --gauge-track: #F8F9FA;
+      --gauge-edge: #1C2024;
+
+      --chart-vol: #2F3539;   /* thể tích: nét liền đậm */
+      --chart-pres: #7C858D;  /* áp suất: nét đứt nhạt */
+      --chart-res: #E8A317;   /* mức dự trữ: giới hạn báo động ưu tiên 2 */
+      --chart-anom: #D0202E;
+      --grid: rgba(28, 32, 36, 0.07);
+      --axis: #5C646C;
+      --scrim: rgba(28, 32, 36, 0.45);
+
+      --dot-ok: #6E777F;
+      --dot-warn: #E8A317;
+      --dot-bad: #D0202E;
+      --accent-warn: #E8A317;
+      --bar-warn: #E8A317;
+      --scroll-2: #8A9299;
+      --hover-veil: rgba(255, 255, 255, 0.55);
+    }
+    /* Nền tối cho phòng điều khiển ban đêm. CHỈ khai token MÀU — thang chữ, bán
+       kính, chiều rộng rail là quyết định bố cục, thừa hưởng từ :root. */
+    :root[data-theme="dark"] {
+      /* Phòng trực đêm: cùng luật, nền graphite. */
+      --bg: #151719;
+      --surface: #1D2023;
+      --surface-solid: #1D2023;
+      --surface-2: #24282B;
+      --surface-3: #2C3135;
+      --panel-head: #23272A;
+      --line: #363B40;
+      --line-soft: #2C3034;
+      --line-strong: #4A5056;
+      --fg: #D9DDE1;
+      --fg-soft: #C2C7CC;
+      --muted: #9AA2A9;
+      --faint: #8A929A;
+
+      /* --brand là màu CHỮ/viền nên phải sáng; nút giữ đúng màu logo (chữ trắng 6,32:1). */
+      --brand: #6AA6E8;
+      --brand-strong: #8DBBEE;
+      --brand-solid: #1060B0;
       --brand-hover: #0c4d8f;
       --on-brand: #ffffff;
+      --sel: rgba(106, 166, 232, .16);
+      --sel-line: rgba(106, 166, 232, .45);
+      --ring: #6AA6E8;
+      --ring-soft: rgba(106, 166, 232, .3);
+      --tag-fill-fg: #D9DDE1;
 
       --nlx: #3ecf85;
       --nlx-strong: #7ddcaa;
-      --nlx-bg: rgba(62, 207, 133, .13);
+      --nlx-bg: rgba(62, 207, 133, .12);
 
-      --ok: #3ecf85;   --ok-bg: rgba(62, 207, 133, .13);   --ok-line: rgba(62, 207, 133, .30);
-      --warn: #fbbf24; --warn-bg: rgba(251, 191, 36, .13); --warn-line: rgba(251, 191, 36, .30);
-      --crit: #f87171; --crit-bg: rgba(248, 113, 113, .13); --crit-line: rgba(248, 113, 113, .32);
+      --ok: #C2C7CC;   --ok-bg: #24282B;                 --ok-line: #363B40;
+      --warn: #F0B53C; --warn-bg: rgba(232, 163, 23, .14); --warn-line: rgba(232, 163, 23, .45); --warn-fill: #E8A317;
+      --crit: #FF6B6B; --crit-bg: rgba(224, 48, 61, .16);  --crit-line: rgba(224, 48, 61, .5);   --crit-fill: #E0303D;
       /* Chữ TỐI trên huy hiệu đỏ: --crit ở nền tối sáng nên chữ trắng chỉ đạt
-         2,77, còn chữ tối đạt 6,6 và giữ được độ nổi của huy hiệu. */
-      --on-crit: #0b1120;
+         2,77, còn chữ tối đạt 6,6. */
+      --on-crit: #151719;
+      --crit-bg-2: rgba(224, 48, 61, .26);
+      --crit-line-2: rgba(224, 48, 61, .6);
 
-      --sel: rgba(91, 155, 224, .15);
-      --ring: #5b9be0;
-      --ring-soft: rgba(91, 155, 224, .28);
+      --shadow: 0 8px 24px rgba(0, 0, 0, .5);
+      --shadow-sm: none;
+      --shadow-glass: none;
 
-      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
-      --shadow-sm: 0 2px 8px rgba(0, 0, 0, .30);
-      --shadow-glass: 0 10px 32px rgba(0, 0, 0, .40);
+      --gauge: #8A929A;
+      --gauge-track: #24282B;
+      --gauge-edge: #D9DDE1;
 
-      --chart-vol: #5b9be0;
-      --chart-pres: #3ecf85;
-      --grid: rgba(147, 161, 184, .10);
-      --axis: #93a1b8;
-      --chart-anom: #ef4444;
-      --scrim: rgba(4, 8, 16, .62);
-      --line-strong: #2b3b57;
-      --fg-soft: #cbd5e1;
-      --sel-line: rgba(91, 155, 224, .34);
-      --dot-ok: #2fbf71;
-      --dot-warn: #fbbf24;
-      --dot-bad: #f87171;
-      --accent-warn: #fbbf24;
-      --bar-warn: #fcd34d;
-      --crit-bg-2: rgba(248, 113, 113, .22);
-      --crit-line-2: rgba(248, 113, 113, .45);
-      --scroll-2: #3d5075;
-      --hover-veil: rgba(255, 255, 255, 0.06);
-      /* Chữ nhãn "Nạp LNG" nằm trên nền --sel của dòng nạp: dùng bản sáng hơn
-         --brand để giữ trên 7:1 — nhãn người vận hành đọc nhiều nhất. */
-      --tag-fill-fg: #9cc3ee;
+      --chart-vol: #C9CED3;
+      --chart-pres: #7F878F;
+      --chart-res: #E8A317;
+      --chart-anom: #E0303D;
+      --grid: rgba(217, 221, 225, .08);
+      --axis: #9AA2A9;
+      --scrim: rgba(4, 6, 8, .62);
+
+      --dot-ok: #8A929A;
+      --dot-warn: #E8A317;
+      --dot-bad: #E0303D;
+      --accent-warn: #E8A317;
+      --bar-warn: #E8A317;
+      --scroll-2: #4A5056;
+      --hover-veil: rgba(255, 255, 255, 0.05);
     }
     /* Dòng nguồn của điểm neo: nằm ngay dưới ô "Thể tích ban đầu" vì nó nói con số
        trong ô đó từ đâu ra. Cỡ nhỏ, màu phụ — nó là chú thích, không tranh chỗ với
@@ -261,17 +302,8 @@
     /* ============ SCROLLBARS & MICRO-ANIMATIONS ============ */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 0; }
     ::-webkit-scrollbar-thumb:hover { background: var(--scroll-2); }
-
-    @keyframes pulse-live {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(0, 160, 80, 0.55); }
-      50% { box-shadow: 0 0 0 7px rgba(0, 160, 80, 0); }
-    }
-    @keyframes pulse-crit {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(190, 18, 60, 0.6); }
-      50% { box-shadow: 0 0 0 7px rgba(190, 18, 60, 0); }
-    }
 
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -303,7 +335,7 @@
     :where(button, .btn):hover { border-color: var(--line-strong); background: var(--surface-2); color: var(--fg); }
     button:active, .btn:active { transform: translateY(1px); }
     button:focus-visible, .btn:focus-visible, .field:focus-visible,
-    tr.tank:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .tk:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
     button:disabled { opacity: .45; cursor: not-allowed; }
     /* Nền PHẲNG màu logo: gradient + bóng xanh + nhích lên là ba lớp trang trí
        chồng lên một việc duy nhất là "đây là nút chính". */
@@ -337,7 +369,6 @@
       background: var(--surface);
       border-right: 1px solid var(--line);
       display: flex; flex-direction: column; min-width: 0; overflow: hidden;
-      box-shadow: 2px 0 12px rgba(15, 23, 42, 0.03);
     }
     .side-brand {
       display: flex; align-items: center; gap: 12px; height: var(--header-h);
@@ -377,13 +408,13 @@
     .nav-item.soon { opacity: .55; cursor: default; }
     .nav-item.soon:hover { background: transparent; color: var(--muted); }
     .nav-item .badge {
-      margin-left: auto; min-width: 20px; height: 19px; padding: 0 8px; border-radius: 999px;
+      margin-left: auto; min-width: 20px; height: 19px; padding: 0 8px; border-radius: var(--r-sm);
       background: var(--crit); color: var(--on-crit); font-size: var(--fs-tiny); font-weight: 700;
       display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
     }
     .nav-item .tag {
       margin-left: auto; font-size: var(--fs-micro); font-weight: 700; letter-spacing: .04em;
-      color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px;
+      color: var(--faint); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px 8px;
     }
     .side-foot { border-top: 1px solid var(--line); padding: 12px; flex: 0 0 auto; background: var(--surface); }
     .rail-toggle {
@@ -408,63 +439,50 @@
       display: flex; align-items: center; gap: 16px; padding: 0 16px;
       background: var(--surface);
       border-bottom: 1px solid var(--line);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
     .page-title { font-weight: 700; font-size: var(--fs-lg); letter-spacing: -.02em; white-space: nowrap; flex: 0 0 auto; color: var(--fg); }
     .kpis { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+    /* Thanh trên kiểu phòng điều khiển: mục báo động là CHỮ có hình ▲, không phải
+       viên thuốc nền hồng. Bình thường thì im — "Hệ thống bình thường", "2 bồn",
+       "1 trực tuyến" không còn chiếm chỗ (soát UI 26/10/2026: 9 viên thuốc). */
     .kpi {
       flex: 0 0 auto;
-      display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
-      height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px;
-      background: var(--bg); font-size: var(--fs-micro); color: var(--muted); font-weight: 500;
+      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+      height: 28px; padding: 0; border: 0; background: none;
+      font-size: var(--fs-sm); color: var(--muted); font-weight: 500;
     }
     .kpi b { font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg); line-height: 1; }
-    .kpi-btn { cursor: pointer; font-family: inherit; }
-    .kpi-btn:hover { filter: brightness(0.98); }
-    .kpi.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
-    .kpi.ok b { color: var(--ok); }
-    .kpi.bad { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
-    .kpi.bad b { color: var(--crit); }
+    .kpi-btn { cursor: pointer; font-family: inherit; min-height: 28px; }
+    .kpi-btn:hover { background: none; text-decoration: underline; }
+    .kpi.bad, .kpi.bad b { color: var(--crit); font-weight: 700; }
+    .kpi.bad::before, #kpi-vendor::before {
+      content: ""; width: 11px; height: 10px; margin-right: 4px; flex: 0 0 auto;
+      background: var(--crit-fill); clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
     .kpi[hidden] { display: none; }
-    .kpi.vol { border-color: var(--sel-line); background: var(--sel); color: var(--brand); }
-    .kpi.vol b { color: var(--brand); }
-    #kpi-vendor { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); font-weight: 600; }
-    #kpi-vendor:hover { background: var(--crit-bg-2); border-color: var(--crit-line-2); }
+    #kpi-vendor { color: var(--crit); font-weight: 700; border: 0; background: none; padding: 0; }
     .head-right { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
     .meta-chip { min-width: 0; color: var(--muted); font-size: var(--fs-micro); white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
-    .head-right .icon-btn { flex: 0 0 auto; width: 36px; min-height: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+    .head-right .icon-btn { flex: 0 0 auto; width: 36px; min-height: 36px; height: 36px; border-radius: var(--r-sm); border: 1px solid transparent; background: none; color: var(--muted); }
     .head-right .icon-btn:hover { background: var(--bg); border-color: var(--line-strong); color: var(--brand); }
     .meta-chip[hidden] { display: none; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
-    .dot.ok { background: var(--dot-ok); animation: pulse-live 2.5s infinite; }
-    .dot.bad { background: var(--dot-bad); animation: pulse-crit 2s infinite; }
+    .dot.ok { background: var(--dot-ok); }
+    .dot.bad { background: var(--dot-bad); }
     .dot.warn { background: var(--dot-warn); }
-    #health-pill {
-      background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok);
-      font-weight: 600; font-size: var(--fs-micro); height: 30px; padding: 0 12px; border-radius: 999px;
-      display: inline-flex; align-items: center; gap: 8px;
-    }
-    #health-pill.degraded, #health-pill.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
-    #health-pill.bad, #health-pill.error { background: var(--crit-bg); border-color: var(--crit-line); color: var(--crit); }
-    #ingest-label, #last-update {
-      background: var(--bg); border: 1px solid var(--line); color: var(--muted);
-      font-size: var(--fs-micro); font-weight: 500; height: 30px; padding: 0 8px; border-radius: 6px;
-      display: inline-flex; align-items: center;
-    }
-    .user-chip {
-      color: var(--fg); font-weight: 600; font-size: var(--fs-sm); background: var(--surface-2);
-      height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong);
-      display: inline-flex; align-items: center; gap: 8px;
-    }
-    .user-chip::before {
-      content: ""; width: 14px; height: 14px; flex: 0 0 auto;
-      background-size: contain; background-repeat: no-repeat; background-position: center;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");
-    }
+    /* Tình trạng máy: CHỈ hiện khi không ổn (JS ẩn nó khi ổn). */
+    #health-pill { font-weight: 700; font-size: var(--fs-sm); display: inline-flex; align-items: center; gap: 8px; }
+    /* Khai riêng: luật theo id ở trên thắng `.meta-chip[hidden]`, nên thiếu dòng này
+       thì "Hệ thống bình thường" vẫn hiện dù đã bị ẩn (e2e bắt được). */
+    #health-pill[hidden] { display: none; }
+    #health-pill.degraded, #health-pill.warn { color: var(--warn); }
+    #health-pill.bad, #health-pill.error { color: var(--crit); }
+    #ingest-label { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+    .user-chip { color: var(--fg-soft); font-weight: 600; font-size: var(--fs-sm); }
     .alert-chip { position: relative; }
     .alert-chip .badge {
       position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
-      border-radius: 999px; background: var(--crit); color: var(--on-crit); font-size: var(--fs-micro); font-weight: 700;
+      border-radius: var(--r-sm); background: var(--crit); color: var(--on-crit); font-size: var(--fs-micro); font-weight: 700;
       display: none; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
     }
     .alert-chip.has .badge { display: inline-flex; }
@@ -488,8 +506,13 @@
     }
     .action-list button:hover { background: var(--surface-2); border-color: var(--line); }
     .action-list .where { font-weight: 700; color: var(--fg); display: inline-flex; align-items: center; gap: 8px; }
-    .action-list .where .sev { width: 7px; height: 7px; border-radius: 50%; }
-    .action-list .where .sev.crit { background: var(--crit); } .action-list .where .sev.warn { background: var(--warn); }
+    /* Hình theo mức ưu tiên, như mọi chỗ khác: tam giác đỏ, thoi hổ phách. */
+    .action-list .where .sev { width: 11px; height: 10px; flex: 0 0 auto; }
+    .action-list .where .sev.crit { background: var(--crit-fill); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .action-list .where .sev.warn { width: 9px; height: 9px; background: var(--warn-fill); transform: rotate(45deg); }
+    .fleet-alarms { padding: 16px; border-top: 1px solid var(--line); }
+    .fleet-alarms h2 { margin: 0 0 8px; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
+    .fleet-alarms .empty-al { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
     .action-list .msg { color: var(--muted); font-size: var(--fs-prose); }
 
     /* ============ MAIN / WORKSPACE ============ */
@@ -512,46 +535,44 @@
     .pane-head h1, .pane-head h2 { margin: 0; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
     .pane-head .meta { color: var(--muted); font-size: var(--fs-sm); }
     .fleet-scroll { overflow: auto; flex: 1; min-height: 0; }
-    table.tanks { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
-    table.tanks th {
-      text-align: left; font-weight: 700; color: var(--faint); font-size: var(--fs-micro);
-      padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--bg);
-      position: sticky; top: 0; z-index: 1;
+    /* MỖI BỒN VẼ THÀNH MỘT BỒN: cột mức chất lỏng (đầu vòm như bồn đứng thật), vạch
+       đứt hổ phách là mức dự trữ, mặt chất lỏng là một vạch đậm. Bình thường thì
+       chất lỏng xám; chỉ tô hổ phách/đỏ khi bồn có việc phải làm. Số liệu cũ thì
+       thân bồn sọc chéo — "không tin được con số này" nhìn ra được trước khi đọc.
+       Thay cho bảng 4 cột cũ: ba bồn chiếm một dải trên cùng, phần dưới bỏ trống. */
+    .tk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .tk {
+      display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; align-items: start;
+      width: 100%; min-height: 0; padding: 16px; margin: 0;
+      border: 0; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); border-radius: 0;
+      background: transparent; color: var(--fg); text-align: left; font-weight: 400; cursor: pointer;
     }
-    table.tanks th.r, table.tanks td.r { text-align: right; }
-    table.tanks td { padding: 12px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
-    table.tanks th { padding-left: 8px; padding-right: 8px; white-space: nowrap; }
-    /* Dưới 1366px thanh mức chứa nhường chỗ: con số % đã đủ thông tin, còn bốn cột
-       thì phải vừa khung — ở 1280px bảng từng tràn 55px và cắt cột Trạng thái. */
-    @media (max-width: 1365px) { table.tanks .lvl-bar { display: none; } }
-    table.tanks td:first-child { max-width: 220px; }
-    table.tanks td:last-child { white-space: nowrap; }
-    tr.tank { cursor: pointer; transition: background-color .12s ease; }
-    tr.tank:hover { background: var(--bg); }
-    tr.tank.is-selected { background: var(--sel); }
-    tr.tank.is-selected td:first-child { box-shadow: inset 4px 0 0 var(--brand); }
-    .tname { display: block; font-weight: 600; font-size: var(--fs-body); color: var(--fg); line-height: 1.3;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: var(--fs-micro); margin-top: 1px; }
-    td.r .num { font-weight: 700; font-size: var(--fs-body); color: var(--fg); }
-    .lvl { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-    .lvl-bar {
-      width: 54px; height: 6px; background: var(--surface-3); border-radius: 999px;
-      overflow: hidden; padding: 0 !important; margin: 0 !important;
-      box-sizing: border-box; display: inline-block; vertical-align: middle; flex: 0 0 auto;
+    .tk[aria-pressed="true"] { background: var(--sel); box-shadow: inset 4px 0 0 var(--brand); }
+    .tk-gauge {
+      position: relative; display: block; width: 44px; height: 96px; overflow: hidden;
+      border: 2px solid var(--gauge-edge); border-radius: 16px 16px 4px 4px; background: var(--gauge-track);
     }
-    /* MỘT màu; chỉ đổi màu khi chạm ngưỡng — màu ở đây là thông tin, không trang trí. */
-    .lvl-bar > i { display: block; height: 100%; background: var(--chart-vol); border-radius: 999px; transition: width .3s ease; }
-    .lvl-bar.low > i { background: var(--accent-warn); }
-    .lvl-bar.empty > i { background: var(--dot-bad); min-width: 3px; }
-    .st {
-      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
-      font-size: var(--fs-micro); font-weight: 600; padding: 2px 8px; border-radius: 6px; line-height: 1.2;
-    }
-    .st::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-    .st.on { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-line); }
-    .st.off { color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); }
-    table.tanks td.empty, p.empty { padding: 24px 16px; color: var(--muted); text-align: center; }
+    .tk-liq { position: absolute; left: 0; right: 0; bottom: 0; background: var(--gauge); border-top: 2px solid var(--gauge-edge); }
+    .tk[data-sev="warn"] .tk-liq { background: var(--warn-fill); }
+    .tk[data-sev="crit"] .tk-liq { background: var(--crit-fill); }
+    .tk-res { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--chart-res); }
+    .tk-gauge.stale { background: repeating-linear-gradient(135deg, var(--gauge-track) 0 5px, var(--surface-3) 5px 10px); }
+    .tk-gauge.stale .tk-liq { opacity: .5; }
+    .tk-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .tname { display: block; font-weight: 600; font-size: var(--fs-body); color: var(--fg); line-height: 1.3; overflow-wrap: anywhere; }
+    .tpsn { display: block; color: var(--faint); font-family: var(--mono); font-size: var(--fs-micro); }
+    .tk-pct { font-size: var(--fs-xl); font-weight: 700; color: var(--fg); line-height: 1.2; margin-top: 8px; }
+    .tk-run { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+    .tk-st { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; margin-top: 4px; }
+    /* Trạng thái: chữ + HÌNH, không viên thuốc màu. Vuông xám = bình thường,
+       tam giác đỏ = ưu tiên 1, thoi hổ phách = ưu tiên 2 (ISA-101: không bao giờ
+       chỉ dựa vào màu). */
+    .st { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--fs-micro); font-weight: 600; line-height: 1.2; color: var(--muted); }
+    .st::before { content: ""; width: 8px; height: 8px; background: var(--dot-ok); flex: 0 0 auto; }
+    .st.on { color: var(--muted); }
+    .st.off { color: var(--crit); font-weight: 700; }
+    .st.off::before { width: 11px; height: 10px; background: var(--crit-fill); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    p.empty { padding: 24px 16px; color: var(--muted); text-align: center; }
 
     /* Inspect (Chi tiết bồn) */
     .inspect { background: var(--bg); min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
@@ -561,19 +582,21 @@
       border: 1px solid var(--line);
       border-radius: var(--r);
       padding: 16px 16px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
     }
-    .hero { padding: 16px 24px; }
-    .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-    .hero h2 { margin: 0; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; color: var(--fg); }
-    .hero .ids { color: var(--faint); font-size: var(--fs-sm); margin-top: 4px; }
+    /* Panel có DẢI TIÊU ĐỀ như cửa sổ của màn hình vận hành, không phải thẻ trắng nổi. */
+    .hero { padding: 0 24px 16px; }
+    .hero-top {
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      margin: 0 -24px; padding: 12px 24px; background: var(--panel-head); border-bottom: 1px solid var(--line);
+    }
+    .hero h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--fg); }
+    .hero .ids { color: var(--faint); font-size: var(--fs-sm); margin-top: 2px; }
     .hero .ids .mono { font-family: var(--mono); color: var(--muted); }
     /* Câu kết luận đầu khung: một con số to (28px — con số DUY NHẤT ở cỡ này trên
        trang) và câu nói phải làm gì. Nền chỉ tô màu khi có việc phải làm; ổn thì
        để trung tính, không nhuộm xanh cả khối cho một tin "không có gì". */
     .td-lead {
-      margin-top: 16px; padding: 12px 16px; border-radius: var(--r-sm);
-      background: var(--surface-2); border: 1px solid var(--line);
+      margin-top: 16px; padding: 4px 0 4px 16px; border-left: 4px solid var(--line-strong);
       display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: center;
     }
     .td-lead .big { font-size: var(--fs-3xl); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; color: var(--fg); white-space: nowrap; }
@@ -581,9 +604,9 @@
     .td-lead p { margin: 0; }
     .td-lead .l1 { font-size: var(--fs-body); font-weight: 600; color: var(--fg); }
     .td-lead .l2 { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
-    .td-lead[data-sev="crit"] { background: var(--crit-bg); border-color: var(--crit-line); }
+    .td-lead[data-sev="crit"] { border-left-color: var(--crit-fill); }
     .td-lead[data-sev="crit"] .big, .td-lead[data-sev="crit"] .l1 { color: var(--crit); }
-    .td-lead[data-sev="warn"] { background: var(--warn-bg); border-color: var(--warn-line); }
+    .td-lead[data-sev="warn"] { border-left-color: var(--warn-fill); }
     .td-lead[data-sev="warn"] .big, .td-lead[data-sev="warn"] .l1 { color: var(--warn); }
     .td-lead[data-sev="na"] .big { color: var(--faint); }
     /* Bốn số đo: MỘT hàng phẳng, ngăn bằng vạch mảnh — không còn bốn ô thẻ to bằng
@@ -612,21 +635,21 @@
     .local-alerts p {
       margin: 0; font-size: var(--fs-sm); font-weight: 600; padding: 8px 16px;
       border-radius: var(--r-sm); display: flex; gap: 12px; align-items: center;
-      background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      background: var(--warn-bg); border: 0; border-left: 4px solid var(--warn-fill); color: var(--warn);
     }
-    .local-alerts p::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
-    .local-alerts .crit { color: var(--crit); background: var(--crit-bg); border: 1px solid var(--crit-line); }
-    .local-alerts .warn { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); }
+    .local-alerts p::before { content: ""; width: 9px; height: 9px; background: var(--warn-fill); transform: rotate(45deg); flex: 0 0 auto; }
+    .local-alerts .crit { color: var(--crit); background: var(--crit-bg); border-left-color: var(--crit-fill); }
+    .local-alerts .crit::before { width: 11px; height: 10px; background: var(--crit-fill); transform: none; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .local-alerts .warn { color: var(--warn); background: var(--warn-bg); border-left-color: var(--warn-fill); }
 
     /* Chart Panel */
-    .chart-panel { padding: 16px 16px; min-width: 0; }
-    .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chart-panel { padding: 0 16px 16px; min-width: 0; }
+    .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 -16px 12px; padding: 8px 16px; background: var(--panel-head); border-bottom: 1px solid var(--line); }
     .chart-head h2 { margin: 0; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
     .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); padding: 2px; gap: 2px; }
-    .seg button { min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: var(--muted); border-radius: 6px; font-size: var(--fs-sm); font-weight: 500; }
+    .seg button { min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: var(--muted); border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 500; }
     .seg button:hover { background: var(--hover-veil); color: var(--fg); }
-    .seg button[aria-pressed="true"] { background: var(--surface); color: var(--brand); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .seg button[aria-pressed="true"] { background: var(--surface); color: var(--brand); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line-strong); }
     .chart-box { position: relative; height: 232px; min-width: 0; }
     .chart-box canvas { max-width: 100%; }
     .chart-note { font-size: var(--fs-sm); color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); padding: 8px 12px; border-radius: var(--r-sm); margin-bottom: 8px; }
@@ -705,7 +728,7 @@
     .plan-table th { position: sticky; top: 0; z-index: 1; background: var(--bg); color: var(--faint); font-size: var(--fs-micro); text-align: left; padding: 12px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
     .plan-table th.r, .plan-table td.r { text-align: right; } .plan-table th.c, .plan-table td.c { text-align: center; }
     .plan-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
-    .plan-table tr.is-fill { background: var(--sel); }
+    .plan-table tr.is-fill { background: var(--surface-2); }
     /* Ngày đã qua: vạch trái trung tính — số liệu vẫn đọc rõ, chỉ khác là đã xảy ra. */
     .plan-table tr.is-past td:first-child { box-shadow: inset 3px 0 0 var(--line-strong); }
     .plan-table input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .45; }
@@ -727,20 +750,20 @@
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
     }
     .plan-table td.c { padding-top: 0; padding-bottom: 0; }
-    .tag-fill { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--tag-fill-fg); background: var(--sel); padding: 4px 12px; border-radius: 999px; }
+    .tag-fill { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--tag-fill-fg); background: var(--surface-3); padding: 4px 12px; border-radius: var(--r-sm); }
     .plan-table td.trigger { color: var(--warn); font-weight: 700; background: var(--warn-bg); }
     .plan-table td.fromact { box-shadow: inset 4px 0 0 var(--brand); }
     /* Lần nạp THẬT và xung đột "nạp vào ngày không có xe". Cùng khuôn với .tag-fill,
        màu lấy từ token trạng thái nên đạt tương phản ở cả hai nền. */
-    .tag-done { display: inline-flex; white-space: nowrap; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--ok); background: var(--ok-bg); padding: 4px 12px; border-radius: 999px; }
-    .tag-warn { display: inline-flex; white-space: nowrap; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--warn); background: var(--warn-bg); padding: 4px 12px; border-radius: 999px; }
+    .tag-done { display: inline-flex; white-space: nowrap; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--ok); background: var(--ok-bg); padding: 4px 12px; border-radius: var(--r-sm); }
+    .tag-warn { display: inline-flex; white-space: nowrap; align-items: center; font-size: var(--fs-sm); font-weight: 700; color: var(--warn); background: var(--warn-bg); padding: 4px 12px; border-radius: var(--r-sm); }
     .p-goc { display: block; font-size: var(--fs-micro); font-variant-numeric: tabular-nums; font-weight: 400; color: var(--muted); white-space: nowrap; }
     .plan-table td.trigger .p-goc, .plan-table td.low .p-goc { color: var(--fg); }
     .plan-table td.act { padding-top: 0; padding-bottom: 0; }
     .p-act {
       width: 96px; min-height: 40px; padding: 8px 8px; text-align: right;
       font-variant-numeric: tabular-nums; font-size: var(--fs-body); font-weight: 400;
-      color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 6px;
+      color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
     }
     .p-act:hover { border-color: var(--line); background: var(--surface-2); }
     .p-act:focus { outline: none; border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 2px var(--ring-soft); }
@@ -899,7 +922,6 @@
 
     /* Pill "còn lại" trong danh sách bồn — thay cột áp suất, vì áp suất đã có ở
        readout chi tiết còn "còn bao nhiêu ngày" thì không có ở đâu khác. */
-    table.tanks td:nth-child(3), table.tanks td:nth-child(4) { white-space: nowrap; }
     /* Tuổi lần đo nằm ngay dưới badge trạng thái: hai thứ này trả lời cùng một câu
        hỏi ("thiết bị còn báo không, lần cuối là khi nào") nên đứng cùng một ô. */
     /* nowrap: "Đo cuối: 29 ngày" và "tới mức dự trữ" là nhãn NGẮN nhưng nhiều từ,
@@ -907,15 +929,15 @@
        thị bồn trên một màn hình, đúng lỗi đã gặp với "79 ngày trước". */
     .tago { display: block; margin-top: 2px; font-size: var(--fs-micro); color: var(--faint); white-space: nowrap; font-weight: 500; line-height: 1.2; }
     .runpill {
-      display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; font-size: var(--fs-micro);
-      font-weight: 600; font-variant-numeric: tabular-nums; padding: 2px 8px;
-      border-radius: 6px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line);
-      white-space: nowrap; line-height: 1.2;
+      display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; line-height: 1.2;
+      font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg);
     }
-    .runpill.stale { background: var(--bg); color: var(--faint); border-color: var(--line); }
-    .runpill.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
-    .runpill.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
-    .runpill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+    .runpill.stale { color: var(--muted); font-weight: 600; }
+    .runpill.ok { color: var(--fg); }
+    .runpill.warn { color: var(--warn); }
+    .runpill.crit { color: var(--crit); }
+    .runpill.warn::before { content: ""; width: 9px; height: 9px; background: var(--warn-fill); transform: rotate(45deg); flex: 0 0 auto; }
+    .runpill.crit::before { content: ""; width: 11px; height: 10px; background: var(--crit-fill); clip-path: polygon(50% 0, 100% 100%, 0 100%); flex: 0 0 auto; }
 
     /* ===== KẾ HOẠCH: trợ lý đề xuất ===== */
     /* min-width: 0 ở CẢ khối và dòng chú thích. Mặc định flex item có
@@ -924,7 +946,7 @@
        trong một cột 394px, tràn sang đè cột "Mức dự trữ" bên cạnh. Cùng họ với bẫy
        `1fr` vs `minmax(0, 1fr)` đã gặp ở .plan-params. */
     .p-measure { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0; }
-    .p-measure button { font-size: var(--fs-tiny); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--brand);
+    .p-measure button { font-size: var(--fs-tiny); padding: 2px 8px; border-radius: var(--r-sm); border: 1px solid var(--brand);
                         background: transparent; color: var(--brand); cursor: pointer; white-space: nowrap; }
     .p-measure button:hover { background: var(--sel); }
     .p-measure button[disabled] { opacity: .45; cursor: not-allowed; border-color: var(--line); color: var(--faint); }
@@ -950,18 +972,18 @@
     .an-name { font-size: var(--fs-md); font-weight: 700; color: var(--fg); }
     .an-psn { font-family: var(--mono); font-size: var(--fs-tiny); color: var(--faint); }
     .an-tag { font-size: var(--fs-micro); font-weight: 700;
-              padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+              padding: 2px 8px; border-radius: var(--r-sm); border: 1px solid var(--line); color: var(--muted);
               background: var(--surface-2); white-space: nowrap; }
     .an-tag.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
     .an-tag.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
     .an-tag.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
-    .an-verdict { margin: 8px 0 0; padding: 12px 16px; border-radius: var(--r-sm); font-size: var(--fs-body);
-      line-height: 1.5; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
-    .an-verdict.ok { background: var(--ok-bg); border-color: var(--ok-line); }
+    .an-verdict { margin: 8px 0 0; padding: 8px 16px; border-radius: 0; font-size: var(--fs-body);
+      line-height: 1.5; border: 0; border-left: 4px solid var(--line-strong); background: none; color: var(--fg); }
+    .an-verdict.ok { border-left-color: var(--line-strong); }
     .an-verdict.ok b { color: var(--ok); }
-    .an-verdict.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+    .an-verdict.warn { background: var(--warn-bg); border-left-color: var(--warn-fill); }
     .an-verdict.warn b { color: var(--warn); }
-    .an-verdict.crit { background: var(--crit-bg); border-color: var(--crit-line); }
+    .an-verdict.crit { background: var(--crit-bg); border-left-color: var(--crit-fill); }
     .an-verdict.crit b { color: var(--crit); }
     .an-more { margin-top: 12px; }
     .an-more > summary { cursor: pointer; list-style: none; font-size: var(--fs-sm); color: var(--brand); font-weight: 600; }
@@ -1042,7 +1064,7 @@
     /* vector-effect giữ nét viền 1px ở mọi mức zoom. Không có nó, viền dày theo
        viewBox và ở mức Việt Nam đường bờ biển thành một dải bệt. */
     .mp-land { fill: var(--surface-3); stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-    .mp-land.vn { fill: var(--ok-bg); stroke: var(--nlx); stroke-width: 1.4; }
+    .mp-land.vn { fill: var(--nlx-bg); stroke: var(--nlx); stroke-width: 1.4; }
     .mp-marks { position: absolute; inset: 0; pointer-events: none; }
     .mp-pin { position: absolute; transform: translate(-50%, -50%); width: 44px; height: 44px; min-height: 44px;
               padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; }
@@ -1141,7 +1163,7 @@
     /* Nhãn cho biết giá trị đang lấy từ đâu — câu hỏi đầu tiên của bất kỳ ai mở
        một trang cấu hình có hai nguồn (app và biến môi trường). */
     .src { font-size: var(--fs-micro); font-weight: 600;
-           padding: 0 4px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+           padding: 0 4px; border-radius: var(--r-sm); border: 1px solid var(--line); color: var(--muted);
            flex: 0 0 auto; white-space: nowrap; }
     .src.app { color: var(--brand); border-color: var(--brand); }
         /* Badge phải đứng NGAY SAU chữ và không bao giờ gãy dòng: space-between đẩy
@@ -1151,7 +1173,7 @@
     .set-note { font-size: var(--fs-prose); color: var(--muted); line-height: 1.6; }
     .set-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
     .set-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .set-pill { font-size: var(--fs-sm); font-weight: 700; padding: 4px 12px; border-radius: 999px;
+    .set-pill { font-size: var(--fs-sm); font-weight: 700; padding: 4px 12px; border-radius: var(--r-sm);
       border: 1px solid var(--line); color: var(--muted); background: var(--surface-2); }
     .set-pill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
     .set-pill.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
@@ -1161,7 +1183,7 @@
     .set-when ul { margin: 4px 0 0 16px; padding: 0; }
     .set-step2 { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding-top: 16px;
       margin-top: 16px; border-top: 1px solid var(--line); }
-    .set-num { width: 28px; height: 28px; border-radius: 50%; background: var(--brand-solid); color: var(--on-brand);
+    .set-num { width: 28px; height: 28px; border-radius: 50%; background: var(--fg); color: var(--surface);
       display: grid; place-items: center; font-weight: 700; font-size: var(--fs-sm); }
     .set-step-body { min-width: 0; }
     .set-step-body h3, .set-more h3 { font-size: var(--fs-body); font-weight: 700; color: var(--fg); margin: 2px 0 8px; }
@@ -1343,10 +1365,10 @@
       </button>
       <div class="page-title">Giám sát bồn LNG</div>
       <div class="kpis" aria-label="Tóm tắt">
-        <span class="kpi"><b class="num" id="stat-total">--</b> bồn</span>
-        <span class="kpi ok"><b class="num" id="stat-online">--</b> trực tuyến</span>
+        <span class="kpi" data-want="0" hidden><b class="num" id="stat-total">--</b> bồn</span>
+        <span class="kpi ok" data-want="0" hidden><b class="num" id="stat-online">--</b> trực tuyến</span>
         <span class="kpi bad"><b class="num" id="stat-offline">--</b> ngoại tuyến</span>
-        <span class="kpi bad"><b class="num" id="stat-alert">--</b> cảnh báo</span>
+        <span class="kpi bad" data-want="0" hidden><b class="num" id="stat-alert">--</b> cảnh báo</span>
         <!-- Chip RIÊNG, không cộng vào "cảnh báo": đó là cảnh báo platform tự suy
              (ngoại tuyến / sắp cạn / pin / sóng), còn đây là sự cố thiết bị tại nhà
              máy (van, công tắc áp). Hai việc, hai người phải gọi. Gộp lại thành một
@@ -1362,7 +1384,7 @@
         <button type="button" class="kpi bad kpi-btn" id="kpi-vendor" hidden
                 onclick="goVendorAlarms()"
                 aria-label="Xem danh sách báo động của nhà máy"><b class="num" id="stat-vendor">--</b> báo động nhà máy ›</button>
-        <span class="kpi vol"><b class="num" id="stat-volume">--</b></span>
+        <span class="kpi vol" data-want="0" hidden><b class="num" id="stat-volume">--</b></span>
         <span id="stat-critical" hidden></span>
       </div>
       <div class="head-right">
@@ -1402,26 +1424,13 @@
             <span class="meta" id="fleet-meta"></span>
           </div>
           <div class="fleet-scroll">
-            <table class="tanks">
-              <thead>
-                <tr>
-                  <th scope="col">Bồn</th>
-                  <th scope="col" class="r">Mức chứa</th>
-                  <!-- Cột này thay chỗ của "Áp suất": áp suất đã hiện ở readout chi
-                       tiết và ở ô thời gian giữ áp, còn "còn bao nhiêu ngày" thì
-                       không có ở đâu khác — và đó mới là con số khiến người vận
-                       hành phải làm gì đó.
-
-                       Tiêu đề là "Còn lại", KHÔNG phải "Tới dự trữ": mốc được đếm
-                       thay đổi theo mức bồn (trên dự trữ -> đếm tới dự trữ; đã
-                       dưới -> đếm tới cạn), nên tiêu đề cố định một mốc là sai với
-                       nửa số hàng. Mốc thật của từng hàng nằm ở nhãn phụ trong ô. -->
-                  <th scope="col" class="r">Còn lại</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody id="tank-list"></tbody>
-            </table>
+            <div class="tk-grid" id="tank-list" aria-label="Các bồn, bồn cần xử lý xếp trước"></div>
+            <!-- Danh sách báo động ngay dưới các bồn, như ô alarm summary của màn hình
+                 vận hành: chỗ này từng bỏ trống (ba bồn chỉ chiếm một dải trên cùng). -->
+            <section class="fleet-alarms" aria-labelledby="fa-h">
+              <h2 id="fa-h">Cần xử lý</h2>
+              <div id="fleet-alarms" class="action-list"></div>
+            </section>
           </div>
         </section>
 
@@ -1803,7 +1812,7 @@
                   <label class="set-prov">
                     <span class="set-lbl">Dịch vụ thư</span>
                     <select id="s-provider" class="field">
-                      <option value="brevo">Brevo (khuyên dùng: miễn phí, không cần quản trị viên)</option>
+                      <option value="brevo">Brevo (khuyên dùng, miễn phí)</option>
                       <option value="gmail">Gmail</option>
                       <option value="outlook">Outlook.com hoặc Hotmail (thư cá nhân)</option>
                       <option value="m365">Microsoft 365 (thư công ty)</option>
@@ -2036,7 +2045,7 @@
 
     // Chart.js vẽ chữ lên canvas, mà ctx.font KHÔNG hiểu var(). Phải là font stack
     // đã resolve; giữ khớp với --font để legend không lệch chữ với phần còn lại.
-    const CHART_FONT = '"Plus Jakarta Sans", system-ui, sans-serif';
+    const CHART_FONT = '"Be Vietnam Pro", system-ui, sans-serif';
     // Trục và tooltip của mọi biểu đồ dùng cùng quy ước số với phần còn lại của
     // trang, không phụ thuộc ngôn ngữ của trình duyệt.
     if (window.Chart) Chart.defaults.locale = "vi-VN";
@@ -2100,7 +2109,7 @@
       // localStorage quyết định, nên nó có thể ngược hẳn với cài đặt hệ điều hành —
       // lúc đó thanh trạng thái tối chồng lên một app sáng, hoặc ngược lại.
       const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", dark ? "#0b1120" : "#f8fafc");
+      if (meta) meta.setAttribute("content", dark ? "#151719" : "#E5E7E9");
     }
     function toggleTheme() {
       const dark = document.documentElement.getAttribute("data-theme") !== "light";
@@ -2292,6 +2301,8 @@
       if (!health) { text.textContent = "Hệ thống: --"; dot.className = "dot"; banner.classList.remove("show"); return; }
       const map = { ok: "Hệ thống bình thường", degraded: "Hệ thống suy giảm", error: "Hệ thống lỗi" };
       text.textContent = map[health.status] || map.degraded;
+      // Phòng điều khiển: bình thường thì im. Chỉ hiện khi máy suy giảm hoặc lỗi.
+      document.getElementById("health-pill").hidden = health.status === "ok";
       dot.className = "dot " + (health.status === "ok" ? "ok" : health.status === "error" ? "bad" : "warn");
       const ingestEl = document.getElementById("ingest-label");
       const ingest = health.ingest && health.ingest.detail
@@ -2354,9 +2365,15 @@
       const al = document.getElementById("stat-alert").parentElement;
       on.classList.toggle("ok", summary.online > 0);
       off.classList.toggle("bad", summary.offline > 0);
+      // "0 ngoại tuyến" là tin bình thường: không chiếm chỗ ở thanh trên.
+      off.dataset.want = summary.offline > 0 ? "1" : "0";
       al.classList.toggle("bad", alertTanks > 0);
       const fm = document.getElementById("fleet-meta");
-      if (fm) fm.textContent = `${summary.total} bồn` + (alertTanks ? `, ${alertTanks} cần chú ý` : ", không bồn nào cần chú ý");
+      if (fm) {
+        fm.textContent = `${summary.total} bồn, ${summary.online} trực tuyến`
+          + (vol === null || vol === undefined ? "." : `. Tổng ${fmtN(Number(vol) / 1000, 1)} m³${cu ? " (số cũ)" : ""}.`);
+        fm.title = volEl.parentElement.title;
+      }
       fitKpis();
     }
 
@@ -2401,34 +2418,45 @@
       return tanks.slice().sort((a, b) => rank(a) - rank(b) || tankName(a).localeCompare(tankName(b), "vi"));
     }
 
+    // Mức gấp của một bồn, dùng cho màu cột mức: cùng luật với cột "Còn lại"
+    // (runPill) và với chuông cảnh báo — ba chỗ không được nói khác nhau.
+    function tankSev(tank) {
+      const sev = worstSeverity(alertsFor(tank.psn));
+      if (sev === "critical" || tank.status !== "online") return "crit";
+      const f = fcOf(tank.psn);
+      const r = (f && !f.stale && f.runout) || {};
+      if (r.days_to_reserve != null && r.days_to_reserve <= 1) return "crit";
+      if (sev === "warning" || (r.days_to_reserve != null && r.days_to_reserve <= 3)) return "warn";
+      return "ok";
+    }
+
     function renderTankList() {
       const container = document.getElementById("tank-list");
       if (!tanks.length) {
-        container.innerHTML = `<tr><td colspan="4" class="empty">Chưa có bồn nào trong hệ thống.</td></tr>`;
+        container.innerHTML = `<p class="empty">Chưa có bồn nào trong hệ thống.</p>`;
         return;
       }
       container.innerHTML = sortedTanks().map(tank => {
         const p = pctOf(tank);
-        const barClass = p === null ? "" : (p < 5 ? " empty" : p < 15 ? " low" : "");
-        const selected = tank.psn === selectedPsn ? " is-selected" : "";
+        const f = fcOf(tank.psn);
+        const on = tank.status === "online";
+        const fill = p === null ? 0 : Math.min(100, Math.max(0, p));
+        const res = f && f.reserve_l != null && Number(tank.capacity_l) > 0
+          ? Math.min(100, Number(f.reserve_l) / Number(tank.capacity_l) * 100) : null;
         return `
-          <tr class="tank${selected}" tabindex="0" data-psn="${esc(tank.psn)}" onclick="selectTank('${esc(tank.psn)}')">
-            <td>
-              <span class="tname" title="${esc(tankName(tank))}">${esc(tankName(tank))}</span>
+          <button type="button" class="tk" data-psn="${esc(tank.psn)}" data-sev="${tankSev(tank)}"
+                  aria-pressed="${tank.psn === selectedPsn}" onclick="selectTank('${esc(tank.psn)}')">
+            <span class="tk-gauge${f && f.stale ? " stale" : ""}" aria-hidden="true">
+              <i class="tk-liq" style="height:${fill}%"></i>${res === null ? "" : `<b class="tk-res" style="bottom:${res.toFixed(1)}%"></b>`}
+            </span>
+            <span class="tk-txt">
+              <span class="tname">${esc(tankName(tank))}</span>
               <span class="tpsn">${esc(tank.psn)}</span>
-            </td>
-            <td class="r">
-              <div class="lvl">
-                <span class="lvl-bar${barClass}"><i style="width:${p === null ? 0 : Math.min(100, Math.max(0, p))}%"></i></span>
-                <span class="num">${esc(fmtPct(p))}%</span>
-              </div>
-            </td>
-            <td class="r">${runPill(tank.psn)}</td>
-            <td>
-              <span class="st ${tank.status === "online" ? "on" : "off"}">${tank.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
-              <span class="tago">Đo cuối: ${esc(fmtAgo(tank.last_seen_at))}</span>
-            </td>
-          </tr>`;
+              <span class="tk-pct num">${esc(fmtPct(p))}%</span>
+              <span class="tk-run">${runPill(tank.psn)}</span>
+              <span class="tk-st"><span class="st ${on ? "on" : "off"}">${on ? "Trực tuyến" : "Ngoại tuyến"}</span><span class="tago">Đo cuối: ${esc(fmtAgo(tank.last_seen_at))}</span></span>
+            </span>
+          </button>`;
       }).join("");
     }
 
@@ -2853,6 +2881,8 @@
       const volume = items.map(r => r.volume_l === null ? null : Number(r.volume_l) / 1000);
       const pressure = items.map(r => r.pressure_mpa === null ? null : Number(r.pressure_mpa));
       const cVol = cssVar("--chart-vol"), cPres = cssVar("--chart-pres"), cGrid = cssVar("--grid"), cAxis = cssVar("--axis");
+      const fcSel = fcOf(psn);
+      const reserveM3 = fcSel && fcSel.reserve_l != null ? Number(fcSel.reserve_l) / 1000 : null;
       const ctx = document.getElementById("historyChart").getContext("2d");
       if (chartInstance) chartInstance.destroy();
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2867,6 +2897,12 @@
             { label: "Áp suất (MPa)", data: pressure, borderColor: cPres,
               backgroundColor: "transparent", tension: 0.15, yAxisID: "y1",
               spanGaps: true, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0 },
+            // Giới hạn báo động vẽ NGAY TRÊN xu hướng (ISA-101): người xem thấy thể
+            // tích còn cách mức dự trữ bao xa, không phải nhẩm từ hai con số.
+            ...(reserveM3 === null ? [] : [{
+              label: "Mức dự trữ", data: labels.map(() => reserveM3), borderColor: cssVar("--chart-res"),
+              backgroundColor: "transparent", yAxisID: "y", borderWidth: 1.5, borderDash: [8, 4],
+              pointRadius: 0, tension: 0 }]),
           ],
         },
         options: {
@@ -2881,10 +2917,11 @@
                 // `cAxis` chứ không phải mã màu viết cứng: legend nằm trên canvas
                 // nên không thừa hưởng token CSS, phải truyền giá trị đã resolve.
                 color: cAxis,
+                // Mẫu chú giải là ĐOẠN NÉT đúng kiểu nét của đường (liền / đứt),
+                // không phải chấm tròn: ba đường phân biệt bằng nét, không bằng màu.
                 usePointStyle: true,
-                pointStyle: 'circle',
-                boxWidth: 7,
-                boxHeight: 7,
+                pointStyle: 'line',
+                pointStyleWidth: 24,
                 padding: 14,
                 // KHÔNG được để `var(--font)`: canvas dựng chuỗi shorthand
                 // "600 11.5px var(--font)" rồi gán vào ctx.font, trình duyệt từ
@@ -2921,8 +2958,10 @@
       const count = new Set(merged.map(a => a.psn)).size;
       chip.classList.toggle("has", total > 0);
       chipBadge.textContent = count;
+      const inline = document.getElementById("fleet-alarms");
       if (!total) {
         container.innerHTML = `<p class="empty-al">Không có cảnh báo nào. Mọi bồn đang bình thường.</p>`;
+        if (inline) inline.innerHTML = `<p class="empty-al">Không có việc cần xử lý. Mọi bồn đang bình thường.</p>`;
         return;
       }
       const byPsn = [];
@@ -2933,7 +2972,9 @@
       }
       container.innerHTML = byPsn.map(g => {
         const t = tanks.find(x => x.psn === g.psn);
-        const sev = worstSeverity(g.items) === "critical" ? "crit" : "warn";
+        // Mất liên lạc là ưu tiên 1 ở MỌI chỗ (ô bồn, Phân tích, ở đây): không thấy
+        // được bồn thì không biết nó còn bao nhiêu — server xếp nó là "warning".
+        const sev = worstSeverity(g.items) === "critical" || (t && t.status !== "online") ? "crit" : "warn";
         const msg = g.items.map(a => a.message.replace(/\s+/g, " ").replace(/\.?$/, ".")).join(" ");
         return `
         <button type="button" onclick="selectTank('${esc(g.psn)}'); toggleAlerts(false);">
@@ -2941,6 +2982,7 @@
           <span class="msg">${esc(msg)}</span>
         </button>`;
       }).join("");
+      if (inline) inline.innerHTML = container.innerHTML;
     }
 
     function renderPsnOptions() {
@@ -2974,9 +3016,8 @@
         ]);
         summary = s; tanks = t.items; alerts = a; health = h;
         clearError();
-        const lu = document.getElementById("last-update");
-        lu.textContent = "Làm mới " + new Date().toLocaleTimeString("vi-VN");
-        lu.hidden = false;
+        // Giờ làm mới nằm ở chú thích của nút làm mới, không chiếm một chip riêng.
+        document.getElementById("btn-refresh").title = "Làm mới (lần cuối " + new Date().toLocaleTimeString("vi-VN") + ")";
         renderHealth(); renderStats(); renderAlerts(); renderPsnOptions(); renderPlanTankOptions();
         renderTankList();
         // Bản đồ chỉ vẽ lại khi ĐANG mở. Vòng làm mới 60 giây có thể chạy trong lúc
@@ -5351,9 +5392,6 @@
       document.getElementById("action-strip").addEventListener("click", (e) => e.stopPropagation());
       document.addEventListener("click", () => toggleAlerts(false));
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") { toggleAlerts(false); closeDrawer(); } });
-      document.getElementById("tank-list").addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" && ev.target.dataset.psn) selectTank(ev.target.dataset.psn);
-      });
       // Đóng drawer khi chọn bồn (mobile)
       document.getElementById("tank-list").addEventListener("click", closeDrawer);
 
