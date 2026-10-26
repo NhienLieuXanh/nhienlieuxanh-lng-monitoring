@@ -4,6 +4,7 @@ khung khuyến nghị khớp bảng, đánh dấu ngày nghỉ được LƯU, xu
 from __future__ import annotations
 
 import io
+import re
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -110,6 +111,8 @@ def test_huong_dan_gon_va_loi_thuong(app_page: Page) -> None:
     guide.locator("summary").click()
     expect(guide).to_contain_text("Ngày đã qua")
     summary = app_page.locator("#plan-summary")
+    # Một câu, không còn bốn ô thẻ số (soát UI 26/10/2026).
+    expect(summary).to_contain_text(re.compile(r"Trong \d+ ngày cần đặt [\d.,]+ m³ qua \d+ lần nạp"))
     expect(summary).to_contain_text("Nạp khi đầu ngày còn")
     expect(summary).to_contain_text("thứ Bảy")
     expect(summary).not_to_contain_text("T7")

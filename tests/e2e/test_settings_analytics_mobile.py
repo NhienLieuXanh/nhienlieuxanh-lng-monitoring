@@ -72,12 +72,17 @@ def test_phan_tich_co_cau_ket_luan_de_hieu_cho_moi_bon(app_page: Page) -> None:
     expect(fuji.locator(".an-verdict")).to_have_attribute("data-verdict", "crit")
     expect(ykh.locator(".an-verdict")).not_to_have_attribute("data-verdict", "crit")
     expect(ykh.locator(".an-verdict")).to_contain_text("tới mức dự trữ")
-    # Ô kỹ thuật gấp sẵn; mở ra thì có đủ, tên dễ hiểu, và biểu đồ có kích thước thật.
+    # Số liệu kỹ thuật: MỘT bảng chung, mỗi bồn một hàng (soát UI 26/10/2026 —
+    # bản trước lặp chín ô thẻ cho mỗi bồn), tên cột dễ hiểu.
+    table = view.locator(".an-table table")
+    expect(table.locator("tbody tr")).to_have_count(2)
+    expect(table.locator("thead")).to_contain_text("Hao hụt do bay hơi")
+    expect(table.locator("thead")).to_contain_text("Còn giữ được áp")
+    expect(view.locator(".an-tile")).to_have_count(0)
+    # Lịch sử lần đo gấp sẵn; mở ra thì biểu đồ có kích thước thật.
     more = ykh.locator("details.an-more")
     expect(more).not_to_have_attribute("open", "")
     more.locator("summary").first.click()
-    expect(more).to_contain_text("Hao hụt do bay hơi")
-    expect(more).to_contain_text("Còn giữ được áp")
     expect(view).not_to_contain_text("1 / 0 lần đo")
     app_page.wait_for_timeout(500)
     w = more.locator("canvas").first.evaluate("c => c.getBoundingClientRect().width")

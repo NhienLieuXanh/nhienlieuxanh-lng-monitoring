@@ -38,6 +38,21 @@ def test_so_thap_phan_viet_theo_kieu_viet_nam(app_page: Page) -> None:
     assert not re.search(r"\d\.\d{3}(?!\d)", detail), detail
 
 
+def test_khung_chi_tiet_mo_dau_bang_cau_ket_luan(app_page: Page) -> None:
+    """Soát UI 26/10/2026: khung chi tiết mở bằng bốn ô số đo to bằng nhau, còn con
+    số người vận hành hành động theo (bao lâu nữa tới mức dự trữ) không có ở đó."""
+    app_page.locator(f'#tank-list tr[data-psn="{YKH}"]').click()
+    lead = app_page.locator("#td-lead")
+    expect(lead).to_contain_text("tới mức dự trữ")
+    expect(lead.locator(".big")).to_have_text(re.compile(r"^\d+,\d\s*(ngày|giờ)$"))
+    # Cùng con số với cột "Còn lại" của danh sách.
+    pill = app_page.locator(f'#tank-list tr[data-psn="{YKH}"] .runpill').inner_text()
+    assert lead.locator(".big").inner_text().replace("\n", "").replace(" ", "") == pill.replace(" ", "")
+    app_page.locator(f'#tank-list tr[data-psn="{FUJI}"]').click()
+    expect(app_page.locator("#td-lead")).to_have_attribute("data-sev", "crit")
+    expect(app_page.locator("#td-lead")).to_contain_text("không có số đo mới")
+
+
 def test_nhan_truc_bieu_do_7_va_30_ngay_luon_co_ngay(app_page: Page) -> None:
     """Lỗi production 30/09: ở 7/30 ngày trục ghi "05:29, 05:29, …" không có ngày."""
     app_page.locator(f'#tank-list tr[data-psn="{YKH}"]').click()

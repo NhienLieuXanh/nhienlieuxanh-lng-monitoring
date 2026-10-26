@@ -567,42 +567,47 @@
     .hero-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .hero h2 { margin: 0; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; color: var(--fg); }
     .hero .ids { color: var(--faint); font-size: var(--fs-sm); margin-top: 4px; }
+    .hero .ids .mono { font-family: var(--mono); color: var(--muted); }
+    /* Câu kết luận đầu khung: một con số to (28px — con số DUY NHẤT ở cỡ này trên
+       trang) và câu nói phải làm gì. Nền chỉ tô màu khi có việc phải làm; ổn thì
+       để trung tính, không nhuộm xanh cả khối cho một tin "không có gì". */
+    .td-lead {
+      margin-top: 16px; padding: 12px 16px; border-radius: var(--r-sm);
+      background: var(--surface-2); border: 1px solid var(--line);
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: center;
+    }
+    .td-lead .big { font-size: var(--fs-3xl); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; color: var(--fg); white-space: nowrap; }
+    .td-lead .big small { font-size: var(--fs-md); font-weight: 600; color: var(--muted); margin-left: 4px; letter-spacing: 0; }
+    .td-lead p { margin: 0; }
+    .td-lead .l1 { font-size: var(--fs-body); font-weight: 600; color: var(--fg); }
+    .td-lead .l2 { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
+    .td-lead[data-sev="crit"] { background: var(--crit-bg); border-color: var(--crit-line); }
+    .td-lead[data-sev="crit"] .big, .td-lead[data-sev="crit"] .l1 { color: var(--crit); }
+    .td-lead[data-sev="warn"] { background: var(--warn-bg); border-color: var(--warn-line); }
+    .td-lead[data-sev="warn"] .big, .td-lead[data-sev="warn"] .l1 { color: var(--warn); }
+    .td-lead[data-sev="na"] .big { color: var(--faint); }
+    /* Bốn số đo: MỘT hàng phẳng, ngăn bằng vạch mảnh — không còn bốn ô thẻ to bằng
+       nhau tranh nhau làm điểm nhấn. */
     .readouts {
       display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px; margin-top: 16px; align-items: stretch;
+      margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line-soft);
     }
-    @media (max-width: 760px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
     /* Theo bề rộng của CHÍNH khung chi tiết, không theo màn hình: từ khi cột danh
-       sách rộng 46%, khung này ở 1440px chỉ còn ~620px và bốn ô số liệu chật tới mức
-       "Thể tích hiện tại", "Dung tích" xuống dòng từng chữ. Hẹp thì xếp 2×2. */
+       sách rộng 46%, khung này ở 1440px chỉ còn ~620px. Hẹp thì xếp 2×2. */
     #tank-detail { container-type: inline-size; }
-    @container (max-width: 720px) { .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    .readout {
-      padding: 16px 16px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--r-sm);
-      display: flex; flex-direction: column; justify-content: space-between;
-      min-height: 104px;
+    .readout { min-width: 0; padding: 0 16px; }
+    .readout:first-child { padding-left: 0; }
+    .readout + .readout { border-left: 1px solid var(--line-soft); }
+    @container (max-width: 560px) {
+      .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+      .readout:nth-child(3) { border-left: 0; padding-left: 0; }
     }
-    .readout dt {
-      color: var(--faint); font-size: var(--fs-micro); margin: 0 0 8px; font-weight: 700;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .readout dd {
-      margin: 0; font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums;
-      letter-spacing: -.03em; color: var(--fg); line-height: 1.1;
-      display: flex; align-items: baseline; gap: 4px;
-    }
-    .readout dd small { font-size: var(--fs-sm); color: var(--faint); font-weight: 600; letter-spacing: 0; font-family: var(--font); }
-    .readout.bad { background: var(--crit-bg); border-color: var(--crit-line); }
-    .readout.bad dd { color: var(--crit); }
-    .readout-footer {
-      margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--line);
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: var(--fs-micro); color: var(--faint); font-weight: 500;
-    }
-    .readout-footer .rf-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--fg-soft); }
+    .readout dt { color: var(--muted); font-size: var(--fs-micro); margin: 0 0 4px; font-weight: 600; white-space: nowrap; }
+    .readout dd { margin: 0; font-size: var(--fs-xl); font-weight: 700; color: var(--fg); line-height: 1.2; white-space: nowrap; }
+    .readout dd small { font-size: var(--fs-sm); color: var(--muted); font-weight: 500; margin-left: 2px; }
+    .readout .sub { font-size: var(--fs-micro); color: var(--muted); margin-top: 2px; }
+    .readout.bad dd, .readout.bad .sub { color: var(--crit); }
+    .td-when { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
     .local-alerts { display: grid; gap: 8px; margin-top: 16px; }
     .local-alerts p {
       margin: 0; font-size: var(--fs-sm); font-weight: 600; padding: 8px 16px;
@@ -676,12 +681,12 @@
     .plan-params label { display: grid; gap: 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; align-content: start; min-width: 0; }
     .plan-params .field { min-height: 44px; align-self: start; }
     .p-out { display: flex; align-items: center; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brand); background: var(--surface-2); }
-    .plan-summary { display: flex; gap: 16px; flex-wrap: wrap; }
-    .ps-tile { flex: 1; min-width: 150px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-sm); }
-    .ps-tile span { font-size: var(--fs-micro); color: var(--muted); font-weight: 600; }
-    .ps-tile b { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--fg); letter-spacing: -.02em; }
-    .ps-tile.hi b { color: var(--brand); }
-    .ps-tile b.tight { font-size: var(--fs-body); }
+    /* Tóm tắt kỳ kế hoạch: MỘT đoạn văn, không phải bốn ô thẻ số to. Bốn ô từng
+       trả lời bốn câu rời; người đặt hàng cần đọc chúng như một câu. */
+    .plan-summary { margin: 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r); font-size: var(--fs-md); line-height: 1.6; color: var(--fg); }
+    .plan-summary b { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .plan-summary .dev { display: block; color: var(--muted); font-size: var(--fs-sm); }
     .plan-guide > summary { cursor: pointer; list-style: none; }
     .plan-guide > summary::-webkit-details-marker { display: none; }
     .plan-guide > summary::before { content: "▸ "; color: var(--brand); }
@@ -950,7 +955,6 @@
     .an-tag.crit { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
     .an-tag.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
     .an-tag.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
-    .an-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
     .an-verdict { margin: 8px 0 0; padding: 12px 16px; border-radius: var(--r-sm); font-size: var(--fs-body);
       line-height: 1.5; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
     .an-verdict.ok { background: var(--ok-bg); border-color: var(--ok-line); }
@@ -965,10 +969,14 @@
     .an-more > summary::before { content: "▸ "; }
     .an-more[open] > summary::before { content: "▾ "; }
     .an-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
-    .an-tile { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; min-width: 0; }
-    .an-tile dt { font-size: var(--fs-micro); color: var(--faint); margin-bottom: 2px; }
-    .an-tile dd { font-variant-numeric: tabular-nums; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; color: var(--fg); }
-    .an-tile dd small { font-family: var(--font); font-size: var(--fs-tiny); color: var(--muted); margin-left: 4px; }
+    /* Bảng số liệu kỹ thuật: MỘT bảng, mỗi bồn một hàng — bản trước lặp chín ô
+       thẻ cho mỗi bồn (20 ô viền trên một trang hai bồn) và không so được hai bồn
+       với nhau. Cột tên bồn dính trái khi cuộn ngang trên điện thoại. */
+    .an-table h2 { margin: 0 0 4px; font-size: var(--fs-body); font-weight: 700; color: var(--fg); }
+    .an-table .hint { margin-bottom: 8px; }
+    .an-mini th[scope="row"] { position: sticky; left: 0; background: var(--surface); color: var(--fg); font-size: var(--fs-body); font-weight: 600; }
+    .an-mini td.crit { color: var(--crit); font-weight: 700; }
+    .an-mini th.r { white-space: normal; min-width: 96px; vertical-align: bottom; }
     .an-sub { font-size: var(--fs-micro); color: var(--faint); margin-top: 2px; }
     .an-empty { margin-bottom: 8px; padding: 8px 12px; border-radius: var(--r-sm);
                 font-size: var(--fs-prose); line-height: 1.6;
@@ -1391,7 +1399,7 @@
         <section class="fleet" aria-label="Danh sách bồn">
           <div class="pane-head">
             <h1>Danh sách bồn</h1>
-            <span class="meta">Chọn một bồn để xem chi tiết</span>
+            <span class="meta" id="fleet-meta"></span>
           </div>
           <div class="fleet-scroll">
             <table class="tanks">
@@ -1451,7 +1459,6 @@
       <section id="view-planner" class="planner" hidden aria-label="Kế hoạch nạp LNG">
         <div class="pane-head">
           <h1>Kế hoạch nạp LNG</h1>
-          <span class="meta">Lập kế hoạch theo tháng · mọi thông số đều điều chỉnh được</span>
         </div>
         <div class="plan-scroll">
           <form class="plan-params" id="plan-form">
@@ -1485,7 +1492,7 @@
             <label>Số ngày lập kế hoạch<input type="number" id="p-days" class="field num" value="30" step="1" min="1" max="366" /></label>
             <label>Thể tích sau khi nạp<output id="p-postfill" class="field p-out">54 m³</output></label>
           </form>
-          <div class="plan-summary" id="plan-summary"></div>
+          <p class="plan-summary" id="plan-summary" aria-live="polite"></p>
           <p class="plan-warn" id="plan-warn" hidden></p>
           <!-- Trợ lý đề xuất: mô hình điểm đặt hàng lại có dự trữ an toàn thống kê,
                chạy trên số liệu THẬT của bồn đang chọn. Luôn kèm phần "vì sao" —
@@ -1494,7 +1501,7 @@
           <!-- Hai đoạn hướng dẫn dài (≈ nửa màn hình, đọc như sách) gộp thành một mục
                gấp sẵn, mỗi ý một dòng — người dùng 06/10/2026: "chưa friendly". -->
           <details class="plan-help plan-guide" id="plan-guide">
-            <summary><b>Cách đọc bảng</b> <span class="set-help">— bấm để xem</span></summary>
+            <summary><b>Cách đọc bảng</b></summary>
             <ul>
               <li>Ô <span class="lg lg-trig">vàng</span>: sắp tới lúc phải nạp. Ô <span class="lg lg-low">đỏ</span>:
                   dưới mức dự trữ. <span class="lg lg-from">Vạch xanh</span>: ngày đang tính lại từ một số bạn đo.</li>
@@ -1577,7 +1584,7 @@
           <!-- Thay cho thẻ "Xuất dữ liệu thô (CSV)" (06/10/2026): người dùng không dùng
                CSV thô, họ gửi đối tác một bảng lịch nạp. Một file Excel, ba sheet. -->
           <div class="rep-card">
-            <h2>Báo cáo Excel — lịch nạp LNG</h2>
+            <h2>Báo cáo Excel lịch nạp LNG</h2>
             <p class="hint">
               Một file Excel ba sheet, in vừa khổ A4: <b>Lịch nạp</b> (lần nạp thật đã qua và lần
               nạp theo kế hoạch, lượng tính bằng m³, ngày nghỉ ghi chú ở dòng giao trước nó),
@@ -1741,7 +1748,7 @@
       <section id="view-settings" class="settings" hidden aria-label="Cài đặt">
         <div class="pane-head">
           <h1>Cài đặt</h1>
-          <span class="meta" id="set-meta">Thay đổi có hiệu lực ngay cho toàn hệ thống</span>
+          <span class="meta" id="set-meta"></span>
         </div>
         <div class="set-scroll">
           <!-- Trang Cài đặt làm lại 06/10/2026: người dùng thấy các thông số kỹ thuật
@@ -1757,9 +1764,9 @@
             <div class="set-when">
               <b>Hệ thống chỉ gửi email trong hai trường hợp:</b>
               <ul>
-                <li><b>Bồn sắp chạm mức dự trữ</b> — còn 3 ngày trở xuống. Thư ghi luôn nên
+                <li><b>Bồn sắp chạm mức dự trữ:</b> còn 3 ngày trở xuống. Thư ghi luôn nên
                     đặt bao nhiêu m³, đặt trước lúc nào và xe giao lúc nào.</li>
-                <li><b>Nhà máy phát báo động</b> — báo động thiết bị tại nhà máy, đã gộp theo việc.</li>
+                <li><b>Nhà máy phát báo động:</b> báo động thiết bị tại nhà máy, đã gộp theo việc.</li>
               </ul>
             </div>
 
@@ -1796,9 +1803,9 @@
                   <label class="set-prov">
                     <span class="set-lbl">Dịch vụ thư</span>
                     <select id="s-provider" class="field">
-                      <option value="brevo">Brevo — khuyên dùng (miễn phí, không cần quản trị viên)</option>
+                      <option value="brevo">Brevo (khuyên dùng: miễn phí, không cần quản trị viên)</option>
                       <option value="gmail">Gmail</option>
-                      <option value="outlook">Outlook.com · Hotmail (thư cá nhân)</option>
+                      <option value="outlook">Outlook.com hoặc Hotmail (thư cá nhân)</option>
                       <option value="m365">Microsoft 365 (thư công ty)</option>
                       <option value="custom">Khác (máy chủ riêng của công ty)</option>
                     </select>
@@ -1899,8 +1906,8 @@
                   <label>
                     <span class="set-lbl">Bảo mật kết nối</span>
                     <select id="s-tls" class="field">
-                      <option value="true">STARTTLS · cổng 587</option>
-                      <option value="false">SSL/TLS · cổng 465</option>
+                      <option value="true">STARTTLS, cổng 587</option>
+                      <option value="false">SSL/TLS, cổng 465</option>
                     </select>
                   </label>
                 </div>
@@ -1924,7 +1931,7 @@
           </div>
 
           <details class="rep-card set-more" id="set-more">
-            <summary><b>Nâng cao</b> — thông số tính toán và ngưỡng cảnh báo trên màn hình
+            <summary><b>Nâng cao:</b> thông số tính toán và ngưỡng cảnh báo trên màn hình
               <span class="set-help">(thường không cần sửa)</span></summary>
             <h3>Thông số bồn</h3>
             <div class="set-grid">
@@ -1953,7 +1960,7 @@
                 </label>
                 <label>
                   <span class="set-lbl">Mức an toàn khi đặt hàng</span>
-                  <select id="s-service" class="field"><option value="50">50% · không dự phòng</option><option value="80">80%</option><option value="90">90%</option><option value="95">95% · thông dụng</option><option value="99">99% · rất an toàn</option></select>
+                  <select id="s-service" class="field"><option value="50">50% (không dự phòng)</option><option value="80">80%</option><option value="90">90%</option><option value="95">95% (thông dụng)</option><option value="99">99% (rất an toàn)</option></select>
                   <small class="set-help">Càng cao càng đặt sớm, phòng khi nhà máy chạy mạnh hơn bình thường. 95% là mức thông dụng.</small>
                 </label>
                 <label>
@@ -2293,11 +2300,11 @@
       ingestEl.textContent = ingest; ingestEl.hidden = false;
       if (health.status === "ok") { banner.classList.remove("show"); return; }
       const parts = [];
-      if (health.database && !health.database.ok) parts.push("DB: " + (health.database.detail || "lỗi"));
-      if (health.migration && !health.migration.ok) parts.push("schema: " + (health.migration.detail || "lỗi"));
-      if (health.ingest && !health.ingest.ok) parts.push("ingest: " + (health.ingest.detail || "lỗi"));
-      if (health.ingest_paused_reason) parts.push("job tạm dừng: " + health.ingest_paused_reason);
-      banner.textContent = parts.join(" · ") || "Máy không ở trạng thái ổn.";
+      if (health.database && !health.database.ok) parts.push("Cơ sở dữ liệu lỗi: " + (health.database.detail || "không rõ lý do") + ".");
+      if (health.migration && !health.migration.ok) parts.push("Cấu trúc dữ liệu chưa cập nhật: " + (health.migration.detail || "không rõ lý do") + ".");
+      if (health.ingest && !health.ingest.ok) parts.push("Thu thập dữ liệu lỗi: " + (health.ingest.detail || "không rõ lý do") + ".");
+      if (health.ingest_paused_reason) parts.push("Việc thu thập đang tạm dừng: " + health.ingest_paused_reason + ".");
+      banner.textContent = parts.join(" ") || "Máy không ở trạng thái ổn.";
       banner.className = "banner show " + (health.status === "error" ? "err" : "warn");
     }
 
@@ -2348,6 +2355,8 @@
       on.classList.toggle("ok", summary.online > 0);
       off.classList.toggle("bad", summary.offline > 0);
       al.classList.toggle("bad", alertTanks > 0);
+      const fm = document.getElementById("fleet-meta");
+      if (fm) fm.textContent = `${summary.total} bồn` + (alertTanks ? `, ${alertTanks} cần chú ý` : ", không bồn nào cần chú ý");
       fitKpis();
     }
 
@@ -2533,7 +2542,7 @@
         const why = !f
           ? "Đang tính…"
           : below
-            ? "Đã dưới mức dự trữ · chưa đo được tốc độ hao để tính thời gian tới cạn"
+            ? "Đã dưới mức dự trữ; chưa đo được tốc độ hao để tính thời gian tới cạn"
             : "Chưa đo được mức tiêu thụ từ lịch sử";
         return `<span class="runpill stale" title="${esc(why)}">--</span>`
           + `<span class="tago">${below ? "dưới mức dự trữ" : "chưa đủ dữ liệu"}</span>`;
@@ -2544,7 +2553,7 @@
       const tip = below
         ? `Đã dưới mức dự trữ ${fmtM3(f.reserve_l)} m³ — còn ${fmtDays(d)} tới cạn hoàn toàn`
         : `Còn ${fmtDays(d)} tới mức dự trữ ${fmtM3(f.reserve_l)} m³`
-          + (r.days_to_empty != null ? ` · cạn hoàn toàn sau ${fmtDays(r.days_to_empty)}` : "");
+          + (r.days_to_empty != null ? `, cạn hoàn toàn sau ${fmtDays(r.days_to_empty)}` : "");
       return `<span class="runpill ${cls}" title="${esc(tip)}">${esc(fmtDays(d))}</span>`
         + `<span class="tago">${below ? "tới cạn" : "tới mức dự trữ"}</span>`;
     }
@@ -2560,13 +2569,13 @@
       const urg = s.urgency || "unknown";
       const reasons = (s.reasons || []).map(r => `<li>${esc(r)}</li>`).join("");
       const lead = s.order_l != null
-        ? `<b>${esc(nf2(m3(s.order_l)))} m³</b><span>đặt lúc ${esc(fmtWhen(s.order_at))}</span>`
-          + (s.deliver_at ? `<span class="fc-sub">giao lúc ${esc(fmtWhen(s.deliver_at))}</span>` : "")
-        : `<b>--</b><span>Chưa đủ dữ liệu để đề xuất lượng đặt</span>`;
+        ? `<b>${esc(nf2(m3(s.order_l)))} m³</b><span>Đặt trước ${esc(fmtWhen(s.order_at))}`
+          + (s.deliver_at ? `, xe giao lúc ${esc(fmtWhen(s.deliver_at))}.` : ".") + `</span>`
+        : `<b>--</b><span>Chưa đủ dữ liệu để đề xuất lượng đặt.</span>`;
       return `
         <div class="fc-sug ${esc(urg)}">
           <div class="lead">
-            <span class="tagline">${esc(title)} · ${esc(URG_VI[urg] || urg)}</span>
+            <span class="tagline">${esc(title)}: ${esc((URG_VI[urg] || urg).toLowerCase())}</span>
           </div>
           <div class="lead">${lead}</div>
           ${reasons ? `<details class="fc-why"><summary>Cơ sở tính toán</summary><ol>${reasons}</ol></details>` : ""}
@@ -2582,12 +2591,55 @@
         // Dự báo về sau khi dashboard đã vẽ -> vẽ lại đúng những phần phụ thuộc nó.
         renderStats(); renderAlerts(); renderTankList();
         updateMeasuredBtn(); renderPlanAssist(); planRefreshLive();
+        // Chỉ thay câu kết luận, không vẽ lại cả khung: ô đổi tên bên dưới có thể
+        // đang được gõ dở.
+        const lead = document.getElementById("td-lead");
+        if (lead && selectedPsn) lead.outerHTML = detailLeadHtml(selectedPsn);
       } catch (e) {
         if (e.name === "AuthError") return;
         // Dự báo lỗi KHÔNG được che dashboard: số liệu hiện tại vẫn đúng và vẫn
         // dùng được. Ghi console để debug, không đẩy banner đỏ toàn trang.
         console.warn("forecast:", e.message);
       }
+    }
+
+    // Đầu khung chi tiết: MỘT con số và MỘT câu trả lời "bồn này còn bao lâu, có
+    // phải làm gì không". Bản trước mở bằng bốn ô số to bằng nhau (%, thể tích, áp
+    // suất, nhiệt độ) — đều là số đo, không số nào là quyết định; con số người vận
+    // hành hành động theo chỉ nằm trong một nhãn nhỏ ở danh sách (soát UI 26/10/2026).
+    // Cùng luật với cột "Còn lại" (runPill) để hai chỗ không nói khác nhau.
+    function detailLeadHtml(psn) {
+      const f = fcOf(psn);
+      const box = (sev, big, unit, line1, line2) =>
+        `<div class="td-lead" id="td-lead" data-sev="${sev}">`
+        + `<div class="big num">${esc(big)}${unit ? `<small>${esc(unit)}</small>` : ""}</div>`
+        + `<div><p class="l1">${line1}</p>${line2 ? `<p class="l2">${line2}</p>` : ""}</div></div>`;
+      if (!f) return box("na", "--", "", "Đang tính dự báo…", "");
+      if (f.stale) {
+        const age = f.reading_age_days;
+        const [n, u] = age != null ? fmtDays(age).split(" ") : ["--", ""];
+        return box("crit", n, u, "không có số đo mới",
+          "Số bên dưới là lần đo cuối, không phải hiện tại. Cần kiểm tra thiết bị (pin, sóng, nguồn điện).");
+      }
+      const r = f.runout || {};
+      const below = r.days_to_reserve != null && r.days_to_reserve <= 0;
+      const d = below ? r.days_to_empty : r.days_to_reserve;
+      const reserve = f.reserve_l != null ? ` ${esc(fmtM3(f.reserve_l))} m³` : "";
+      if (d === null || d === undefined) {
+        return box(below ? "crit" : "na", "--", "",
+          below ? `đã dưới mức dự trữ${reserve}` : "chưa đủ dữ liệu để dự báo",
+          below ? "Chưa đo được tốc độ hao để tính thời gian tới cạn. Cần đặt hàng ngay."
+                : "Chưa đo được mức tiêu thụ từ lịch sử của bồn này.");
+      }
+      const sev = below || d <= 1 ? "crit" : d <= 3 ? "warn" : "ok";
+      const [n, u] = fmtDays(d).split(" ");
+      const s = f.suggestion || {};
+      let act = "";
+      if (below || s.urgency === "now") act = "Cần đặt hàng ngay.";
+      else if (s.order_at) act = `Nên đặt hàng trước ${esc(fmtWhen(s.order_at))}.`;
+      return box(sev, n, u,
+        below ? `tới cạn hoàn toàn. Bồn đã dưới mức dự trữ${reserve}.` : `tới mức dự trữ${reserve}`,
+        act);
     }
 
     function renderTankDetail(detail) {
@@ -2598,50 +2650,47 @@
             `<p class="${a.severity === "critical" ? "crit" : "warn"}">${esc(a.message)}</p>`
           ).join("")}</div>`
         : "";
-      const pctClass = p !== null && p < 15 ? " bad" : "";
-
-      const cap = fmtM3(detail.capacity_l);
+      const low = p !== null && p < 15;
       const vol = fmtM3(detail.volume_l);
       const pres = fmtN(detail.pressure_mpa, 3, 0);
       const temp = fmtN(detail.temperature_c, 1, 0);
-      // Ba dòng chân thẻ chỉ được nói thứ ĐO ĐƯỢC hoặc CẤU HÌNH ĐƯỢC. "Bình thường"
-      // khi chưa có số liệu, một ngưỡng áp suất không tồn tại trong hệ thống, và
-      // môi chất viết cứng bất kể nguồn khai gì — cả ba đều là lời khẳng định mà
-      // dữ liệu không đỡ nổi, trên một màn hình giám sát bồn lạnh có áp.
-      const mucLabel = p === null ? "Chưa có số liệu" : (p < 15 ? "Mức thấp" : "Bình thường");
-      const moiChat = detail.medium_name ? String(detail.medium_name) : "--";
-      const doLuc = fmtAgo(detail.last_seen_at);  // trả "chưa có" nếu null
+      // Chỉ nói thứ ĐO ĐƯỢC hoặc CẤU HÌNH ĐƯỢC: không có dung tích thì không có dòng
+      // "trên … m³", không có môi chất thì không in một môi chất viết cứng.
+      const capLine = detail.capacity_l == null ? "" : `<div class="sub" title="Dung tích bồn">trên ${esc(fmtM3(detail.capacity_l))} m³</div>`;
+      const lastAt = detail.last_seen_at
+        ? `Lần đo cuối ${esc(fmtAgo(detail.last_seen_at))} trước, lúc ${esc(fmtWhen(detail.last_seen_at))}.`
+        : "Chưa có lần đo nào.";
 
       document.getElementById("tank-detail").innerHTML = `
         <div class="hero-top">
           <div>
             <h2>${esc(tankName(detail))}</h2>
-            <div class="ids num">${esc(detail.psn)}${detail.medium_name ? " · " + esc(detail.medium_name) : ""}</div>
+            <div class="ids">Mã <span class="mono">${esc(detail.psn)}</span>${detail.medium_name ? `, môi chất ${esc(detail.medium_name)}` : ""}</div>
           </div>
           <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
         </div>
+        ${detailLeadHtml(detail.psn)}
         <dl class="readouts">
-          <div class="readout${pctClass}">
+          <div class="readout${low ? " bad" : ""}">
             <dt>Mức chứa</dt>
-            <dd>${esc(fmtPct(p))}<small>%</small></dd>
-            <div class="readout-footer"><span>Trạng thái</span><span class="rf-val">${esc(mucLabel)}</span></div>
+            <dd class="num">${esc(fmtPct(p))}<small>%</small></dd>
+            ${low ? `<div class="sub">dưới 15%</div>` : ""}
           </div>
           <div class="readout">
-            <dt>Thể tích hiện tại</dt>
-            <dd>${esc(vol)}<small>m³</small></dd>
-            <div class="readout-footer"><span>Dung tích</span><span class="rf-val">${esc(cap)} m³</span></div>
+            <dt>Thể tích</dt>
+            <dd class="num">${esc(vol)}<small>m³</small></dd>
+            ${capLine}
           </div>
           <div class="readout">
-            <dt>Áp suất bồn</dt>
-            <dd>${esc(pres)}<small>MPa</small></dd>
-            <div class="readout-footer"><span>Môi chất</span><span class="rf-val">${esc(moiChat)}</span></div>
+            <dt>Áp suất</dt>
+            <dd class="num">${esc(pres)}<small>MPa</small></dd>
           </div>
           <div class="readout">
-            <dt>Nhiệt độ bồn</dt>
-            <dd>${esc(temp)}<small>°C</small></dd>
-            <div class="readout-footer"><span>Đo cách đây</span><span class="rf-val">${esc(doLuc)}</span></div>
+            <dt>Nhiệt độ</dt>
+            <dd class="num">${esc(temp)}<small>°C</small></dd>
           </div>
         </dl>
+        <p class="td-when">${lastAt}</p>
         ${alertBlock}`;
       document.getElementById("tank-specs").innerHTML = `
         <div class="meta-grid">
@@ -2885,7 +2934,7 @@
       container.innerHTML = byPsn.map(g => {
         const t = tanks.find(x => x.psn === g.psn);
         const sev = worstSeverity(g.items) === "critical" ? "crit" : "warn";
-        const msg = g.items.map(a => a.message.replace(/\s+/g, " ")).join(" · ");
+        const msg = g.items.map(a => a.message.replace(/\s+/g, " ").replace(/\.?$/, ".")).join(" ");
         return `
         <button type="button" onclick="selectTank('${esc(g.psn)}'); toggleAlerts(false);">
           <span class="where"><span class="sev ${sev}"></span>${esc(t ? tankName(t) : g.psn)}</span>
@@ -2898,7 +2947,7 @@
       const sel = document.getElementById("chart-psn");
       const keep = selectedPsn || sel.value;
       sel.innerHTML = tanks.map(t =>
-        `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`
+        `<option value="${esc(t.psn)}">${esc(t.name ? `${t.name} (${t.psn})` : t.psn)}</option>`
       ).join("");
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
     }
@@ -3249,10 +3298,10 @@
     function planBasis() {
       const p = planParams();
       const postFill = round2((p.pct / 100) * p.cap);
-      return `Kế hoạch tính theo: tiêu thụ ${nf2(p.use)} m³/ngày · dự trữ ${nf2(p.res)} m³ · `
-        + `nạp tới ${nf2(postFill)} m³ · giờ nạp ${p.time.slice(0, 5)}`
-        + (planLive ? ` · tính từ số đo thật lúc ${fmtDT(planLive.at)}.`
-                    : " · bồn không có số đo mới, tính từ thể tích nhập tay.");
+      return `Kế hoạch tính với mức tiêu thụ ${nf2(p.use)} m³/ngày, mức dự trữ ${nf2(p.res)} m³, `
+        + `nạp tới ${nf2(postFill)} m³, giờ nạp ${p.time.slice(0, 5)}; `
+        + (planLive ? `tính từ số đo thật lúc ${fmtDT(planLive.at)}.`
+                    : "bồn không có số đo mới nên tính từ thể tích nhập tay.");
     }
     async function postPlanXlsx(psn, from, to, rows, basis, customer) {
       await dlCsv(`/api/plan/export/${encodeURIComponent(psn)}`, `lich_nap_${psn}.xlsx`, {
@@ -3275,7 +3324,7 @@
       const n = rows.length ? planExportRows(rows).length : 0;
       btn.disabled = !rows.length;
       note.textContent = rows.length
-        ? `${dd(rows[0].key)} – ${dd(rows[rows.length - 1].key)} · ${n} lần nạp kế hoạch (lần nạp thật hệ thống tự thêm)`
+        ? `Từ ${dd(rows[0].key)} đến ${dd(rows[rows.length - 1].key)}, ${n} lần nạp kế hoạch; lần nạp thật hệ thống tự thêm.`
         : "";
     }
     async function planExportXlsx() {
@@ -3407,13 +3456,12 @@
       // Ngưỡng tính tới GIỜ XE TỚI của ngày giao được kế tiếp, nên cộng thêm phần
       // dùng từ nửa đêm tới giờ nạp (h ngày). Thứ Bảy cộng thêm một ngày Chủ Nhật.
       const hh = planRefillHour(p);
-      const band = `≤ ${nf2(R + (1 + hh) * U)} m³` + (U > 0 ? ` · thứ Bảy ≤ ${nf2(R + (2 + hh) * U)} m³` : "");
-      document.getElementById("plan-summary").innerHTML =
-        `<div class="ps-tile hi"><span>Tổng cần đặt trong kỳ</span><b class="num">${nf2(total)} m³</b></div>` +
-        `<div class="ps-tile"><span>Số lần nạp</span><b class="num">${fills}</b></div>` +
-        `<div class="ps-tile"><span>Mức sau khi nạp</span><b class="num">${nf2(postFill)} m³</b></div>` +
-        `<div class="ps-tile" title="Thứ Bảy cao hơn vì Chủ Nhật không có xe"><span>Nạp khi đầu ngày còn</span><b class="num tight">${band}</b></div>` +
-        planDeviationTile(rows);
+      const band = `Nạp khi đầu ngày còn ≤ <b>${nf2(R + (1 + hh) * U)} m³</b>`
+        + (U > 0 ? ` (thứ Bảy ≤ <b>${nf2(R + (2 + hh) * U)} m³</b>, vì Chủ Nhật không có xe).` : ".");
+      const head = fills
+        ? `Trong ${rows.length} ngày cần đặt <b>${nf2(total)} m³</b> qua <b>${fills} lần nạp</b>, mỗi lần nạp tới ${nf2(postFill)} m³. `
+        : `Trong ${rows.length} ngày không cần nạp lần nào. `;
+      document.getElementById("plan-summary").innerHTML = head + band + planDeviationLine(rows);
       const warn = document.getElementById("plan-warn");
       const msgs = [];
       // Chặn số ngày thì NÓI RA. Bản trước chặn im lặng: ô hiện 90, bảng tính 62, và
@@ -3468,7 +3516,7 @@
           luc = `<span class="p-goc" title="Dự báo tính từ lần đo mới nhất của thiết bị">`
             + `${r.anchor.open ? "" : "đo "}lúc ${hhmm(r.anchor.at)}${r.anchor.open ? ": " + nf2(r.anchor.m3) : ""}</span>`;
         } else if (r.past && r.noData) {
-          luc = `<span class="p-goc">${planOpenLoading ? "đang tải…" : (r.level === null ? "không có số đo" : "không có số đo · ước tính")}</span>`;
+          luc = `<span class="p-goc">${planOpenLoading ? "đang tải…" : (r.level === null ? "không có số đo" : "không có số đo, ước tính")}</span>`;
         } else if (r.past) {
           // Lần đo đầu ngày muộn (bồn im cả đêm) thì không phải thể tích đầu ngày.
           const muon = r.openAt && (r.openAt.getHours() >= 1);
@@ -3534,13 +3582,13 @@
     // Tổng độ lệch tích luỹ. Mỗi ngày có số đo đóng góp (thực tế − ước tính của
     // riêng ngày đó), vì sau mỗi lần dịch mốc thì ước tính ngày kế đã tính từ số
     // thực tế — nên cộng lại là "cả kỳ đã dùng ít/nhiều hơn kế hoạch bao nhiêu m³".
-    function planDeviationTile(rows) {
+    function planDeviationLine(rows) {
       const acts = rows.filter(r => r.act !== null && r.act !== undefined && r.est !== null && r.est !== undefined);
       if (!acts.length) return "";
       const dev = round2(acts.reduce((a, r) => a + (r.act - r.est), 0));
-      return `<div class="ps-tile" title="Cộng dồn (thực tế − ước tính) của các ngày đã nhập. `
-        + `Số dương nghĩa là dùng ít hơn kế hoạch."><span>Thực tế so với ước tính</span>`
-        + `<b class="num tight">${dev > 0 ? "+" : ""}${nf2(dev)} m³ trong ${acts.length} ngày</b></div>`;
+      const how = dev === 0 ? "đúng bằng kế hoạch"
+        : dev > 0 ? `dùng ít hơn kế hoạch ${nf2(dev)} m³` : `dùng nhiều hơn kế hoạch ${nf2(-dev)} m³`;
+      return `<span class="dev">Theo ${acts.length} ngày đã nhập số thực tế: ${how}.</span>`;
     }
 
     // Ánh xạ ô trên form <-> field API. Đơn vị: API nói LÍT, form nói m³.
@@ -3967,8 +4015,8 @@
       // rồi không hiểu vì sao lệch. Bản trước không ghi, và chính vì không ghi mà
       // con số 3,44 (trộn 18 ngày tắt máy) trông như một phép đo đáng tin.
       const nghi = Number(c.idle_days) || 0;
-      const loai = nghi >= 0.5 ? ` · đã loại ${Math.round(nghi)} ngày nhà máy nghỉ` : "";
-      note.textContent = `Số đo thực tế ${fmtM3(v)} m³/ngày khi nhà máy chạy${loai} · ${CONF_VI[c.confidence] || ""}`;
+      const loai = nghi >= 0.5 ? `, đã loại ${Math.round(nghi)} ngày nhà máy nghỉ` : "";
+      note.textContent = `Số đo thực tế ${fmtM3(v)} m³/ngày khi nhà máy chạy${loai}. ${CONF_VI[c.confidence] || ""}`.trim();
     }
 
     function useMeasuredDaily() {
@@ -4058,7 +4106,7 @@
       if (!sel) return;
       const keep = sel.value || selectedPsn;
       sel.innerHTML = tanks.map(t =>
-        `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`).join("");
+        `<option value="${esc(t.psn)}">${esc(t.name ? `${t.name} (${t.psn})` : t.psn)}</option>`).join("");
       if (keep && tanks.some(t => t.psn === keep)) sel.value = keep;
       applyRepDates();
       renderRpScope();
@@ -4117,7 +4165,7 @@
       if (!sel) return;
       const keep = sel.value;
       sel.innerHTML = `<option value="">Toàn bộ bồn (${tanks.length})</option>` + tanks.map(t =>
-        `<option value="${esc(t.psn)}">${esc(t.name ? t.name + " · " + t.psn : t.psn)}</option>`).join("");
+        `<option value="${esc(t.psn)}">${esc(t.name ? `${t.name} (${t.psn})` : t.psn)}</option>`).join("");
       // Giữ lựa chọn cũ. "" là giá trị HỢP LỆ (toàn bộ bồn) nên không thể dùng
       // `if (keep)` để quyết định gán lại — làm vậy thì mỗi lần làm mới dữ liệu,
       // người đang xem một bồn cụ thể bị đẩy về "toàn bộ".
@@ -4177,14 +4225,6 @@
     const GRADE_CLS = { "cao": "ok", "trung bình": "warn", "thấp": "crit",
                         "chưa đủ lịch sử": "warn", "không dùng được": "crit" };
 
-    function anTile(label, value, sub, cls) {
-      return `<div class="an-tile">
-          <dt>${esc(label)}</dt>
-          <dd class="${cls || ""}">${value}</dd>
-          ${sub ? `<div class="an-sub">${sub}</div>` : ""}
-        </div>`;
-    }
-
     // MỘT câu kết luận cho mỗi bồn: có việc gì phải làm không. Trang Phân tích từng
     // chỉ có các ô kỹ thuật ("Còn báo được --", "Tỉ lệ nhận mẫu", "Bay hơi tự nhiên
     // 0.050 Tham chiếu") — người vận hành không rút ra được việc gì (06/10/2026).
@@ -4192,78 +4232,59 @@
     function anVerdict(a, fc, ageD) {
       const h = a.health || {}, hold = fc.hold || {}, ro = fc.runout || {};
       if (h.days_to_failure === 0 || (fc.stale && ageD != null && ageD >= 1)) {
-        return { cls: "crit", title: `Thiết bị mất liên lạc${ageD != null ? " " + ageD + " ngày" : ""}`,
-                 text: "— cần ra kiểm tra thiết bị (pin, sóng, nguồn điện). Số liệu của bồn này đang cũ." };
+        return { cls: "crit", title: `Thiết bị mất liên lạc${ageD != null ? " " + ageD + " ngày" : ""}.`,
+                 text: "Cần ra kiểm tra thiết bị (pin, sóng, nguồn điện); số liệu của bồn này đang cũ." };
       }
       if (hold.days != null && hold.days <= 5) {
-        return { cls: "crit", title: `Áp suất sắp chạm van an toàn (còn ${fmtDays(hold.days)})`,
-                 text: "— cần tăng tiêu thụ hoặc xả áp theo quy trình." };
+        return { cls: "crit", title: `Áp suất sắp chạm van an toàn, còn ${fmtDays(hold.days)}.`,
+                 text: "Cần tăng tiêu thụ hoặc xả áp theo quy trình." };
       }
       if (ro.days_to_reserve != null && ro.days_to_reserve <= 3) {
-        return { cls: "warn", title: `Còn ${fmtDays(ro.days_to_reserve)} tới mức dự trữ`,
-                 text: "— cần đặt hàng. Xem lượng và thời điểm ở trang Kế hoạch nạp." };
+        return { cls: "warn", title: `Còn ${fmtDays(ro.days_to_reserve)} tới mức dự trữ.`,
+                 text: "Cần đặt hàng; lượng và thời điểm xem ở trang Kế hoạch nạp." };
       }
       if (h.risk === "cao" || h.risk === "trung bình") {
-        return { cls: "warn", title: "Thiết bị có dấu hiệu yếu dần",
-                 text: "— " + (h.likely_cause || "nên kiểm tra pin và sóng trong lần ghé tới.") };
+        const why = h.likely_cause ? h.likely_cause.charAt(0).toUpperCase() + h.likely_cause.slice(1) : "";
+        return { cls: "warn", title: "Thiết bị có dấu hiệu yếu dần.",
+                 text: why || "Nên kiểm tra pin và sóng trong lần ghé tới." };
       }
       const cons = fc.consumption || {};
       const bits = [];
-      if (cons.daily_use_l != null) bits.push(`tiêu thụ ~${fmtM3(cons.daily_use_l, 1)} m³/ngày`);
+      if (cons.daily_use_l != null) bits.push(`tiêu thụ khoảng ${fmtM3(cons.daily_use_l, 1)} m³/ngày`);
       if (ro.days_to_reserve != null) bits.push(`còn ${fmtDays(ro.days_to_reserve)} tới mức dự trữ`);
-      return { cls: "ok", title: "Ổn — không cần làm gì",
-               text: bits.length ? "· " + bits.join(", ") + "." : "" };
+      const t = bits.join(", ");
+      return { cls: "ok", title: "Ổn, không cần làm gì.",
+               text: t ? t.charAt(0).toUpperCase() + t.slice(1) + "." : "" };
     }
 
     function anCard(a) {
-      const h = a.health || {}, q = a.quality || {}, b = h.battery || {}, s = h.signal || {};
-      const pct = (x) => x == null ? "--" : `${Math.round(x * 100)}%`;
-
-      // Con số chính của thẻ là SỐ NGÀY CÒN LẠI khi đoán được, còn không thì là mức
-      // rủi ro. Không bao giờ hiện "0 ngày" như một dự báo: 0 nghĩa là đã xảy ra rồi,
-      // nên ca đó nói thẳng "đã ngừng báo".
-      const dead = h.days_to_failure === 0;
-      const headline = dead
-        ? "Đã ngừng báo"
-        : h.days_to_failure != null ? fmtDays(h.days_to_failure) : "--";
-
-      // Thu gọn 10 dòng lý do. Sáu ô số phía trên đã trả lời câu hỏi chính; phần
-      // này là để tra khi cần cãi lại con số, không phải để đọc mỗi lần mở trang.
-      // Cùng khuôn <details> mà thẻ dự báo đã dùng — trang mới không được tự đặt
-      // một kiểu trình bày riêng cho cùng loại nội dung.
+      const h = a.health || {}, q = a.quality || {};
+      // Lý do chi tiết thu gọn: để tra khi cần cãi lại con số, không phải để đọc mỗi
+      // lần mở trang. Cùng khuôn <details> với thẻ dự báo.
       const why = [...(q.reasons || []), ...(h.reasons || [])]
         .map(r => `<li>${esc(r)}</li>`).join("");
-
-      // Ba số về BỒN (tiêu thụ, bay hơi, giữ áp) và lần nạp gần nhất chuyển về đây
-      // khi khối "Dự báo tiêu thụ & an toàn" bị bỏ khỏi Bảng điều khiển — chúng không
-      // có ở đâu khác. Lấy từ fcByPsn mà trình duyệt đã tải cho bảng bồn, không thêm
-      // request nào.
       const fc = fcOf(a.psn) || {};
-      const cons = fc.consumption || {};
-      const bor = fc.idle ? fc.idle.boil_off_percent_per_day : null;
-      const hold = fc.hold || {};
       const lf = (fc.refills || [])[0];
       const lastFill = lf
-        ? `<p class="an-sub" style="margin-top:8px">Lần nạp gần nhất: ${esc(fmtWhen(lf.at))}
-             · +${esc(fmtM3(lf.amount_l))} m³ (${esc(fmtM3(lf.before_l))} → ${esc(fmtM3(lf.after_l))} m³)</p>`
+        ? `<p class="an-sub" style="margin-top:8px">Lần nạp gần nhất lúc ${esc(fmtWhen(lf.at))}: thêm `
+          + `${esc(fmtM3(lf.amount_l))} m³, từ ${esc(fmtM3(lf.before_l))} lên ${esc(fmtM3(lf.after_l))} m³.</p>`
         : "";
 
       const anoms = (a.anomalies || []).slice(-5).reverse().map(x => `
         <div class="an-anom-row">
           <time>${esc(fmtWhen(x.at))}</time>
-          <span><b>${esc(x.kind)}</b> — ${esc(x.note)}</span>
+          <span><b>${esc(x.kind)}:</b> ${esc(x.note)}</span>
         </div>`).join("");
 
       // 0 mẫu trong cửa sổ: nói THẲNG vì sao rỗng và nói luôn cách xem được. Một thẻ
-      // toàn dấu "--" đọc lên như tính năng chưa làm xong — người dùng đã kết luận
-      // đúng như vậy, và đó là lỗi của cách trình bày chứ không phải của họ.
+      // toàn dấu "--" đọc lên như tính năng chưa làm xong.
       const tk = tanks.find(x => x.psn === a.psn);
       const ageD = tk && tk.last_seen_at
         ? Math.floor((Date.now() - new Date(tk.last_seen_at).getTime()) / 86400000) : null;
       const emptyWhy = (q.samples === 0)
         ? `<p class="an-empty">Không có lần đo nào trong ${Math.round(a.window_days)} ngày.${
-            ageD != null ? ` Lần đo cuối cách đây <b>${ageD} ngày</b>${
-              ageD > a.window_days ? ` — chọn cửa sổ rộng hơn để xem lịch sử.` : "."}` : ""
+            ageD != null ? ` Lần đo cuối cách đây <b>${ageD} ngày</b>.${
+              ageD > a.window_days ? ` Chọn cửa sổ rộng hơn để xem lịch sử.` : ""}` : ""
           }</p>`
         : "";
 
@@ -4276,50 +4297,12 @@
         <p class="an-verdict ${v.cls}" data-verdict="${v.cls}"><b>${esc(v.title)}</b> ${esc(v.text)}</p>
         ${lastFill}
         <details class="an-more">
-          <summary>Chi tiết kỹ thuật</summary>
+          <summary>Lịch sử lần đo và cơ sở đánh giá</summary>
         <div class="an-tags">
           <span class="an-tag ${RISK_CLS[h.risk] || ""}">Rủi ro thiết bị: ${esc(h.risk || "--")}</span>
           <span class="an-tag ${GRADE_CLS[q.grade] || ""}">Chất lượng dữ liệu: ${esc(q.grade || "--")}</span>
         </div>
         ${emptyWhy}
-        <div class="an-grid">
-          ${anTile("Thiết bị còn hoạt động được", esc(headline),
-                   h.likely_cause ? esc(h.likely_cause) : "Chưa đoán được thời điểm",
-                   dead ? "crit" : "")}
-          ${anTile("Số lần đo nhận được", esc(pct(q.coverage)),
-                   q.expected_samples
-                     ? `${q.samples ?? "--"} / ${q.expected_samples} lần đo`
-                     : `${q.samples ?? 0} lần đo · chưa đủ để tính số kỳ vọng`)}
-          ${anTile("Pin", b.current_v == null ? "--" : esc(fmtN(b.current_v, 2)) + "<small>V</small>",
-                   b.current_v == null
-                     ? "Không có số đo pin"
-                     : b.volts_per_day == null
-                       ? "Chưa đo được xu hướng"
-                       : `${fmtN(b.volts_per_day * 1000, 1)} mV/ngày · tin cậy ${esc(b.confidence)}`)}
-          ${anTile("Sóng", s.current_percent == null ? "--" : esc(fmtN(s.current_percent, 0)) + "<small>%</small>",
-                   s.current_percent == null
-                     ? "Không có số đo sóng"
-                     : s.below_floor_ratio
-                       ? `${pct(s.below_floor_ratio)} mẫu dưới sàn ${esc(s.floor_percent)}%`
-                       : "Trên sàn")}
-          ${anTile("Tỉ lệ lần đo về đủ", esc(pct(h.delivery_ratio)),
-                   "Trong khoảng thiết bị còn báo")}
-          ${anTile("Lần đo bất thường", String((a.anomalies || []).length),
-                   (a.regime_changes || []).length
-                     ? `${a.regime_changes.length} lần đổi chế độ tiêu thụ`
-                     : "Không đổi chế độ tiêu thụ")}
-          ${anTile("Mức tiêu thụ/ngày",
-                   esc(fmtM3(cons.daily_use_l)) + "<small>m³</small>",
-                   cons.confidence ? esc(CONF_VI[cons.confidence] || "--") : "Chưa có dự báo")}
-          ${anTile("Hao hụt do bay hơi",
-                   bor == null ? "--" : esc(fmtN(bor, 3)) + "<small>%/ngày</small>",
-                   fc.idle ? esc(METHOD_VI[fc.idle.method] || "--") : "Chưa có dự báo")}
-          ${anTile("Còn giữ được áp", esc(fmtDays(hold.days)),
-                   hold.days == null
-                     ? "Chưa đo được tốc độ tăng áp"
-                     : `Tới van an toàn ${esc(fmtN(hold.relief_mpa, 2))} MPa`,
-                   hold.days != null && hold.days <= 5 ? "crit" : "")}
-        </div>
         ${covBlock(a)}
         ${why || anoms
           ? `<details class="an-why"><summary>Cơ sở đánh giá${
@@ -4330,6 +4313,64 @@
           : ""}
         </details>
       </div>`;
+    }
+
+    // Số liệu kỹ thuật của MỌI bồn trong một bảng. Mỗi ô có title nói con số tính
+    // thế nào (dòng phụ của các ô thẻ trước đây).
+    function anTable(rows) {
+      const pct = (x) => x == null ? "--" : `${Math.round(x * 100)}%`;
+      const td = (v, title, cls) =>
+        `<td class="num${cls ? " " + cls : ""}"${title ? ` title="${esc(title)}"` : ""}>${v}</td>`;
+      const body = rows.map(a => {
+        const h = a.health || {}, q = a.quality || {}, b = h.battery || {}, sg = h.signal || {};
+        const fc = fcOf(a.psn) || {};
+        const cons = fc.consumption || {}, hold = fc.hold || {};
+        const bor = fc.idle ? fc.idle.boil_off_percent_per_day : null;
+        // Không bao giờ hiện "0 ngày" như một dự báo: 0 nghĩa là đã xảy ra rồi.
+        const dead = h.days_to_failure === 0;
+        const life = dead ? "Đã ngừng báo" : h.days_to_failure != null ? fmtDays(h.days_to_failure) : "--";
+        const regimes = (a.regime_changes || []).length;
+        return `<tr><th scope="row">${esc(a.name || a.psn)}</th>
+          ${td(esc(fmtM3(cons.daily_use_l)), cons.confidence ? CONF_VI[cons.confidence] || "" : "Chưa có dự báo")}
+          ${td(bor == null ? "--" : esc(fmtN(bor, 3)), fc.idle ? METHOD_VI[fc.idle.method] || "" : "Chưa có dự báo")}
+          ${td(esc(fmtDays(hold.days)),
+               hold.days == null ? "Chưa đo được tốc độ tăng áp" : `Tới van an toàn ${fmtN(hold.relief_mpa, 2)} MPa`,
+               hold.days != null && hold.days <= 5 ? "crit" : "")}
+          ${td(b.current_v == null ? "--" : esc(fmtN(b.current_v, 2)),
+               b.current_v == null ? "Không có số đo pin"
+                 : b.volts_per_day == null ? "Chưa đo được xu hướng"
+                 : `${fmtN(b.volts_per_day * 1000, 1)} mV/ngày, độ tin cậy ${b.confidence}`)}
+          ${td(sg.current_percent == null ? "--" : esc(fmtN(sg.current_percent, 0)),
+               sg.current_percent == null ? "Không có số đo sóng"
+                 : sg.below_floor_ratio ? `${pct(sg.below_floor_ratio)} lần đo dưới sàn ${sg.floor_percent}%` : "Trên sàn")}
+          ${td(esc(pct(q.coverage)),
+               q.expected_samples ? `${q.samples ?? "--"} trên ${q.expected_samples} lần đo kỳ vọng`
+                                  : `${q.samples ?? 0} lần đo, chưa đủ để tính số kỳ vọng`)}
+          ${td(esc(pct(h.delivery_ratio)), "Trong khoảng thiết bị còn báo")}
+          ${td(String((a.anomalies || []).length),
+               regimes ? `${regimes} lần đổi chế độ tiêu thụ` : "Không đổi chế độ tiêu thụ")}
+          ${td(esc(life), h.likely_cause || "Chưa đoán được thời điểm", dead ? "crit" : "")}
+        </tr>`;
+      }).join("");
+      return `<section class="an-card an-table" aria-labelledby="an-t-h">
+        <h2 id="an-t-h">Số liệu kỹ thuật các bồn</h2>
+        <p class="hint">Mỗi bồn một hàng. Rê chuột lên một ô để xem con số được tính thế nào.</p>
+        <div class="mini-wrap"><table class="mini an-mini">
+          <thead><tr>
+            <th scope="col">Bồn</th>
+            <th scope="col" class="r">Tiêu thụ mỗi ngày (m³)</th>
+            <th scope="col" class="r">Hao hụt do bay hơi (%/ngày)</th>
+            <th scope="col" class="r">Còn giữ được áp</th>
+            <th scope="col" class="r">Pin (V)</th>
+            <th scope="col" class="r">Sóng (%)</th>
+            <th scope="col" class="r">Số lần đo nhận được</th>
+            <th scope="col" class="r">Tỉ lệ lần đo về đủ</th>
+            <th scope="col" class="r">Lần đo bất thường</th>
+            <th scope="col" class="r">Thiết bị còn hoạt động</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table></div>
+      </section>`;
     }
 
     // Mot Chart cho moi the. Giu tham chieu de destroy truoc khi ve lai: doi cua
@@ -4345,7 +4386,7 @@
         cad ? `nguồn phát mỗi ${cad < 1 ? cad : Math.round(cad)} phút` : null,
         expect ? `kỳ vọng ${expect.toLocaleString("vi-VN")} lần/ngày` : null,
         `${n}/${Math.round(a.window_days)} ngày có dữ liệu`,
-      ].filter(Boolean).join(" · ");
+      ].filter(Boolean).join(", ");
       return `<div class="an-chart">
         <div class="an-chart-head">
           <h4>Lần đo nhận được mỗi ngày</h4>
@@ -4422,7 +4463,7 @@
                     const v = ctx.parsed.y;
                     if (!v) return "Không có lần đo nào";
                     return `${v.toLocaleString("vi-VN")} lần đo`
-                      + (k ? ` · ${k} bất thường` : "");
+                      + (k ? `, ${k} bất thường` : "");
                   },
                 },
               },
@@ -4455,7 +4496,7 @@
           box.innerHTML = `<p class="hint">Chưa có bồn nào trong hệ thống.</p>`;
           return;
         }
-        box.innerHTML = rows.map(anCard).join("");
+        box.innerHTML = rows.map(anCard).join("") + anTable(rows);
         // Ve SAU khi innerHTML da xong: canvas phai ton tai trong DOM va co
         // kich thuoc, khong thi Chart.js dung 0x0 roi khong tu sua lai.
         anDrawCharts(rows);
@@ -4463,8 +4504,8 @@
         if (meta) {
           const bad = rows.filter(r => r.health.risk === "cao").length;
           meta.textContent = bad
-            ? `${bad}/${rows.length} bồn cần xử lý thiết bị`
-            : `${rows.length} bồn · không bồn nào ở mức rủi ro cao`;
+            ? `${bad} trên ${rows.length} bồn cần xử lý thiết bị.`
+            : `${rows.length} bồn, không bồn nào ở mức rủi ro cao.`;
         }
       } catch (e) {
         if (e.name === "AuthError") return;
@@ -4578,7 +4619,7 @@
         const q = new URLSearchParams({ horizon_days: String(horizon) });
         if (Number.isFinite(typed) && typed > 0) q.set("truck_capacity_l", String(typed * 1000));
         const p = await api(`/api/delivery-plan?${q}`);
-        truckEl.placeholder = `${fmtM3(p.truck_capacity_l)} · theo Cài đặt`;
+        truckEl.placeholder = `${fmtM3(p.truck_capacity_l)} (theo Cài đặt)`;
         if (!p.trips || !p.trips.length) {
           box.innerHTML = `<p class="hint">Không có bồn nào cần nạp trong ${horizon} ngày tới.</p>`;
           return;
@@ -4586,20 +4627,20 @@
         box.innerHTML = p.trips.map(t => `
           <div class="trip">
             <div class="thead">
-              <span>Chuyến ${t.seq} · ${t.stops.length} điểm giao</span>
+              <span>Chuyến ${t.seq}: ${t.stops.length} điểm giao</span>
               <span><b>${esc(fmtM3(t.total_l))}</b> / ${esc(fmtM3(t.truck_capacity_l))} m³</span>
             </div>
             ${t.stops.map(s => `
               <div class="stop ${esc(s.urgency)}">
                 <!-- days_to_reserve = 0 nghĩa là ĐÃ dưới mức dự trữ. In "còn 0.0 giờ
                      tới mức dự trữ" là vừa vô nghĩa vừa làm nhẹ mức khẩn. -->
-                <span>${esc(s.name || s.psn)} · ${s.days_to_reserve != null && s.days_to_reserve <= 0
+                <span>${esc(s.name || s.psn)}: ${s.days_to_reserve != null && s.days_to_reserve <= 0
                   ? "đã dưới mức dự trữ"
                   : "còn " + esc(fmtDays(s.days_to_reserve)) + " tới mức dự trữ"}</span>
                 <span class="q">${esc(fmtM3(s.order_l))} m³${s.parts > 1 ? ` <small>(phần ${s.part}/${s.parts})</small>` : ""}</span>
               </div>`).join("")}
           </div>`).join("")
-          + `<p class="hint" style="margin-top:8px">Tổng ${esc(fmtM3(p.total_l))} m³ · ${p.trips.length} chuyến · ${p.stops} điểm giao.</p>`;
+          + `<p class="hint" style="margin-top:8px">Tổng ${esc(fmtM3(p.total_l))} m³ trong ${p.trips.length} chuyến, ${p.stops} điểm giao.</p>`;
       } catch (e) {
         if (e.name === "AuthError") return;
         box.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
@@ -4777,8 +4818,8 @@
 
         const meta = document.getElementById("set-meta");
         meta.textContent = d.updated_at
-          ? `Cập nhật lần cuối ${fmtWhen(d.updated_at)}${d.updated_by ? " · " + d.updated_by : ""}`
-          : "Thay đổi có hiệu lực ngay cho toàn hệ thống";
+          ? `Sửa lần cuối lúc ${fmtWhen(d.updated_at)}${d.updated_by ? ", bởi " + d.updated_by : ""}.`
+          : "";
 
         // Tự suy nhà cung cấp từ host đã lưu để hiển thị đúng giao diện Bước 1.
         const hostEl = document.getElementById("s-host");
@@ -5076,7 +5117,7 @@
         const cls = crit.has(t.psn) ? "crit" : (t.status === "offline" ? "off" : "");
         const pct = pctOf(t);
         const name = t.name || t.psn;
-        const lbl = pct === null ? name : `${name} · ${fmtPct(pct)}%`;
+        const lbl = pct === null ? name : `${name} (${fmtPct(pct)}%)`;
 
         // Nhãn mặc định bên phải ghim. Trên màn hẹp, một tên bồn dài không vừa BÊN
         // NÀO: đo được nhãn 178px trên khung 347px, lật sang trái thì cắt mất đầu
