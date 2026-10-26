@@ -182,12 +182,34 @@ def _watch_errors(page: Page) -> list[str]:
     return errors
 
 
+# Ảnh PNG 1×1 trả thay cho tile OpenStreetMap: bộ test không gọi máy chủ tile của
+# cộng đồng (chính sách dùng tile của OSM) và không phụ thuộc mạng ngoài.
+_BLANK_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+)
+
+
 @pytest.fixture
-def app_page(page: Page, server: str) -> Iterator[Page]:
+def tile_requests() -> list[str]:
+    """URL mọi tile bản đồ đường phố mà trang đã xin trong test này."""
+    return []
+
+
+@pytest.fixture
+def app_page(page: Page, server: str, tile_requests: list[str]) -> Iterator[Page]:
     """Trang đã đăng nhập, đứng ở Bảng điều khiển. Hỏng nếu có lỗi JS nào."""
     page.context.add_cookies([{
         "name": "nlx_session", "value": session_cookie(), "url": server,
     }])
+
+    def _tile(route: Any) -> None:
+        tile_requests.append(route.request.url)
+        if os.getenv("E2E_REAL_TILES") == "1":   # chỉ để chụp ảnh màn hình
+            route.continue_()
+        else:
+            route.fulfill(status=200, content_type="image/png", body=_BLANK_PNG)
+
+    page.route("https://tile.openstreetmap.org/**", _tile)
     errors = _watch_errors(page)
     page.set_default_timeout(15_000)
     page.goto(f"{server}/ui/")

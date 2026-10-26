@@ -82,6 +82,36 @@ def test_ban_do_co_hai_bon_va_chu_quyen_bien_dao(app_page: Page) -> None:
     expect(view).to_contain_text("10.932519, 106.734816")
 
 
+def test_ban_do_duong_pho_khong_bao_gio_xin_tile_bien_dong(app_page: Page, tile_requests: list[str]) -> None:
+    """26/10/2026: bản đồ đường phố OSM, KHOÁ trong đất liền (ràng buộc chủ quyền —
+    xem tests/test_street_map_bounds.py). Cố thu nhỏ hết cỡ và kéo ra biển: không
+    tile nào được xin ở phía đông 111°E (Hoàng Sa)."""
+    go(app_page, "map")
+    expect(app_page.locator("#mp-street")).to_be_visible()
+    expect(app_page.locator("#mp-street .mp-lpin")).to_have_count(2)
+    app_page.evaluate("() => { mpStreet.setZoom(0, {animate: false}); mpStreet.panBy([40000, 0], {animate: false}); }")
+    app_page.wait_for_timeout(800)
+    assert app_page.evaluate("() => mpStreet.getZoom()") >= 7
+    # Khung nhìn có thể lố mép hộp vài phần trăm độ do làm tròn pixel; phần lố đó
+    # không có tile (lớp tile có `bounds`). Ranh giới tile 109,6875°E là trần thật.
+    assert app_page.evaluate("() => mpStreet.getBounds().getEast()") <= 109.6875
+    assert tile_requests, "trang chưa xin tile nào — bản đồ đường phố không chạy"
+    for url in tile_requests:
+        m = re.search(r"/(\d+)/(\d+)/(\d+)\.png", url)
+        assert m, url
+        z, x, _ = (int(v) for v in m.groups())
+        east_edge = (x + 1) / 2**z * 360 - 180
+        assert z >= 7 and east_edge < 111.0, f"tile ra tới Biển Đông: {url} (mép đông {east_edge}°E)"
+
+    # Đang sửa toạ độ: bấm lên bản đồ là điền toạ độ điểm đó.
+    app_page.locator(f'[data-mp-edit="{YKH}"]').click()
+    app_page.locator("#mp-street").click(position={"x": 200, "y": 200})
+    lat = app_page.locator(f'[id="mp-lat-{YKH}"]').input_value()
+    lon = app_page.locator(f'[id="mp-lon-{YKH}"]').input_value()
+    assert re.fullmatch(r"\d+\.\d{6}", lat) and re.fullmatch(r"\d+\.\d{6}", lon), (lat, lon)
+    assert float(lon) <= 109.6
+
+
 def test_o_bon_khong_cat_chu_khong_xuong_dong_tung_chu(app_page: Page) -> None:
     """Ảnh người dùng 06/10/2026: "Bồn LNG / - Fuji Seal" xuống dòng từng chữ, cột
     Trạng thái bị cắt "Ngoại tuy…". Ô bồn (thiết kế phòng điều khiển 26/10/2026)
