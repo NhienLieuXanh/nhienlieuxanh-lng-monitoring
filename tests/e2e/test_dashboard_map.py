@@ -152,7 +152,8 @@ def test_mau_chi_xuat_hien_khi_bat_thuong(app_page: Page) -> None:
         [YKH, FUJI],
     )
     r, g, b = _rgb(liq[0])
-    assert max(r, g, b) - min(r, g, b) <= 24, f"bồn bình thường không được tô màu: {liq[0]}"
+    # Xám ngả xanh thép (#6F7F8D, chênh 30) vẫn là xám; vàng/đỏ/xanh lá chênh > 100.
+    assert max(r, g, b) - min(r, g, b) <= 34, f"bồn bình thường không được tô màu: {liq[0]}"
     r, g, b = _rgb(liq[1])
     assert r > g + 80 and r > b + 80, f"bồn mất liên lạc phải đỏ: {liq[1]}"
     expect(app_page.locator(f'#tank-list [data-psn="{FUJI}"]')).to_contain_text("Ngoại tuyến")
