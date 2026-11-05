@@ -152,8 +152,9 @@ def test_mau_chi_xuat_hien_khi_bat_thuong(app_page: Page) -> None:
         [YKH, FUJI],
     )
     r, g, b = _rgb(liq[0])
-    # Xám ngả xanh thép (#6F7F8D, chênh 30) vẫn là xám; vàng/đỏ/xanh lá chênh > 100.
-    assert max(r, g, b) - min(r, g, b) <= 34, f"bồn bình thường không được tô màu: {liq[0]}"
+    # 05/11/2026: chủ dự án muốn bồn bình thường cũng có màu — xanh lá, cùng thang
+    # xanh / hổ phách / đỏ với phần còn lại (trước đó là xám).
+    assert g > r + 60 and g > b + 30, f"bồn bình thường phải xanh lá: {liq[0]}"
     r, g, b = _rgb(liq[1])
     assert r > g + 80 and r > b + 80, f"bồn mất liên lạc phải đỏ: {liq[1]}"
     expect(app_page.locator(f'#tank-list [data-psn="{FUJI}"]')).to_contain_text("Ngoại tuyến")
@@ -182,7 +183,8 @@ def test_thanh_tren_khong_lap_va_khong_con_chu_giam_sat(app_page: Page) -> None:
     assert "Giám sát" not in top, top
     assert "ngoại tuyến" not in top, top
     expect(app_page.locator(".page-title")).to_have_text("Bảng điều khiển")
-    expect(app_page.locator("#alert-badge")).to_have_text("2")
+    # Dữ liệu mẫu: chỉ bồn Fuji (mất liên lạc) có cảnh báo; bồn YKH bình thường.
+    expect(app_page.locator("#alert-badge")).to_have_text("1")
 
 
 def test_o_bon_cao_bang_nhau_khi_ten_dai(app_page: Page) -> None:
@@ -247,6 +249,33 @@ def test_cot_muc_bon_dung_voi_phan_tram(app_page: Page) -> None:
     app_page.evaluate(f"shownFill['{YKH}'] = 0; shownFill['{FUJI}'] = 100; renderTankList();")
     app_page.wait_for_timeout(1500)
     check()
+
+
+def test_khung_chi_tiet_bon_binh_thuong_co_mau_nhu_bon_loi(app_page: Page) -> None:
+    """Chủ dự án góp ý 05/11/2026: khung chi tiết bồn ngoại tuyến nhiều màu, trực quan
+    hơn khung bồn trực tuyến (xám trơn). Bồn bình thường cũng phải có màu xanh lá ở
+    dải tiêu đề, con số chính, thanh mức và dải trạng thái."""
+    app_page.locator(f'#tank-list [data-psn="{YKH}"]').click()
+    detail = app_page.locator("#tank-detail")
+    expect(detail.locator('.hero-top[data-st="on"]')).to_be_visible()
+    expect(detail.locator('.td-lead[data-sev="ok"]')).to_be_visible()
+    expect(detail.locator(".local-alerts .ok")).to_contain_text("bình thường")
+
+    def green(js: str, margin: int = 20) -> bool:
+        r, g, b = _rgb(detail.evaluate(js))
+        return g > r + margin and g > b + margin // 2
+
+    # Nền nhạt (#E1F3E8) nên biên độ xanh nhỏ hơn chữ và thanh.
+    assert green("d => getComputedStyle(d.querySelector('.hero-top')).backgroundColor", 10)
+    assert green("d => getComputedStyle(d.querySelector('.td-lead .big')).color")
+    assert green("d => getComputedStyle(d.querySelector('.lvbar i')).backgroundColor")
+    assert green("d => getComputedStyle(d.querySelector('.readout[data-sev=ok] dd')).color")
+
+    app_page.locator(f'#tank-list [data-psn="{FUJI}"]').click()
+    expect(detail.locator('.hero-top[data-st="off"]')).to_be_visible()
+    # Cùng một mức ưu tiên ở mọi chỗ: bồn mất liên lạc đỏ cả ở dải cảnh báo.
+    expect(detail.locator(".local-alerts .warn")).to_have_count(0)
+    expect(detail.locator(".local-alerts .crit").first).to_be_visible()
 
 
 def test_cau_canh_bao_theo_kieu_viet_nam_va_khong_noi_bang_gach(app_page: Page) -> None:

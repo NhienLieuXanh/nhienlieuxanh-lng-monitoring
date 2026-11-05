@@ -64,28 +64,52 @@ def seed(engine: Engine) -> dict[str, object]:
         # xuống ÂM — lần CI đầu tiên lộ ra (06/10/2026), máy dev không thấy vì chạy
         # đúng lúc test so "rỗng == rỗng".
         last = now - timedelta(minutes=5)
-        at = (now - timedelta(days=30)).replace(minute=0)
-        vol = 40_000.0
-        step = USE_L_PER_DAY / 48
-        rows = []
-        while at <= last:
-            local = at.astimezone(VN)
-            if local.weekday() != 6:                      # Chủ Nhật nhà máy nghỉ
-                vol -= step
-            if vol < REFILL_BELOW_L and local.weekday() != 6 and local.hour == 14 and local.minute == 0:
-                vol = REFILL_TO_L
-                refills.append(at)
-            rows.append(Telemetry(
-                terminal_id=ykh.id, psn=YKH, sampled_at=at,
-                volume_l=Decimal(str(round(vol, 1))),
-                volume_percent=Decimal(str(round(vol / CAPACITY_L * 100, 3))),
+
+        def simulate(vol0: float) -> tuple[list[tuple[datetime, float]], list[datetime]]:
+            at = (now - timedelta(days=30)).replace(minute=0)
+            vol = vol0
+            step = USE_L_PER_DAY / 48
+            points: list[tuple[datetime, float]] = []
+            done: list[datetime] = []
+            while at <= last:
+                local = at.astimezone(VN)
+                if local.weekday() != 6:                      # Chủ Nhật nhà máy nghỉ
+                    vol -= step
+                if vol < REFILL_BELOW_L and local.weekday() != 6 and local.hour == 14 and local.minute == 0:
+                    vol = REFILL_TO_L
+                    done.append(at)
+                points.append((at, vol))
+                at += timedelta(minutes=30)
+            return points, done
+
+        # Thể tích ban đầu được CHỌN để lần đo cuối luôn ở vùng "bình thường" (còn hơn
+        # ~4 ngày tới mức dự trữ), bất kể hôm nay thứ mấy, mấy giờ. Với số cố định
+        # 40.000 L thì pha của răng cưa phụ thuộc ngày chạy test: 05/11/2026 bồn rơi
+        # vào "còn 2,6 ngày" và test "bình thường là xám" đỏ trên CI mà không ai đổi gì.
+        points, refills = [], []
+        for start in range(54_000, 12_000, -500):
+            points, refills = simulate(float(start))
+            if (
+                points[-1][1] >= 38_000
+                and len(refills) >= 3
+                and min(v for _, v in points) > 0
+            ):
+                break
+        rows = [
+            Telemetry(
+                terminal_id=ykh.id, psn=YKH, sampled_at=t,
+                volume_l=Decimal(str(round(v, 1))),
+                volume_percent=Decimal(str(round(v / CAPACITY_L * 100, 3))),
                 pressure_mpa=Decimal("0.42"), temperature_c=Decimal("30"),
                 source="e2e", raw_payload={},
-            ))
-            at += timedelta(minutes=30)
-        # Bộ test dựa vào dữ liệu này: nó PHẢI có xe tới và không bao giờ âm.
+            )
+            for t, v in points
+        ]
+        # Bộ test dựa vào dữ liệu này: nó PHẢI có xe tới, không bao giờ âm, và bồn
+        # đang ở trạng thái bình thường.
         assert len(refills) >= 3, f"dữ liệu mẫu chỉ có {len(refills)} lần nạp"
         assert min(float(r.volume_l) for r in rows) > 0, "dữ liệu mẫu có thể tích âm"
+        assert float(rows[-1].volume_l) >= 38_000, "dữ liệu mẫu: bồn YKH không ở trạng thái bình thường"
         ykh.last_seen_at = rows[-1].sampled_at
         rows.append(Telemetry(
             terminal_id=fuji.id, psn=FUJI, sampled_at=now - timedelta(days=69),

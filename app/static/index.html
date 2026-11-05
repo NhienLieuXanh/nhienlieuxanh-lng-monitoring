@@ -97,6 +97,9 @@
          trạng thái kết nối, không tô cột chất lỏng hay nền ô. */
       --live: #008A42;
       --live-text: #006B35;
+      --live-fill: #00A050;
+      --live-bg: #E1F3E8;
+      --live-line: #86CBA2;
 
       /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
       --ok: #3A424A;      --ok-bg: #F1F4F7;   --ok-line: #B9C1C9;
@@ -201,6 +204,9 @@
          trạng thái kết nối, không tô cột chất lỏng hay nền ô. */
       --live: #008A42;
       --live-text: #006B35;
+      --live-fill: #00A050;
+      --live-bg: #E1F3E8;
+      --live-line: #86CBA2;
 
       /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
       --ok: #3A424A;      --ok-bg: #F1F4F7;   --ok-line: #B9C1C9;
@@ -271,6 +277,9 @@
       --nlx-bg: rgba(62, 207, 133, .12);
       --live: #2FBF71;
       --live-text: #5FD99A;
+      --live-fill: #2FBF71;
+      --live-bg: rgba(47, 191, 113, .14);
+      --live-line: rgba(47, 191, 113, .45);
 
       --ok: #C2C7CC;   --ok-bg: #24282B;                 --ok-line: #363B40;
       --warn: #F0B53C; --warn-bg: rgba(232, 163, 23, .14); --warn-line: rgba(232, 163, 23, .45); --warn-fill: #E8A317;
@@ -571,6 +580,7 @@
        chỉ phải dịch một lớp (không dàn lại trang) và vạch mặt chất lỏng không bị
        méo như khi co chiều cao. Không có JS/GSAP thì style trong dòng vẫn đặt đúng mức. */
     .tk-liq { position: absolute; left: 0; right: 0; top: 0; height: 100%; background: var(--gauge); border-top: 2px solid var(--gauge-edge); will-change: transform; }
+    .tk[data-sev="ok"] .tk-liq { background: var(--live-fill); }
     .tk[data-sev="warn"] .tk-liq { background: var(--warn-fill); }
     .tk[data-sev="crit"] .tk-liq { background: var(--crit-fill); }
     .tk-res { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--chart-res); }
@@ -617,9 +627,14 @@
     .hero h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--fg); }
     .hero .ids { color: var(--faint); font-size: var(--fs-sm); margin-top: 2px; }
     .hero .ids .mono { font-family: var(--mono); color: var(--muted); }
+    /* Dải tiêu đề mang màu trạng thái kết nối: xanh lá nhạt khi trực tuyến, đỏ nhạt
+       khi ngoại tuyến. Bồn bình thường trước đây là khung xám trơn cạnh một khung đỏ
+       nhiều màu, nhìn như "chưa có gì" (chủ dự án góp ý 05/11/2026). */
+    .hero-top[data-st="on"] { background: var(--live-bg); border-bottom-color: var(--live-line); }
+    .hero-top[data-st="off"] { background: var(--crit-bg); border-bottom-color: var(--crit-line); }
     /* Câu kết luận đầu khung: một con số to (28px — con số DUY NHẤT ở cỡ này trên
-       trang) và câu nói phải làm gì. Nền chỉ tô màu khi có việc phải làm; ổn thì
-       để trung tính, không nhuộm xanh cả khối cho một tin "không có gì". */
+       trang) và câu nói phải làm gì. Xanh lá khi ổn, hổ phách khi sắp tới ngưỡng,
+       đỏ khi phải làm ngay: cùng thang màu với cột chất lỏng ở danh sách. */
     .td-lead {
       margin-top: 16px; padding: 4px 0 4px 16px; border-left: 4px solid var(--line-strong);
       display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: center;
@@ -629,6 +644,8 @@
     .td-lead p { margin: 0; }
     .td-lead .l1 { font-size: var(--fs-body); font-weight: 600; color: var(--fg); }
     .td-lead .l2 { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
+    .td-lead[data-sev="ok"] { border-left-color: var(--live-fill); }
+    .td-lead[data-sev="ok"] .big, .td-lead[data-sev="ok"] .l1 { color: var(--live-text); }
     .td-lead[data-sev="crit"] { border-left-color: var(--crit-fill); }
     .td-lead[data-sev="crit"] .big, .td-lead[data-sev="crit"] .l1 { color: var(--crit); }
     .td-lead[data-sev="warn"] { border-left-color: var(--warn-fill); }
@@ -655,6 +672,14 @@
     .readout dd small { font-size: var(--fs-sm); color: var(--muted); font-weight: 500; margin-left: 2px; }
     .readout .sub { font-size: var(--fs-micro); color: var(--muted); margin-top: 2px; }
     .readout.bad dd, .readout.bad .sub { color: var(--crit); }
+    .readout[data-sev="ok"] dd { color: var(--live-text); }
+    .readout[data-sev="warn"] dd { color: var(--warn); }
+    /* Thanh mức dưới số "Mức chứa": cùng thang xanh / hổ phách / đỏ với cột bồn. */
+    .lvbar { height: 6px; margin-top: 6px; background: var(--surface-3); }
+    .lvbar i { display: block; height: 100%; background: var(--gauge); }
+    .lvbar[data-sev="ok"] i { background: var(--live-fill); }
+    .lvbar[data-sev="warn"] i { background: var(--warn-fill); }
+    .lvbar[data-sev="crit"] i { background: var(--crit-fill); }
     .td-when { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
     .local-alerts { display: grid; gap: 8px; margin-top: 16px; }
     .local-alerts p {
@@ -666,6 +691,8 @@
     .local-alerts .crit { color: var(--crit); background: var(--crit-bg); border-left-color: var(--crit-fill); }
     .local-alerts .crit::before { width: 11px; height: 10px; background: var(--crit-fill); transform: none; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
     .local-alerts .warn { color: var(--warn); background: var(--warn-bg); border-left-color: var(--warn-fill); }
+    .local-alerts .ok { color: var(--live-text); background: var(--live-bg); border-left-color: var(--live-fill); }
+    .local-alerts .ok::before { width: 9px; height: 9px; background: var(--live); transform: none; border-radius: 50%; }
 
     /* Chart Panel */
     .chart-panel { padding: 0 16px 16px; min-width: 0; }
@@ -2740,12 +2767,17 @@
     function renderTankDetail(detail) {
       const p = pctOf(detail);
       const mine = alertsFor(detail.psn);
+      const on = detail.status === "online";
+      const low = p !== null && p < 15;
+      // Cùng thang với cột bồn ở danh sách (tankSev): ▲ đỏ / ◆ hổ phách / ● xanh lá.
+      // Bồn ngoại tuyến luôn đỏ — trước đây dải cảnh báo của nó vàng trong khi ô bồn,
+      // tiêu đề và danh sách bên trái đều đỏ.
+      const sev = low ? "crit" : tankSev(detail);
       const alertBlock = mine.length
         ? `<div class="local-alerts">${mine.map(a =>
-            `<p class="${a.severity === "critical" ? "crit" : "warn"}">${esc(a.message)}</p>`
+            `<p class="${a.severity === "critical" || !on ? "crit" : "warn"}">${esc(a.message)}</p>`
           ).join("")}</div>`
-        : "";
-      const low = p !== null && p < 15;
+        : (on ? `<div class="local-alerts"><p class="ok">Đang hoạt động bình thường, không có cảnh báo.</p></div>` : "");
       const vol = fmtM3(detail.volume_l);
       const pres = fmtN(detail.pressure_mpa, 3, 0);
       const temp = fmtN(detail.temperature_c, 1, 0);
@@ -2757,18 +2789,19 @@
         : "Chưa có lần đo nào.";
 
       document.getElementById("tank-detail").innerHTML = `
-        <div class="hero-top">
+        <div class="hero-top" data-st="${on ? "on" : "off"}">
           <div>
             <h2>${esc(tankName(detail))}</h2>
             <div class="ids">Mã <span class="mono">${esc(detail.psn)}</span>${detail.medium_name ? `, môi chất ${esc(detail.medium_name)}` : ""}</div>
           </div>
-          <span class="st ${detail.status === "online" ? "on" : "off"}">${detail.status === "online" ? "Trực tuyến" : "Ngoại tuyến"}</span>
+          <span class="st ${on ? "on" : "off"}">${on ? "Trực tuyến" : "Ngoại tuyến"}</span>
         </div>
         ${detailLeadHtml(detail.psn)}
         <dl class="readouts">
-          <div class="readout${low ? " bad" : ""}">
+          <div class="readout${low ? " bad" : ""}" data-sev="${sev}">
             <dt>Mức chứa</dt>
             <dd class="num">${esc(fmtPct(p))}<small>%</small></dd>
+            ${p === null ? "" : `<div class="lvbar" data-sev="${sev}" aria-hidden="true"><i style="width:${Math.min(100, Math.max(0, p))}%"></i></div>`}
             ${low ? `<div class="sub">dưới 15%</div>` : ""}
           </div>
           <div class="readout">
@@ -2953,17 +2986,20 @@
       const ctx = document.getElementById("historyChart").getContext("2d");
       if (chartInstance) chartInstance.destroy();
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // Một hai điểm đo thì đường nối không có gì để vẽ và khung biểu đồ trông trống
+      // trơn (bồn ngoại tuyến lâu chỉ còn đúng một lần đo): vẽ chính điểm đo.
+      const pr = items.length <= 2 ? 4 : 0;
       chartInstance = new Chart(ctx, {
         type: "line",
         data: {
           labels,
           datasets: [
-            { label: "Thể tích (m³)", data: volume, borderColor: cVol,
-              backgroundColor: "transparent", tension: 0.15, yAxisID: "y",
-              spanGaps: true, borderWidth: 1.8, pointRadius: 0 },
-            { label: "Áp suất (MPa)", data: pressure, borderColor: cPres,
-              backgroundColor: "transparent", tension: 0.15, yAxisID: "y1",
-              spanGaps: true, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0 },
+            { label: "Thể tích (m³)", data: volume, borderColor: cVol, backgroundColor: cVol,
+              tension: 0.15, yAxisID: "y",
+              spanGaps: true, borderWidth: 1.8, pointRadius: pr },
+            { label: "Áp suất (MPa)", data: pressure, borderColor: cPres, backgroundColor: cPres,
+              tension: 0.15, yAxisID: "y1",
+              spanGaps: true, borderWidth: 1.5, borderDash: [4, 3], pointRadius: pr },
             // Giới hạn báo động vẽ NGAY TRÊN xu hướng (ISA-101): người xem thấy thể
             // tích còn cách mức dự trữ bao xa, không phải nhẩm từ hai con số.
             ...(reserveM3 === null ? [] : [{
