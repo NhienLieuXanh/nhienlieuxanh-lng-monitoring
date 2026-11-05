@@ -32,6 +32,8 @@ from datetime import date, datetime, time, timedelta, tzinfo
 from itertools import pairwise
 from typing import Literal
 
+from app.domain.alerts import vi_decimal
+
 # --------------------------------------------------------------------------- #
 # Hằng số & ngưỡng
 # --------------------------------------------------------------------------- #
@@ -1281,8 +1283,8 @@ def forecast_alerts(
         out.append(
             ForecastAlert(
                 f.psn, "RUNOUT", sev,
-                f"Còn {d:.1f} ngày tới mức dự trữ "
-                f"({f.reserve_l / 1000:.2f} m³) — cần đặt hàng",
+                f"Còn {vi_decimal(d, 1)} ngày tới mức dự trữ "
+                f"({vi_decimal(f.reserve_l / 1000)} m³), cần đặt hàng",
                 d, runout_days,
             )
         )
@@ -1293,8 +1295,8 @@ def forecast_alerts(
         out.append(
             ForecastAlert(
                 f.psn, "HOLD_TIME", sev,
-                f"Thời gian giữ áp còn {h:.1f} ngày — áp suất sẽ chạm van an toàn "
-                f"{f.hold.relief_mpa:g} MPa và bồn phải xả",
+                f"Thời gian giữ áp còn {vi_decimal(h, 1)} ngày, áp suất sẽ chạm van an toàn "
+                f"{vi_decimal(f.hold.relief_mpa, None)} MPa và bồn phải xả",
                 h, hold_days,
             )
         )
@@ -1308,8 +1310,9 @@ def forecast_alerts(
             out.append(
                 ForecastAlert(
                     f.psn, "BOIL_OFF_HIGH", "warning",
-                    f"Bay hơi tự nhiên {bor:.3f}%/ngày vượt ngưỡng {bor_percent_max:g}% "
-                    "— nghi chân không lớp cách nhiệt suy giảm, cần kiểm tra bồn",
+                    f"Bay hơi tự nhiên {vi_decimal(bor, 3)}%/ngày vượt ngưỡng "
+                    f"{vi_decimal(bor_percent_max, None)}%, nghi chân không lớp cách nhiệt "
+                    "suy giảm, cần kiểm tra bồn",
                     bor, bor_percent_max,
                 )
             )

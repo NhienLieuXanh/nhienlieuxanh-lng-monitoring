@@ -75,6 +75,23 @@ class TerminalSnapshot:
     signal_percent: Decimal | None = None
 
 
+def vi_decimal(x: Decimal | float, places: int | None = 2) -> str:
+    """Số theo kiểu Việt Nam: dấu phẩy thập phân ("0,59"), cùng quy ước với
+    ``fmtN`` ở dashboard. Câu cảnh báo do server viết nên phải tự đổi dấu: chuỗi
+    "0.59%" cạnh "69,1%" trên cùng một màn hình đọc như hai quy ước khác nhau.
+
+    ``places=None`` giữ nguyên số chữ số của giá trị (Decimal "3,39" ra "3,39";
+    float 0.5 ra "0,5").
+    """
+    if places is not None:
+        s = f"{x:.{places}f}"
+    elif isinstance(x, Decimal):
+        s = format(x, "f")
+    else:
+        s = f"{x:g}"
+    return s.replace(".", ",")
+
+
 def elapsed_vi(delta: timedelta) -> str:
     """Khoảng thời gian đã trôi, CÙNG thang với ``fmtAgo()`` của dashboard.
 
@@ -109,7 +126,7 @@ def evaluate(
     sát được trên production: bồn 2605090007 im 85 ngày, và API phát ra hai dòng
     cạnh nhau —
 
-        LOW_VOLUME  critical  "Mức chứa thấp: 0.29%"
+        LOW_VOLUME  critical  "Mức chứa thấp: 0,29%"
         OFFLINE     warning   "không có dữ liệu trong 85 ngày"
 
     Hệ thống vừa nói không biết gì về bồn suốt 85 ngày, vừa phát cảnh báo NGHIÊM
@@ -126,19 +143,15 @@ def evaluate(
       thiết bị"); thêm ba dòng nữa chỉ là nhiễu. -> bỏ.
     * ``LOW_VOLUME`` nói về BỒN, và "lần cuối nhìn thấy thì đã cạn" vẫn là thông tin
       thật, có thể còn đúng hơn theo thời gian. -> giữ, nhưng hạ xuống WARNING và
-      ghi rõ tuổi của số đo. Không cắt (mất tín hiệu thật), không để CRITICAL (đòi
-      hành động dựa trên thông tin không ai có).
+      nói đó là "lần đo cuối" chứ không phải mức hiện tại. Tuổi của số đo nằm ở dòng
+      ``OFFLINE`` đi kèm, nên không lặp lại ở đây (dashboard gộp hai dòng của một bồn
+      thành một đoạn; lặp "104 ngày" hai lần trong đó đọc như lỗi). Không cắt (mất
+      tín hiệu thật), không để CRITICAL (đòi hành động dựa trên thông tin không ai
+      có).
     """
     out: list[Alert] = []
     age = None if snap.last_seen_at is None else now - snap.last_seen_at
     stale_reading = age is None or age > th.max_reading_age
-    #: Chuỗi gắn vào message để không ai đọc số cũ như số hiện tại.
-    aged = (
-        " (chưa từng có số đo)"
-        if age is None
-        else f" — số đo {elapsed_vi(age)} trước, thiết bị đã ngoại tuyến"
-    )
-
     st = derive_status(
         snap.last_seen_at, now, th.stale_after, observed_at=th.observed_at
     )
@@ -148,18 +161,24 @@ def evaluate(
         else:
             detail = f"không có dữ liệu trong {elapsed_vi(now - snap.last_seen_at)}"
         out.append(Alert(snap.psn, AlertCode.OFFLINE, Severity.WARNING,
-                         f"Thiết bị ngoại tuyến — {detail}"))
+                         f"Thiết bị ngoại tuyến, {detail}"))
 
     # Ưu tiên fill_percent (server tự tính từ volume_l/capacity_l) hơn số vendor
     # gửi: nó là con số ta kiểm chứng được, và chính nó phát hiện lỗi thang 0-1
     # vs 0-100 mà không constraint nào bắt được.
     pct = snap.fill_percent if snap.fill_percent is not None else snap.volume_percent
     if pct is not None and pct < th.low_volume_percent:
+        if age is None:
+            text = f"Mức chứa thấp: {vi_decimal(pct)}% (chưa từng có số đo)"
+        elif stale_reading:
+            text = f"Mức chứa lần đo cuối chỉ {vi_decimal(pct)}%"
+        else:
+            text = f"Mức chứa thấp: {vi_decimal(pct)}%"
         out.append(Alert(
             snap.psn,
             AlertCode.LOW_VOLUME,
             Severity.WARNING if stale_reading else Severity.CRITICAL,
-            f"Mức chứa thấp: {pct:.2f}%" + (aged if stale_reading else ""),
+            text,
             pct,
             th.low_volume_percent,
         ))
@@ -170,12 +189,12 @@ def evaluate(
 
     if snap.battery_v is not None and snap.battery_v < th.low_battery_v:
         out.append(Alert(snap.psn, AlertCode.LOW_BATTERY, Severity.WARNING,
-                         f"Điện áp pin thấp: {snap.battery_v} V",
+                         f"Điện áp pin thấp: {vi_decimal(snap.battery_v, None)} V",
                          snap.battery_v, th.low_battery_v))
 
     if snap.signal_percent is not None and snap.signal_percent < th.low_signal_percent:
         out.append(Alert(snap.psn, AlertCode.WEAK_SIGNAL, Severity.INFO,
-                         f"Cường độ tín hiệu thấp: {snap.signal_percent}%",
+                         f"Cường độ tín hiệu thấp: {vi_decimal(snap.signal_percent, None)}%",
                          snap.signal_percent, th.low_signal_percent))
 
     # Đối chứng hai nguồn. Không CHECK constraint nào bắt được lỗi thang vì 0.59
@@ -186,9 +205,10 @@ def evaluate(
         if gap > th.percent_mismatch_points:
             out.append(Alert(
                 snap.psn, AlertCode.PERCENT_MISMATCH, Severity.WARNING,
-                f"volume_percent vendor ({snap.volume_percent:.2f}) lệch "
-                f"{gap:.2f} điểm so với tính từ dung tích ({snap.fill_percent:.2f}) "
-                "— nghi vendor đổi thang hoặc capacity_l sai",
+                f"Hai số mức chứa lệch nhau {vi_decimal(gap)} điểm phần trăm: "
+                f"{vi_decimal(snap.volume_percent)}% do thiết bị báo, "
+                f"{vi_decimal(snap.fill_percent)}% tính từ dung tích. "
+                "Nghi thiết bị đổi thang đo hoặc dung tích bồn bị nhập sai",
                 gap, th.percent_mismatch_points,
             ))
 

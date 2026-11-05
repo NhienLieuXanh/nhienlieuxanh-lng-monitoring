@@ -171,3 +171,39 @@ def test_o_so_lieu_chi_tiet_khong_xuong_dong_tung_chu(app_page: Page) -> None:
                  .filter(e => e.getBoundingClientRect().height > 22).map(e => e.textContent.trim())"""
         )
         assert tall == [], f"{width}px: nhãn bị xuống dòng {tall}"
+
+
+def test_thanh_tren_khong_lap_va_khong_con_chu_giam_sat(app_page: Page) -> None:
+    """Soát 05/11/2026: tiêu đề "Giám sát bồn LNG" (đã bị yêu cầu bỏ từ 25/08) quay
+    lại, và chip "N ngoại tuyến" đếm đúng những bồn mà chuông cảnh báo đã đếm."""
+    top = app_page.locator("header.topbar").inner_text()
+    assert "Giám sát" not in top, top
+    assert "ngoại tuyến" not in top, top
+    expect(app_page.locator(".page-title")).to_have_text("Bảng điều khiển")
+    expect(app_page.locator("#alert-badge")).to_have_text("2")
+
+
+def test_o_bon_cao_bang_nhau_khi_ten_dai(app_page: Page) -> None:
+    """Tên bồn dài không được làm ô bồn cao hơn ô bên cạnh (tên một dòng, cắt bằng …),
+    và ô nào cũng xếp trạng thái và "Đo cuối" thành hai dòng như nhau."""
+    app_page.set_viewport_size({"width": 1440, "height": 900})
+    app_page.evaluate(
+        """() => { const n = document.querySelectorAll('#tank-list .tname')[1];
+                   n.textContent = 'Bồn LNG - Microbulk 10m3 FujiSeal tên rất dài rất dài'; }"""
+    )
+    heights = app_page.evaluate(
+        "() => [...document.querySelectorAll('#tank-list .tk')].map(t => Math.round(t.getBoundingClientRect().height))"
+    )
+    assert len(heights) >= 2 and len(set(heights)) == 1, heights
+    name_h = app_page.evaluate(
+        "() => [...document.querySelectorAll('#tank-list .tname')].map(n => Math.round(n.getBoundingClientRect().height))"
+    )
+    assert len(set(name_h)) == 1, f"tên bồn xuống dòng: {name_h}"
+
+
+def test_cau_canh_bao_theo_kieu_viet_nam_va_khong_noi_bang_gach(app_page: Page) -> None:
+    """Câu "Cần xử lý" do server viết; từng lọt "0.59%" cạnh "69,1%" và " — " giữa câu."""
+    text = app_page.locator("#fleet-alarms").inner_text()
+    assert text.strip(), "mục Cần xử lý rỗng"
+    assert "—" not in text, text
+    assert not re.search(r"\d\.\d", text), text

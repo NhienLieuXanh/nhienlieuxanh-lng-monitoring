@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -169,14 +170,42 @@ class TestSoDoQuaCu:
             signal_percent=Decimal("5"),    # dưới ngưỡng -> lẽ ra có WEAK_SIGNAL
         )
 
-    def test_low_volume_ha_xuong_warning_va_ghi_ro_tuoi(self) -> None:
+    def test_low_volume_ha_xuong_warning_va_noi_ro_day_la_lan_do_cuoi(self) -> None:
         alerts = evaluate(self._snap(self.OLD), TH, NOW)
         lv = next(a for a in alerts if a.code is AlertCode.LOW_VOLUME)
         # Hạ cấp, KHÔNG cắt: "lần cuối nhìn thấy thì đã cạn" vẫn là thông tin thật.
         assert lv.severity is Severity.WARNING
-        # Và phải nói ra tuổi của số đo, nếu không người đọc vẫn hiểu là số hiện tại.
-        assert "85 ngày trước" in lv.message
-        assert "ngoại tuyến" in lv.message
+        # Phải nói đây là lần đo cuối, nếu không người đọc hiểu là mức hiện tại.
+        assert lv.message == "Mức chứa lần đo cuối chỉ 0,29%"
+        # Tuổi của số đo nằm ở dòng OFFLINE đi kèm, không lặp lại ở đây.
+        off = next(a for a in alerts if a.code is AlertCode.OFFLINE)
+        assert off.message == "Thiết bị ngoại tuyến, không có dữ liệu trong 85 ngày"
+
+    def test_cau_canh_bao_dung_dau_phay_va_khong_co_gach_noi(self) -> None:
+        """Câu do server viết phải theo quy ước vi-VN như phần còn lại của màn hình,
+        và không dùng " — " để nối hai mệnh đề."""
+        fresh = evaluate(self._snap(NOW), TH, NOW)
+        old = evaluate(self._snap(self.OLD), TH, NOW)
+        for a in fresh + old:
+            assert "—" not in a.message, a.message
+            assert not re.search(r"\d\.\d", a.message), a.message
+        lv = next(a for a in fresh if a.code is AlertCode.LOW_VOLUME)
+        assert lv.message == "Mức chứa thấp: 0,29%"
+        pin = next(a for a in fresh if a.code is AlertCode.LOW_BATTERY)
+        assert pin.message == "Điện áp pin thấp: 3,39 V"
+
+    def test_lech_thang_do_viet_bang_loi_thuong_khong_lo_ten_nha_cung_cap(self) -> None:
+        snap = TerminalSnapshot(
+            psn="X", last_seen_at=NOW,
+            volume_percent=Decimal("0.59"), fill_percent=Decimal("59.00"),
+        )
+        msg = next(
+            a.message for a in evaluate(snap, TH, NOW)
+            if a.code is AlertCode.PERCENT_MISMATCH
+        )
+        assert "vendor" not in msg and "capacity_l" not in msg and "volume_percent" not in msg
+        assert "—" not in msg
+        assert "58,41 điểm phần trăm" in msg
 
     def test_canh_bao_ve_thiet_bi_bi_bo(self) -> None:
         """OFFLINE đã mang đúng một hành động; ba dòng nữa chỉ là nhiễu."""

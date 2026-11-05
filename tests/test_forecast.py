@@ -540,6 +540,12 @@ def test_stale_reading_suppresses_forward_alerts() -> None:
     )
     assert fresh.stale is False
     assert "RUNOUT" in [a.code for a in fresh.alerts]
+    # Câu do server viết theo quy ước vi-VN: dấu phẩy thập phân, không " — ".
+    for a in fresh.alerts:
+        assert "—" not in a.message, a.message
+        assert "." not in a.message.replace("...", ""), a.message
+    runout = next(a for a in fresh.alerts if a.code == "RUNOUT")
+    assert "tới mức dự trữ (" in runout.message and runout.message.endswith(", cần đặt hàng")
 
 
 def test_no_reading_at_is_treated_as_stale() -> None:
