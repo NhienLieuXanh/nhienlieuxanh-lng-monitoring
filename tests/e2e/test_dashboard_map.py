@@ -142,7 +142,8 @@ def _rgb(css: str) -> tuple[int, ...]:
 
 def test_mau_chi_xuat_hien_khi_bat_thuong(app_page: Page) -> None:
     """Thiết kế phòng điều khiển (ISA-101): bình thường là XÁM, chỉ bồn có việc phải
-    làm mới có màu, và luôn kèm chữ. Thanh trên im khi máy ổn."""
+    làm mới có màu, và luôn kèm chữ. Thanh trên im khi máy ổn. (Ngoại lệ 05/11/2026:
+    nhãn "Trực tuyến" xanh lá — xem test_truc_tuyen_la_xanh_la_kem_chu_va_hinh.)"""
     expect(app_page.locator(f'#tank-list [data-psn="{YKH}"]')).to_have_attribute("data-sev", "ok")
     expect(app_page.locator(f'#tank-list [data-psn="{FUJI}"]')).to_have_attribute("data-sev", "crit")
     liq = app_page.evaluate(
@@ -199,6 +200,52 @@ def test_o_bon_cao_bang_nhau_khi_ten_dai(app_page: Page) -> None:
         "() => [...document.querySelectorAll('#tank-list .tname')].map(n => Math.round(n.getBoundingClientRect().height))"
     )
     assert len(set(name_h)) == 1, f"tên bồn xuống dòng: {name_h}"
+
+
+def test_truc_tuyen_la_xanh_la_kem_chu_va_hinh(app_page: Page) -> None:
+    """Chủ dự án chốt 05/11/2026: "Trực tuyến" phải xanh lá, ngoại tuyến đỏ. Vẫn kèm
+    chữ và hình khác nhau (tròn / tam giác), không chỉ dựa vào màu."""
+    on = app_page.locator(f'#tank-list [data-psn="{YKH}"] .st.on')
+    off = app_page.locator(f'#tank-list [data-psn="{FUJI}"] .st.off')
+    expect(on).to_have_text("Trực tuyến")
+    expect(off).to_have_text("Ngoại tuyến")
+    r, g, b = _rgb(on.evaluate("e => getComputedStyle(e).color"))
+    assert g > r + 40 and g > b + 20, f"chữ Trực tuyến phải xanh lá: {(r, g, b)}"
+    shape = on.evaluate(
+        "e => { const s = getComputedStyle(e, '::before');"
+        " return [s.backgroundColor, s.borderTopLeftRadius, s.clipPath]; }"
+    )
+    r, g, b = _rgb(shape[0])
+    assert g > r + 40 and g > b + 20, f"hình Trực tuyến phải xanh lá: {shape}"
+    assert shape[1] not in ("0px", ""), f"Trực tuyến phải là hình tròn: {shape}"
+    r, g, b = _rgb(off.evaluate("e => getComputedStyle(e).color"))
+    assert r > g + 80 and r > b + 80, f"chữ Ngoại tuyến phải đỏ: {(r, g, b)}"
+
+
+def test_cot_muc_bon_dung_voi_phan_tram(app_page: Page) -> None:
+    """Cột mức chạy bằng translateY (và GSAP khi số đổi); sau khi chạy xong, mặt chất
+    lỏng phải nằm đúng chỗ với số phần trăm ghi bên cạnh."""
+    def check() -> None:
+        for psn in (YKH, FUJI):
+            tile = app_page.locator(f'#tank-list [data-psn="{psn}"]')
+            fill = float(tile.locator(".tk-liq").get_attribute("data-fill") or "nan")
+            pct = tile.locator(".tk-pct").inner_text().replace("%", "").replace(",", ".")
+            assert abs(float(pct) - fill) < 0.06, (psn, pct, fill)
+            top = tile.evaluate(
+                """t => { const g = t.querySelector('.tk-gauge').getBoundingClientRect();
+                          const l = t.querySelector('.tk-liq').getBoundingClientRect();
+                          return [l.top - g.top - 2, g.height - 4]; }"""
+            )
+            expected = top[1] * (1 - fill / 100)
+            assert abs(top[0] - expected) <= 2, (psn, top, expected)
+
+    app_page.wait_for_timeout(1500)
+    check()
+    # Mức đổi (từ rỗng lên) rồi vẽ lại: GSAP không được cộng dồn độ lệch với
+    # translateY trong dòng (lỗi đã đo được: cột dừng ở gấp đôi độ lệch).
+    app_page.evaluate(f"shownFill['{YKH}'] = 0; shownFill['{FUJI}'] = 100; renderTankList();")
+    app_page.wait_for_timeout(1500)
+    check()
 
 
 def test_cau_canh_bao_theo_kieu_viet_nam_va_khong_noi_bang_gach(app_page: Page) -> None:

@@ -49,6 +49,9 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- GSAP chỉ để cột mức bồn chạy lên/xuống khi số đo đổi (animateTankLevels). Tải
+       không được thì trang vẫn đúng, chỉ không có chuyển động. -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
   <style>
     /* ============ DESIGN SYSTEM: GAS NHIÊN LIỆU XANH (UI/UX PRO MAX) ============ */
     :root {
@@ -89,6 +92,11 @@
       --nlx: #007A3D;
       --nlx-strong: #00602f;
       --nlx-bg: #DCEBE2;
+      /* "Trực tuyến" là xanh lá (chủ dự án chốt 05/11/2026): hình tròn + chữ, không
+         chỉ màu. Hình ● phân biệt với ■ xám, ▲ đỏ, ◆ hổ phách. Chỉ dùng cho nhãn
+         trạng thái kết nối, không tô cột chất lỏng hay nền ô. */
+      --live: #008A42;
+      --live-text: #006B35;
 
       /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
       --ok: #2F353B;      --ok-bg: #E6E9EC;   --ok-line: #AEB6BE;
@@ -188,6 +196,11 @@
       --nlx: #007A3D;
       --nlx-strong: #00602f;
       --nlx-bg: #DCEBE2;
+      /* "Trực tuyến" là xanh lá (chủ dự án chốt 05/11/2026): hình tròn + chữ, không
+         chỉ màu. Hình ● phân biệt với ■ xám, ▲ đỏ, ◆ hổ phách. Chỉ dùng cho nhãn
+         trạng thái kết nối, không tô cột chất lỏng hay nền ô. */
+      --live: #008A42;
+      --live-text: #006B35;
 
       /* "ok" là TRUNG TÍNH: bình thường thì không tô màu. */
       --ok: #2F353B;      --ok-bg: #E6E9EC;   --ok-line: #AEB6BE;
@@ -256,6 +269,8 @@
       --nlx: #3ecf85;
       --nlx-strong: #7ddcaa;
       --nlx-bg: rgba(62, 207, 133, .12);
+      --live: #2FBF71;
+      --live-text: #5FD99A;
 
       --ok: #C2C7CC;   --ok-bg: #24282B;                 --ok-line: #363B40;
       --warn: #F0B53C; --warn-bg: rgba(232, 163, 23, .14); --warn-line: rgba(232, 163, 23, .45); --warn-fill: #E8A317;
@@ -552,7 +567,10 @@
       position: relative; display: block; width: 44px; height: 96px; overflow: hidden;
       border: 2px solid var(--gauge-edge); border-radius: 16px 16px 4px 4px; background: var(--gauge-track);
     }
-    .tk-liq { position: absolute; left: 0; right: 0; bottom: 0; background: var(--gauge); border-top: 2px solid var(--gauge-edge); }
+    /* Chất lỏng là một khối CAO BẰNG cả cột, dịch xuống bằng translateY: mức đổi thì
+       chỉ phải dịch một lớp (không dàn lại trang) và vạch mặt chất lỏng không bị
+       méo như khi co chiều cao. Không có JS/GSAP thì style trong dòng vẫn đặt đúng mức. */
+    .tk-liq { position: absolute; left: 0; right: 0; top: 0; height: 100%; background: var(--gauge); border-top: 2px solid var(--gauge-edge); will-change: transform; }
     .tk[data-sev="warn"] .tk-liq { background: var(--warn-fill); }
     .tk[data-sev="crit"] .tk-liq { background: var(--crit-fill); }
     .tk-res { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--chart-res); }
@@ -570,12 +588,13 @@
        có dáng khác nhau. */
     .tk-st { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 4px; }
     .tk-st .tago { margin-top: 0; }
-    /* Trạng thái: chữ + HÌNH, không viên thuốc màu. Vuông xám = bình thường,
-       tam giác đỏ = ưu tiên 1, thoi hổ phách = ưu tiên 2 (ISA-101: không bao giờ
-       chỉ dựa vào màu). */
+    /* Trạng thái: chữ + HÌNH, không viên thuốc màu. Tròn xanh lá = trực tuyến,
+       tam giác đỏ = ưu tiên 1, thoi hổ phách = ưu tiên 2 (không bao giờ chỉ dựa vào
+       màu). Hình vuông xám còn lại cho các trạng thái trung tính khác. */
     .st { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--fs-micro); font-weight: 600; line-height: 1.2; color: var(--muted); }
     .st::before { content: ""; width: 8px; height: 8px; background: var(--dot-ok); flex: 0 0 auto; }
-    .st.on { color: var(--muted); }
+    .st.on { color: var(--live-text); font-weight: 700; }
+    .st.on::before { width: 9px; height: 9px; border-radius: 50%; background: var(--live); }
     .st.off { color: var(--crit); font-weight: 700; }
     .st.off::before { width: 11px; height: 10px; background: var(--crit-fill); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
     p.empty { padding: 24px 16px; color: var(--muted); text-align: center; }
@@ -2470,7 +2489,7 @@
           <button type="button" class="tk" data-psn="${esc(tank.psn)}" data-sev="${tankSev(tank)}"
                   aria-pressed="${tank.psn === selectedPsn}" onclick="selectTank('${esc(tank.psn)}')">
             <span class="tk-gauge${f && f.stale ? " stale" : ""}" aria-hidden="true">
-              <i class="tk-liq" style="height:${fill}%"></i>${res === null ? "" : `<b class="tk-res" style="bottom:${res.toFixed(1)}%"></b>`}
+              <i class="tk-liq" data-fill="${fill}" style="transform:translateY(${100 - fill}%)"></i>${res === null ? "" : `<b class="tk-res" style="bottom:${res.toFixed(1)}%"></b>`}
             </span>
             <span class="tk-txt">
               <span class="tname" title="${esc(tankName(tank))}">${esc(tankName(tank))}</span>
@@ -2481,6 +2500,31 @@
             </span>
           </button>`;
       }).join("");
+      animateTankLevels();
+    }
+
+    // Mức đã vẽ lần trước của từng bồn. renderTankList dựng lại toàn bộ DOM mỗi lần
+    // làm mới nên không thể đọc "mức cũ" từ phần tử; phải nhớ ở đây.
+    const shownFill = {};
+
+    // Chuyển động có nghĩa: mức bồn ĐỔI thì cột chạy từ mức cũ tới mức mới; lần vẽ
+    // đầu thì chạy từ rỗng lên. Bồn không đổi thì đứng yên (chọn bồn khác cũng vẽ lại
+    // danh sách, và không được làm mọi cột nhúc nhích). Ưu tiên giảm chuyển động của
+    // hệ điều hành thì bỏ hẳn; không có GSAP thì style trong dòng đã đúng mức.
+    function animateTankLevels() {
+      const still = !window.gsap || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      for (const btn of document.querySelectorAll("#tank-list .tk")) {
+        const liq = btn.querySelector(".tk-liq");
+        if (!liq) continue;
+        const to = Number(liq.dataset.fill);
+        const from = shownFill[btn.dataset.psn] ?? 0;
+        shownFill[btn.dataset.psn] = to;
+        if (still || from === to) continue;
+        // Xoá translateY trong dòng trước: GSAP đọc nó thành px rồi CỘNG thêm yPercent,
+        // nên cột sẽ dừng ở gấp đôi độ lệch (đo được 108px thay vì 54px).
+        liq.style.transform = "none";
+        gsap.fromTo(liq, { yPercent: 100 - from }, { yPercent: 100 - to, duration: 0.8, ease: "power2.out", overwrite: "auto" });
+      }
     }
 
     function row(label, val, extra) {
